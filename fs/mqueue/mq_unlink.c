@@ -21,7 +21,6 @@
 /****************************************************************************
  * Included Files
  ****************************************************************************/
-
 #include <nuttx/config.h>
 
 #include <stdbool.h>
@@ -52,20 +51,16 @@
  *   None
  *
  ****************************************************************************/
+static void mq_inode_release(FAR struct inode* inode) {
+    if (inode->i_crefs <= 1) {
+        FAR struct mqueue_inode_s* msgq = inode->i_private;
 
-static void mq_inode_release(FAR struct inode *inode)
-{
-  if (inode->i_crefs <= 1)
-    {
-      FAR struct mqueue_inode_s *msgq = inode->i_private;
-
-      if (msgq)
-        {
-          nxmq_free_msgq(msgq);
-          inode->i_private = NULL;
+        if (msgq) {
+            nxmq_free_msgq(msgq);
+            inode->i_private = NULL;
         }
 
-      inode_release(inode);
+        inode_release(inode);
     }
 }
 
@@ -95,99 +90,84 @@ static void mq_inode_release(FAR struct inode *inode)
  *   returned on success. A negated errno value is returned on failure.
  *
  ****************************************************************************/
+int file_mq_unlink(FAR char const* mq_name) {
+    FAR struct inode*     inode;
+    struct inode_search_s desc;
+    char                  fullpath[MAX_MQUEUE_PATH];
+    int                   ret;
 
-int file_mq_unlink(FAR const char *mq_name)
-{
-  FAR struct inode *inode;
-  struct inode_search_s desc;
-  char fullpath[MAX_MQUEUE_PATH];
-  int ret;
+    /* Get the full path to the message queue */
+    snprintf(fullpath, MAX_MQUEUE_PATH, CONFIG_FS_MQUEUE_VFS_PATH "/%s", mq_name);
 
-  /* Get the full path to the message queue */
+    /* Get the inode for this message queue. */
+    SETUP_SEARCH(&desc, fullpath, false);
 
-  snprintf(fullpath, MAX_MQUEUE_PATH,
-           CONFIG_FS_MQUEUE_VFS_PATH "/%s", mq_name);
-
-  /* Get the inode for this message queue. */
-
-  SETUP_SEARCH(&desc, fullpath, false);
-
-  sched_lock();
-  ret = inode_find(&desc);
-  if (ret < 0)
-    {
-      /* There is no inode that includes in this path */
-
-      goto errout_with_search;
+    sched_lock();
+    ret = inode_find(&desc);
+    if (ret < 0) {
+        /* There is no inode that includes in this path */
+        goto errout_with_search;
     }
 
-  /* Get the search results */
+    /* Get the search results */
 
-  inode = desc.node;
-  DEBUGASSERT(inode != NULL);
+    inode = desc.node;
+    DEBUGASSERT(inode != NULL);
 
-  /* Verify that what we found is, indeed, a message queue */
-
-  if (!INODE_IS_MQUEUE(inode))
-    {
-      ret = -ENXIO;
-      goto errout_with_inode;
+    /* Verify that what we found is, indeed, a message queue */
+    if (!INODE_IS_MQUEUE(inode)) {
+        ret = -ENXIO;
+        goto errout_with_inode;
     }
 
-  /* Refuse to unlink the inode if it has children.  I.e., if it is
-   * functioning as a directory and the directory is not empty.
-   */
-
-  ret = inode_lock();
-  if (ret < 0)
-    {
-      goto errout_with_inode;
+    /* Refuse to unlink the inode if it has children.  I.e., if it is
+     * functioning as a directory and the directory is not empty.
+     */
+    ret = inode_lock();
+    if (ret < 0) {
+        goto errout_with_inode;
     }
 
-  if (inode->i_child != NULL)
-    {
-      ret = -ENOTEMPTY;
-      goto errout_with_lock;
+    if (inode->i_child != NULL) {
+        ret = -ENOTEMPTY;
+        goto errout_with_lock;
     }
 
-  /* Remove the old inode from the tree.  Because we hold a reference count
-   * on the inode, it will not be deleted now.  This will set the
-   * FSNODEFLAG_DELETED bit in the inode flags.
-   */
+    /* Remove the old inode from the tree.  Because we hold a reference count
+     * on the inode, it will not be deleted now.  This will set the
+     * FSNODEFLAG_DELETED bit in the inode flags.
+     */
+    ret = inode_remove(fullpath);
 
-  ret = inode_remove(fullpath);
+    /* inode_remove() should always fail with -EBUSY because we hae a reference
+     * on the inode.  -EBUSY means that the inode was, indeed, unlinked but
+     * thatis could not be freed because there are references.
+     */
+    DEBUGASSERT(ret >= 0 || ret == -EBUSY);
 
-  /* inode_remove() should always fail with -EBUSY because we hae a reference
-   * on the inode.  -EBUSY means that the inode was, indeed, unlinked but
-   * thatis could not be freed because there are references.
-   */
-
-  DEBUGASSERT(ret >= 0 || ret == -EBUSY);
-
-  /* Now we do not release the reference count in the normal way (by calling
-   * inode release.  Rather, we call mq_inode_release().  mq_inode_release
-   * will decrement the reference count on the inode.  But it will also free
-   * the message queue if that reference count decrements to zero.  Since we
-   * hold one reference, that can only occur if the message queue is not
-   * in-use.
-   */
-
-  inode_unlock();
-  mq_inode_release(inode);
-  RELEASE_SEARCH(&desc);
-  sched_unlock();
-  return OK;
+    /* Now we do not release the reference count in the normal way (by calling
+     * inode release.  Rather, we call mq_inode_release().  mq_inode_release
+     * will decrement the reference count on the inode.  But it will also free
+     * the message queue if that reference count decrements to zero.  Since we
+     * hold one reference, that can only occur if the message queue is not
+     * in-use.
+     */
+    inode_unlock();
+    mq_inode_release(inode);
+    RELEASE_SEARCH(&desc);
+    sched_unlock();
+    return OK;
 
 errout_with_lock:
-  inode_unlock();
+    inode_unlock();
 
 errout_with_inode:
-  inode_release(inode);
+    inode_release(inode);
 
 errout_with_search:
-  RELEASE_SEARCH(&desc);
-  sched_unlock();
-  return ret;
+    RELEASE_SEARCH(&desc);
+    sched_unlock();
+    return ret;
 }
 
 /****************************************************************************
@@ -212,10 +192,8 @@ errout_with_search:
  *   returned on success. A negated errno value is returned on failure.
  *
  ****************************************************************************/
-
-int nxmq_unlink(FAR const char *mq_name)
-{
-  return file_mq_unlink(mq_name);
+int /**/nxmq_unlink(FAR char const* mq_name) {
+    return file_mq_unlink(mq_name);
 }
 
 /****************************************************************************
@@ -236,17 +214,14 @@ int nxmq_unlink(FAR const char *mq_name)
  * Assumptions:
  *
  ****************************************************************************/
+int /**/mq_unlink(FAR char const* mq_name) {
+    int ret;
 
-int mq_unlink(FAR const char *mq_name)
-{
-  int ret;
-
-  ret = nxmq_unlink(mq_name);
-  if (ret < 0)
-    {
-      set_errno(-ret);
-      return ERROR;
+    ret = nxmq_unlink(mq_name);
+    if (ret < 0) {
+        set_errno(-ret);
+        return ERROR;
     }
 
-  return OK;
+    return OK;
 }

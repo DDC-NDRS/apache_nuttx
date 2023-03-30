@@ -400,7 +400,6 @@ void up_release_stack(FAR struct tcb_s *dtcb, uint8_t ttype);
  *   rtcb: Refers to the running task which will be blocked.
  *
  ****************************************************************************/
-
 void up_switch_context(FAR struct tcb_s *tcb, FAR struct tcb_s *rtcb);
 
 /****************************************************************************

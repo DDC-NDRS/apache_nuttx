@@ -21,7 +21,6 @@
 /****************************************************************************
  * Included Files
  ****************************************************************************/
-
 #include <nuttx/config.h>
 
 #include <stdint.h>
@@ -40,11 +39,9 @@
 /****************************************************************************
  * Private Function Prototypes
  ****************************************************************************/
-
-static inline void timer_signotify(FAR struct posix_timer_s *timer);
-static inline void timer_restart(FAR struct posix_timer_s *timer,
-                                 wdparm_t itimer);
-static void timer_timeout(wdparm_t itimer);
+static inline void timer_signotify(FAR struct posix_timer_s* timer);
+static inline void timer_restart(FAR struct posix_timer_s* timer, wdparm_t itimer);
+static void        timer_timeout(wdparm_t itimer);
 
 /****************************************************************************
  * Private Functions
@@ -67,11 +64,8 @@ static void timer_timeout(wdparm_t itimer);
  *   This function executes in the context of the watchod timer interrupt.
  *
  ****************************************************************************/
-
-static inline void timer_signotify(FAR struct posix_timer_s *timer)
-{
-  DEBUGVERIFY(nxsig_notification(timer->pt_owner, &timer->pt_event,
-                                 SI_TIMER, &timer->pt_work));
+static inline void timer_signotify(FAR struct posix_timer_s* timer) {
+    DEBUGVERIFY(nxsig_notification(timer->pt_owner, &timer->pt_event, SI_TIMER, &timer->pt_work));
 }
 
 /****************************************************************************
@@ -90,15 +84,11 @@ static inline void timer_signotify(FAR struct posix_timer_s *timer)
  *   This function executes in the context of the watchdog timer interrupt.
  *
  ****************************************************************************/
+static inline void timer_restart(FAR struct posix_timer_s* timer, wdparm_t itimer) {
+    /* If this is a repetitive timer, then restart the watchdog */
 
-static inline void timer_restart(FAR struct posix_timer_s *timer,
-                                 wdparm_t itimer)
-{
-  /* If this is a repetitive timer, then restart the watchdog */
-
-  if (timer->pt_delay)
-    {
-      wd_start(&timer->pt_wdog, timer->pt_delay, timer_timeout, itimer);
+    if (timer->pt_delay) {
+        wd_start(&timer->pt_wdog, timer->pt_delay, timer_timeout, itimer);
     }
 }
 
@@ -119,33 +109,29 @@ static inline void timer_restart(FAR struct posix_timer_s *timer,
  *   This function executes in the context of the watchod timer interrupt.
  *
  ****************************************************************************/
+static void timer_timeout(wdparm_t itimer) {
+    FAR struct posix_timer_s* timer = timer_gethandle((timer_t)itimer);
 
-static void timer_timeout(wdparm_t itimer)
-{
-  FAR struct posix_timer_s *timer = timer_gethandle((timer_t)itimer);
-
-  if (timer == NULL)
-    {
-      return;
+    if (timer == NULL) {
+        return;
     }
 
-  /* Send the specified signal to the specified task.   Increment the
-   * reference count on the timer first so that will not be deleted until
-   * after the signal handler returns.
-   */
+    /* Send the specified signal to the specified task.   Increment the
+     * reference count on the timer first so that will not be deleted until
+     * after the signal handler returns.
+     */
 
-  timer->pt_crefs++;
-  timer_signotify(timer);
+    timer->pt_crefs++;
+    timer_signotify(timer);
 
-  /* Release the reference.  timer_release will return nonzero if the timer
-   * was not deleted.
-   */
+    /* Release the reference.  timer_release will return nonzero if the timer
+     * was not deleted.
+     */
 
-  if (timer_release(timer))
-    {
-      /* If this is a repetitive timer, the restart the watchdog */
+    if (timer_release(timer)) {
+        /* If this is a repetitive timer, the restart the watchdog */
 
-      timer_restart(timer, itimer);
+        timer_restart(timer, itimer);
     }
 }
 
@@ -216,125 +202,110 @@ static void timer_timeout(wdparm_t itimer)
  * Assumptions:
  *
  ****************************************************************************/
+int /**/ timer_settime(timer_t timerid, int flags, FAR const struct itimerspec* value, FAR struct itimerspec* ovalue) {
+    FAR struct posix_timer_s* timer = timer_gethandle(timerid);
+    irqstate_t                intflags;
+    sclock_t                  delay;
+    int                       ret = OK;
 
-int timer_settime(timer_t timerid, int flags,
-                  FAR const struct itimerspec *value,
-                  FAR struct itimerspec *ovalue)
-{
-  FAR struct posix_timer_s *timer = timer_gethandle(timerid);
-  irqstate_t intflags;
-  sclock_t delay;
-  int ret = OK;
+    /* Some sanity checks */
 
-  /* Some sanity checks */
-
-  if (!timer || !value)
-    {
-      set_errno(EINVAL);
-      return ERROR;
+    if (!timer || !value) {
+        set_errno(EINVAL);
+        return ERROR;
     }
 
-  if (ovalue)
-    {
-      /* Get the number of ticks before the underlying watchdog expires */
+    if (ovalue) {
+        /* Get the number of ticks before the underlying watchdog expires */
 
-      delay = wd_gettime(&timer->pt_wdog);
+        delay = wd_gettime(&timer->pt_wdog);
 
-      /* Convert that to a struct timespec and return it */
+        /* Convert that to a struct timespec and return it */
 
-      clock_ticks2time(delay, &ovalue->it_value);
-      clock_ticks2time(timer->pt_delay, &ovalue->it_interval);
+        clock_ticks2time(delay, &ovalue->it_value);
+        clock_ticks2time(timer->pt_delay, &ovalue->it_interval);
     }
 
-  /* Disarm the timer (in case the timer was already armed when
-   * timer_settime() is called).
-   */
+    /* Disarm the timer (in case the timer was already armed when
+     * timer_settime() is called).
+     */
 
-  wd_cancel(&timer->pt_wdog);
+    wd_cancel(&timer->pt_wdog);
 
-  /* Cancel any pending notification */
+    /* Cancel any pending notification */
 
-  nxsig_cancel_notification(&timer->pt_work);
+    nxsig_cancel_notification(&timer->pt_work);
 
-  /* If the it_value member of value is zero, the timer will not be
-   * re-armed
-   */
+    /* If the it_value member of value is zero, the timer will not be
+     * re-armed
+     */
 
-  if (value->it_value.tv_sec <= 0 && value->it_value.tv_nsec <= 0)
-    {
-      return OK;
+    if (value->it_value.tv_sec <= 0 && value->it_value.tv_nsec <= 0) {
+        return OK;
     }
 
-  /* Setup up any repetitive timer */
+    /* Setup up any repetitive timer */
 
-  if (value->it_interval.tv_sec > 0 || value->it_interval.tv_nsec > 0)
-    {
-      clock_time2ticks(&value->it_interval, &delay);
+    if (value->it_interval.tv_sec > 0 || value->it_interval.tv_nsec > 0) {
+        clock_time2ticks(&value->it_interval, &delay);
 
-      /* REVISIT: Should pt_delay be sclock_t? */
+        /* REVISIT: Should pt_delay be sclock_t? */
 
-      timer->pt_delay = (int)delay;
+        timer->pt_delay = (int)delay;
     }
-  else
-    {
-      timer->pt_delay = 0;
+    else {
+        timer->pt_delay = 0;
     }
 
-  /* We need to disable timer interrupts through the following section so
-   * that the system timer is stable.
-   */
+    /* We need to disable timer interrupts through the following section so
+     * that the system timer is stable.
+     */
 
-  intflags = enter_critical_section();
+    intflags = enter_critical_section();
 
-  /* Check if abstime is selected */
+    /* Check if abstime is selected */
 
-  if ((flags & TIMER_ABSTIME) != 0)
-    {
-      /* Calculate a delay corresponding to the absolute time in 'value' */
+    if ((flags & TIMER_ABSTIME) != 0) {
+        /* Calculate a delay corresponding to the absolute time in 'value' */
 
-      ret = clock_abstime2ticks(timer->pt_clock, &value->it_value, &delay);
+        ret = clock_abstime2ticks(timer->pt_clock, &value->it_value, &delay);
     }
-  else
-    {
-      /* Calculate a delay assuming that 'value' holds the relative time
-       * to wait.  We have internal knowledge that clock_time2ticks always
-       * returns success.
-       */
+    else {
+        /* Calculate a delay assuming that 'value' holds the relative time
+         * to wait.  We have internal knowledge that clock_time2ticks always
+         * returns success.
+         */
 
-      ret = clock_time2ticks(&value->it_value, &delay);
+        ret = clock_time2ticks(&value->it_value, &delay);
     }
 
-  if (ret < 0)
-    {
-      goto errout;
+    if (ret < 0) {
+        goto errout;
     }
 
-  /* If the specified time has already passed, the function shall succeed
-   * and the expiration notification shall be made.
-   */
+    /* If the specified time has already passed, the function shall succeed
+     * and the expiration notification shall be made.
+     */
 
-  if (delay < 0)
-    {
-      delay = 0;
+    if (delay < 0) {
+        delay = 0;
     }
 
-  /* Then start the watchdog */
+    /* Then start the watchdog */
 
-  if (delay >= 0)
-    {
-      ret = wd_start(&timer->pt_wdog, delay, timer_timeout, (wdparm_t)timer);
+    if (delay >= 0) {
+        ret = wd_start(&timer->pt_wdog, delay, timer_timeout, (wdparm_t)timer);
     }
 
 errout:
-  leave_critical_section(intflags);
+    leave_critical_section(intflags);
 
-  if (ret < 0)
-    {
-      set_errno(-ret);
-      ret = ERROR;
+    if (ret < 0) {
+        set_errno(-ret);
+        ret = ERROR;
     }
 
-  return ret;
+    return ret;
 }
 
 #endif /* CONFIG_DISABLE_POSIX_TIMERS */

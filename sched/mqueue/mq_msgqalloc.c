@@ -21,7 +21,6 @@
 /****************************************************************************
  * Included Files
  ****************************************************************************/
-
 #include <nuttx/config.h>
 
 #include <mqueue.h>
@@ -61,55 +60,44 @@
  *             message queue
  *
  ****************************************************************************/
+int /**/nxmq_alloc_msgq(FAR struct mq_attr* attr, FAR struct mqueue_inode_s** pmsgq) {
+    FAR struct mqueue_inode_s* msgq;
 
-int nxmq_alloc_msgq(FAR struct mq_attr *attr,
-                    FAR struct mqueue_inode_s **pmsgq)
-{
-  FAR struct mqueue_inode_s *msgq;
-
-  /* Check if the caller is attempting to allocate a message for messages
-   * larger than the configured maximum message size.
-   */
-
-  DEBUGASSERT((!attr || attr->mq_msgsize <= MQ_MAX_BYTES) && pmsgq);
-  if ((attr && attr->mq_msgsize > MQ_MAX_BYTES) || !pmsgq)
-    {
-      return -EINVAL;
+    /* Check if the caller is attempting to allocate a message for messages
+     * larger than the configured maximum message size.
+     */
+    DEBUGASSERT((!attr || attr->mq_msgsize <= MQ_MAX_BYTES) && pmsgq);
+    if ((attr && attr->mq_msgsize > MQ_MAX_BYTES) || !pmsgq) {
+        return -EINVAL;
     }
 
-  /* Allocate memory for the new message queue. */
+    /* Allocate memory for the new message queue. */
 
-  msgq = (FAR struct mqueue_inode_s *)
-    kmm_zalloc(sizeof(struct mqueue_inode_s));
+    msgq = (FAR struct mqueue_inode_s*)kmm_zalloc(sizeof(struct mqueue_inode_s));
 
-  if (msgq)
-    {
-      /* Initialize the new named message queue */
-
-      list_initialize(&msgq->msglist);
-      if (attr)
-        {
-          msgq->maxmsgs    = (int16_t)attr->mq_maxmsg;
-          msgq->maxmsgsize = (int16_t)attr->mq_msgsize;
+    if (msgq) {
+        /* Initialize the new named message queue */
+        list_initialize(&msgq->msglist);
+        if (attr) {
+            msgq->maxmsgs    = (int16_t)attr->mq_maxmsg;
+            msgq->maxmsgsize = (int16_t)attr->mq_msgsize;
         }
-      else
-        {
-          msgq->maxmsgs    = MQ_MAX_MSGS;
-          msgq->maxmsgsize = MQ_MAX_BYTES;
+        else {
+            msgq->maxmsgs    = MQ_MAX_MSGS;
+            msgq->maxmsgsize = MQ_MAX_BYTES;
         }
 
-#ifndef CONFIG_DISABLE_MQUEUE_NOTIFICATION
-      msgq->ntpid = INVALID_PROCESS_ID;
-#endif
+        #ifndef CONFIG_DISABLE_MQUEUE_NOTIFICATION
+        msgq->ntpid = INVALID_PROCESS_ID;
+        #endif
 
-      dq_init(&msgq->cmn.waitfornotempty);
-      dq_init(&msgq->cmn.waitfornotfull);
+        dq_init(&msgq->cmn.waitfornotempty);
+        dq_init(&msgq->cmn.waitfornotfull);
     }
-  else
-    {
-      return -ENOSPC;
+    else {
+        return -ENOSPC;
     }
 
-  *pmsgq = msgq;
-  return OK;
+    *pmsgq = msgq;
+    return (OK);
 }

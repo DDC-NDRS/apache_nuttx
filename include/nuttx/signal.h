@@ -140,7 +140,6 @@ struct timespec;  /* Forward reference */
  * Assumptions:
  *
  ****************************************************************************/
-
 int nxsig_ismember(FAR const sigset_t *set, int signo);
 
 /****************************************************************************
@@ -556,7 +555,6 @@ int nxsig_usleep(useconds_t usec);
  *   returned on success.  A negated errno value is returned on failure.
  *
  ****************************************************************************/
-
 int nxsig_notification(pid_t pid, FAR struct sigevent *event,
                        int code, FAR struct sigwork_s *work);
 
