@@ -21,7 +21,6 @@
 /****************************************************************************
  * Included Files
  ****************************************************************************/
-
 #include <nuttx/config.h>
 
 #include <sys/types.h>
@@ -57,7 +56,10 @@
  *   ENOMEM - Failed to allocate in-memory resources for the operation
  *
  ****************************************************************************/
-int register_driver(FAR char const* path, FAR const struct file_operations* fops, mode_t mode, FAR void* priv) {
+int /**/register_driver(FAR char const* path, 
+                        FAR const struct file_operations* fops, 
+                        mode_t mode, 
+                        FAR void* priv) {
     FAR struct inode* node;
     int ret;
 

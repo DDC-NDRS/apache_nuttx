@@ -21,7 +21,6 @@
 /****************************************************************************
  * Included Files
  ****************************************************************************/
-
 #include <nuttx/config.h>
 
 #include <sys/types.h>
@@ -62,38 +61,32 @@
  * Assumptions:
  *
  ****************************************************************************/
+static void nxmq_sndtimeout(wdparm_t pid) {
+    FAR struct tcb_s* wtcb;
+    irqstate_t flags;
 
-static void nxmq_sndtimeout(wdparm_t pid)
-{
-  FAR struct tcb_s *wtcb;
-  irqstate_t flags;
+    /* Disable interrupts.  This is necessary because an interrupt handler may
+     * attempt to send a message while we are doing this.
+     */
+    flags = enter_critical_section();
 
-  /* Disable interrupts.  This is necessary because an interrupt handler may
-   * attempt to send a message while we are doing this.
-   */
+    /* Get the TCB associated with this pid.  It is possible that task may no
+     * longer be active when this watchdog goes off.
+     */
+    wtcb = nxsched_get_tcb(pid);
 
-  flags = enter_critical_section();
+    /* It is also possible that an interrupt/context switch beat us to the
+     * punch and already changed the task's state.
+     */
+    if (wtcb != NULL && wtcb->task_state == TSTATE_WAIT_MQNOTFULL) {
+        /* Restart with task with a timeout error */
 
-  /* Get the TCB associated with this pid.  It is possible that task may no
-   * longer be active when this watchdog goes off.
-   */
-
-  wtcb = nxsched_get_tcb(pid);
-
-  /* It is also possible that an interrupt/context switch beat us to the
-   * punch and already changed the task's state.
-   */
-
-  if (wtcb != NULL && wtcb->task_state == TSTATE_WAIT_MQNOTFULL)
-    {
-      /* Restart with task with a timeout error */
-
-      nxmq_wait_irq(wtcb, ETIMEDOUT);
+        nxmq_wait_irq(wtcb, ETIMEDOUT);
     }
 
-  /* Interrupts may now be re-enabled. */
+    /* Interrupts may now be re-enabled. */
 
-  leave_critical_section(flags);
+    leave_critical_section(flags);
 }
 
 /****************************************************************************
@@ -141,145 +134,126 @@ static void nxmq_sndtimeout(wdparm_t pid)
  *   EINTR    The call was interrupted by a signal handler.
  *
  ****************************************************************************/
+int file_mq_timedsend(FAR struct file* mq, FAR char const* msg, size_t msglen, unsigned int prio,
+                      FAR const struct timespec* abstime) {
+    FAR struct tcb_s*          rtcb = this_task();
+    FAR struct mqueue_inode_s* msgq;
+    FAR struct mqueue_msg_s*   mqmsg;
+    irqstate_t flags;
+    sclock_t   ticks;
+    int ret;
 
-int file_mq_timedsend(FAR struct file *mq, FAR const char *msg,
-                      size_t msglen, unsigned int prio,
-                      FAR const struct timespec *abstime)
-{
-  FAR struct tcb_s *rtcb = this_task();
-  FAR struct mqueue_inode_s *msgq;
-  FAR struct mqueue_msg_s *mqmsg;
-  irqstate_t flags;
-  sclock_t ticks;
-  int ret;
+    DEBUGASSERT(up_interrupt_context() == false);
 
-  DEBUGASSERT(up_interrupt_context() == false);
+    /* Verify the input parameters on any failures to verify. */
 
-  /* Verify the input parameters on any failures to verify. */
-
-  ret = nxmq_verify_send(mq, msg, msglen, prio);
-  if (ret < 0)
-    {
-      return ret;
+    ret = nxmq_verify_send(mq, msg, msglen, prio);
+    if (ret < 0) {
+        return ret;
     }
 
-  msgq = mq->f_inode->i_private;
+    msgq = mq->f_inode->i_private;
 
-  /* Disable interruption */
+    /* Disable interruption */
 
-  flags = enter_critical_section();
+    flags = enter_critical_section();
 
-  /* Pre-allocate a message structure */
+    /* Pre-allocate a message structure */
 
-  mqmsg = nxmq_alloc_msg();
-  if (mqmsg == NULL)
-    {
-      /* Failed to allocate the message. nxmq_alloc_msg() does not set the
-       * errno value.
-       */
+    mqmsg = nxmq_alloc_msg();
+    if (mqmsg == NULL) {
+        /* Failed to allocate the message. nxmq_alloc_msg() does not set the
+         * errno value.
+         */
 
-      ret = -ENOMEM;
-      goto errout_in_critical_section;
+        ret = -ENOMEM;
+        goto errout_in_critical_section;
     }
 
-  /* OpenGroup.org: "Under no circumstance shall the operation fail with a
-   * timeout if there is sufficient room in the queue to add the message
-   * immediately. The validity of the abstime parameter need not be checked
-   * when there is sufficient room in the queue."
-   *
-   * Also ignore the time value if for some crazy reason we were called from
-   * an interrupt handler.  This probably really should be an assertion.
-   *
-   * NOTE: There is a race condition here: What if a message is added by
-   * interrupt related logic so that queue again becomes non-empty.  That
-   * is handled because nxmq_do_send() will permit the maxmsgs limit to be
-   * exceeded in that case.
-   */
+    /* OpenGroup.org: "Under no circumstance shall the operation fail with a
+     * timeout if there is sufficient room in the queue to add the message
+     * immediately. The validity of the abstime parameter need not be checked
+     * when there is sufficient room in the queue."
+     *
+     * Also ignore the time value if for some crazy reason we were called from
+     * an interrupt handler.  This probably really should be an assertion.
+     *
+     * NOTE: There is a race condition here: What if a message is added by
+     * interrupt related logic so that queue again becomes non-empty.  That
+     * is handled because nxmq_do_send() will permit the maxmsgs limit to be
+     * exceeded in that case.
+     */
+    if (msgq->nmsgs < msgq->maxmsgs || up_interrupt_context()) {
+        /* Do the send with no further checks (possibly exceeding maxmsgs)
+         * Currently nxmq_do_send() always returns OK.
+         */
 
-  if (msgq->nmsgs < msgq->maxmsgs || up_interrupt_context())
-    {
-      /* Do the send with no further checks (possibly exceeding maxmsgs)
-       * Currently nxmq_do_send() always returns OK.
-       */
-
-      goto out_send_message;
+        goto out_send_message;
     }
 
-  /* The message queue is full... We are going to wait.  Now we must have a
-   * valid time value.
-   */
-
-  if (!abstime || abstime->tv_nsec < 0 || abstime->tv_nsec >= 1000000000)
-    {
-      ret = -EINVAL;
-      nxmq_free_msg(mqmsg);
-      goto errout_in_critical_section;
+    /* The message queue is full... We are going to wait.  Now we must have a
+     * valid time value.
+     */
+    if (!abstime || abstime->tv_nsec < 0 || abstime->tv_nsec >= 1000000000) {
+        ret = -EINVAL;
+        nxmq_free_msg(mqmsg);
+        goto errout_in_critical_section;
     }
 
-  /* We are not in an interrupt handler and the message queue is full.
-   * Set up a timed wait for the message queue to become non-full.
-   *
-   * Convert the timespec to clock ticks.  We must have interrupts
-   * disabled here so that this time stays valid until the wait begins.
-   */
+    /* We are not in an interrupt handler and the message queue is full.
+     * Set up a timed wait for the message queue to become non-full.
+     *
+     * Convert the timespec to clock ticks.  We must have interrupts
+     * disabled here so that this time stays valid until the wait begins.
+     */
+    ret = clock_abstime2ticks(CLOCK_REALTIME, abstime, &ticks);
 
-  ret = clock_abstime2ticks(CLOCK_REALTIME, abstime, &ticks);
-
-  /* If the time has already expired and the message queue is empty,
-   * return immediately.
-   */
-
-  if (ret == OK && ticks <= 0)
-    {
-      ret = ETIMEDOUT;
+    /* If the time has already expired and the message queue is empty,
+     * return immediately.
+     */
+    if (ret == OK && ticks <= 0) {
+        ret = ETIMEDOUT;
     }
 
-  /* Handle any time-related errors */
-
-  if (ret != OK)
-    {
-      ret = -ret;
-      nxmq_free_msg(mqmsg);
-      goto errout_in_critical_section;
+    /* Handle any time-related errors */
+    if (ret != OK) {
+        ret = -ret;
+        nxmq_free_msg(mqmsg);
+        goto errout_in_critical_section;
     }
 
-  /* Start the watchdog and begin the wait for MQ not full */
+    /* Start the watchdog and begin the wait for MQ not full */
+    wd_start(&rtcb->waitdog, ticks, nxmq_sndtimeout, nxsched_gettid());
 
-  wd_start(&rtcb->waitdog, ticks, nxmq_sndtimeout, nxsched_gettid());
+    /* And wait for the message queue to be non-empty */
+    ret = nxmq_wait_send(msgq, mq->f_oflags);
 
-  /* And wait for the message queue to be non-empty */
+    /* This may return with an error and errno set to either EINTR
+     * or ETIMEDOUT.  Cancel the watchdog timer in any event.
+     */
+    wd_cancel(&rtcb->waitdog);
 
-  ret = nxmq_wait_send(msgq, mq->f_oflags);
+    /* Check if nxmq_wait_send() failed */
+    if (ret == OK) {
+        /* If any of the above failed, set the errno.  Otherwise, there should
+         * be space for another message in the message queue.  NOW we can
+         * allocate the message structure.
+         *
+         * Currently nxmq_do_send() always returns OK.
+         */
 
-  /* This may return with an error and errno set to either EINTR
-   * or ETIMEDOUT.  Cancel the watchdog timer in any event.
-   */
-
-  wd_cancel(&rtcb->waitdog);
-
-  /* Check if nxmq_wait_send() failed */
-
-  if (ret == OK)
-    {
-      /* If any of the above failed, set the errno.  Otherwise, there should
-       * be space for another message in the message queue.  NOW we can
-       * allocate the message structure.
-       *
-       * Currently nxmq_do_send() always returns OK.
-       */
-
-out_send_message:
-      ret = nxmq_do_send(msgq, mqmsg, msg, msglen, prio);
+    out_send_message:
+        ret = nxmq_do_send(msgq, mqmsg, msg, msglen, prio);
     }
 
-  /* Exit here with (1) the scheduler locked, (2) a message allocated, (3) a
-   * wdog allocated, and (4) interrupts disabled.
-   */
+    /* Exit here with (1) the scheduler locked, (2) a message allocated, (3) a
+     * wdog allocated, and (4) interrupts disabled.
+     */
 
 errout_in_critical_section:
-  leave_critical_section(flags);
+    leave_critical_section(flags);
 
-  return ret;
+    return ret;
 }
 
 /****************************************************************************
@@ -323,20 +297,17 @@ errout_in_critical_section:
  *   EINTR    The call was interrupted by a signal handler.
  *
  ****************************************************************************/
+int nxmq_timedsend(mqd_t mqdes, FAR char const* msg, size_t msglen, unsigned int prio,
+                   FAR const struct timespec* abstime) {
+    FAR struct file* filep;
+    int              ret;
 
-int nxmq_timedsend(mqd_t mqdes, FAR const char *msg, size_t msglen,
-                   unsigned int prio, FAR const struct timespec *abstime)
-{
-  FAR struct file *filep;
-  int ret;
-
-  ret = fs_getfilep(mqdes, &filep);
-  if (ret < 0)
-    {
-      return ret;
+    ret = fs_getfilep(mqdes, &filep);
+    if (ret < 0) {
+        return ret;
     }
 
-  return file_mq_timedsend(filep, msg, msglen, prio, abstime);
+    return file_mq_timedsend(filep, msg, msglen, prio, abstime);
 }
 
 /****************************************************************************
@@ -389,25 +360,20 @@ int nxmq_timedsend(mqd_t mqdes, FAR const char *msg, size_t msglen,
  * Assumptions/restrictions:
  *
  ****************************************************************************/
+int /**/mq_timedsend(mqd_t mqdes, FAR char const* msg, size_t msglen, unsigned int prio,
+                     FAR const struct timespec* abstime) {
+    int ret;
 
-int mq_timedsend(mqd_t mqdes, FAR const char *msg, size_t msglen,
-                 unsigned int prio, FAR const struct timespec *abstime)
-{
-  int ret;
+    /* mq_timedsend() is a cancellation point */
+    enter_cancellation_point();
 
-  /* mq_timedsend() is a cancellation point */
-
-  enter_cancellation_point();
-
-  /* Let nxmq_send() do all of the work */
-
-  ret = nxmq_timedsend(mqdes, msg, msglen, prio, abstime);
-  if (ret < 0)
-    {
-      set_errno(-ret);
-      ret = ERROR;
+    /* Let nxmq_send() do all of the work */
+    ret = nxmq_timedsend(mqdes, msg, msglen, prio, abstime);
+    if (ret < 0) {
+        set_errno(-ret);
+        ret = ERROR;
     }
 
-  leave_cancellation_point();
-  return ret;
+    leave_cancellation_point();
+    return ret;
 }

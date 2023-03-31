@@ -46,11 +46,11 @@
  */
 
 #ifdef CONFIG_USEC_PER_TICK
-# define CLK_TCK                  (1000000/CONFIG_USEC_PER_TICK)
-# define CLOCKS_PER_SEC           (1000000/CONFIG_USEC_PER_TICK)
+#define CLK_TCK                 (1000000 / CONFIG_USEC_PER_TICK)
+#define CLOCKS_PER_SEC          (1000000 / CONFIG_USEC_PER_TICK)
 #else
-# define CLK_TCK                  (100)
-# define CLOCKS_PER_SEC           (100)
+#define CLK_TCK                 (100)
+#define CLOCKS_PER_SEC          (100)
 #endif
 
 /* CLOCK_REALTIME refers to the standard time source.  For most
@@ -64,41 +64,38 @@
  * forward and backward as the system time-of-day clock is changed.
  */
 
-#define CLOCK_REALTIME            0
+#define CLOCK_REALTIME              0
 
 /* Clock that cannot be set and represents monotonic time since some
  * unspecified starting point. It is not affected by changes in the
  * system time-of-day clock.
  */
 
-#define CLOCK_MONOTONIC           1
+#define CLOCK_MONOTONIC             1
 
 /* Clock that measures CPU time consumed by this process (i.e., CPU
  * time consumed by all threads in the process).
  */
 
-#define CLOCK_PROCESS_CPUTIME_ID  2
+#define CLOCK_PROCESS_CPUTIME_ID    2
 
 /* Clock that measures CPU time consumed by this thread */
 
-#define CLOCK_THREAD_CPUTIME_ID   3
+#define CLOCK_THREAD_CPUTIME_ID     3
 
 /* Monotonic system-wide clock that includes time spent in suspension. */
 
-#define CLOCK_BOOTTIME            4
+#define CLOCK_BOOTTIME              4
 
 /* This is a flag that may be passed to the timer_settime() and
  * clock_nanosleep() functions.
  */
-
-#define TIMER_ABSTIME             1
+#define TIMER_ABSTIME               1
 
 /* Time base values for timespec_get.  */
-
-#define TIME_UTC                  1
+#define TIME_UTC                    1
 
 /* Redirect the timelocal and strftime_l */
-
 #define timelocal                 mktime
 #define strftime_l(s, m, f, t, l) strftime(s, m, f, t)
 
@@ -109,21 +106,20 @@
 /* Scalar types */
 
 #ifdef CONFIG_SYSTEM_TIME64
-typedef uint64_t  time_t;         /* Holds time in seconds */
+typedef uint64_t time_t;        /* Holds time in seconds */
 #else
-typedef uint32_t  time_t;         /* Holds time in seconds */
+typedef uint32_t time_t;        /* Holds time in seconds */
 #endif
-typedef uint8_t   clockid_t;      /* Identifies one time base source */
-typedef FAR void *timer_t;        /* Represents one POSIX timer */
+typedef uint8_t   clockid_t;    /* Identifies one time base source */
+typedef FAR void* timer_t;      /* Represents one POSIX timer */
 
 /* struct timespec is the standard representation of time as seconds and
  * nanoseconds.
  */
 
-struct timespec
-{
-  time_t tv_sec;                   /* Seconds */
-  long   tv_nsec;                  /* Nanoseconds */
+struct timespec {
+    time_t tv_sec;              /* Seconds */
+    long   tv_nsec;             /* Nanoseconds */
 };
 
 /* struct tm is the standard representation for "broken out" time.
@@ -135,27 +131,25 @@ struct timespec
  * two structures must be cast compatible.
  */
 
-struct tm
-{
-  int  tm_sec;         /* Seconds (0-61, allows for leap seconds) */
-  int  tm_min;         /* Minutes (0-59) */
-  int  tm_hour;        /* Hours (0-23) */
-  int  tm_mday;        /* Day of the month (1-31) */
-  int  tm_mon;         /* Month (0-11) */
-  int  tm_year;        /* Years since 1900 */
-  int  tm_wday;        /* Day of the week (0-6) */
-  int  tm_yday;        /* Day of the year (0-365) */
-  int  tm_isdst;       /* Non-0 if daylight savings time is in effect */
-  long tm_gmtoff;      /* Offset from UTC in seconds */
-  const char *tm_zone; /* Timezone abbreviation. */
+struct tm {
+    int         tm_sec;         /* Seconds (0-61, allows for leap seconds) */
+    int         tm_min;         /* Minutes (0-59) */
+    int         tm_hour;        /* Hours (0-23) */
+    int         tm_mday;        /* Day of the month (1-31) */
+    int         tm_mon;         /* Month (0-11) */
+    int         tm_year;        /* Years since 1900 */
+    int         tm_wday;        /* Day of the week (0-6) */
+    int         tm_yday;        /* Day of the year (0-365) */
+    int         tm_isdst;       /* Non-0 if daylight savings time is in effect */
+    long        tm_gmtoff;      /* Offset from UTC in seconds */
+    char const* tm_zone;        /* Timezone abbreviation. */
 };
 
 /* Struct itimerspec is used to define settings for an interval timer */
 
-struct itimerspec
-{
-  struct timespec it_interval; /* Thereafter */
-  struct timespec it_value;    /* First time */
+struct itimerspec {
+    struct timespec it_interval;/* Thereafter */
+    struct timespec it_value;   /* First time */
 };
 
 /* forward reference (defined in signal.h) */
@@ -169,8 +163,7 @@ struct sigevent;
 #undef EXTERN
 #if defined(__cplusplus)
 #define EXTERN extern "C"
-extern "C"
-{
+extern "C" {
 #else
 #define EXTERN extern
 #endif
@@ -189,7 +182,7 @@ extern "C"
  * Setup by tzset()
  */
 
-EXTERN FAR char *tzname[2];
+EXTERN FAR char* tzname[2];
 #endif
 
 /********************************************************************************
@@ -198,31 +191,29 @@ EXTERN FAR char *tzname[2];
 
 clock_t clock(void);
 
-int clock_settime(clockid_t clockid, FAR const struct timespec *tp);
-int clock_gettime(clockid_t clockid, FAR struct timespec *tp);
-int clock_getres(clockid_t clockid, FAR struct timespec *res);
-int timespec_get(FAR struct timespec *t, int b);
+int clock_settime(clockid_t clockid, FAR const struct timespec* tp);
+int clock_gettime(clockid_t clockid, FAR struct timespec* tp);
+int clock_getres(clockid_t clockid, FAR struct timespec* res);
+int timespec_get(FAR struct timespec* t, int b);
 
-time_t timegm(FAR struct tm *tp);
-time_t mktime(FAR struct tm *tp);
+time_t timegm(FAR struct tm* tp);
+time_t mktime(FAR struct tm* tp);
 
-FAR struct tm *gmtime(FAR const time_t *timep);
-FAR struct tm *gmtime_r(FAR const time_t *timep, FAR struct tm *result);
+FAR struct tm* gmtime(FAR time_t const* timep);
+FAR struct tm* gmtime_r(FAR time_t const* timep, FAR struct tm* result);
 
-FAR struct tm *localtime(FAR const time_t *timep);
-FAR struct tm *localtime_r(FAR const time_t *timep, FAR struct tm *result);
+FAR struct tm* localtime(FAR time_t const* timep);
+FAR struct tm* localtime_r(FAR time_t const* timep, FAR struct tm* result);
 
-size_t strftime(FAR char *s, size_t max, FAR const char *format,
-                FAR const struct tm *tm) strftime_like(3);
-FAR char *strptime(FAR const char *s, FAR const char *format,
-                   FAR struct tm *tm);
+size_t    strftime(FAR char* s, size_t max, FAR char const* format, FAR const struct tm* tm) strftime_like(3);
+FAR char* strptime(FAR char const* s, FAR char const* format, FAR struct tm* tm);
 
-FAR char *asctime(FAR const struct tm *tp);
-FAR char *asctime_r(FAR const struct tm *tp, FAR char *buf);
-FAR char *ctime(FAR const time_t *timep);
-FAR char *ctime_r(FAR const time_t *timep, FAR char *buf);
+FAR char* asctime(FAR const struct tm* tp);
+FAR char* asctime_r(FAR const struct tm* tp, FAR char* buf);
+FAR char* ctime(FAR time_t const* timep);
+FAR char* ctime_r(FAR time_t const* timep, FAR char* buf);
 
-time_t time(FAR time_t *timep);
+time_t time(FAR time_t* timep);
 
 #ifdef CONFIG_HAVE_DOUBLE
 double difftime(time_t time1, time_t time0);
@@ -230,19 +221,14 @@ double difftime(time_t time1, time_t time0);
 float difftime(time_t time1, time_t time0);
 #endif
 
-int timer_create(clockid_t clockid, FAR struct sigevent *evp,
-                 FAR timer_t *timerid);
+int timer_create(clockid_t clockid, FAR struct sigevent* evp, FAR timer_t* timerid);
 int timer_delete(timer_t timerid);
-int timer_settime(timer_t timerid, int flags,
-                  FAR const struct itimerspec *value,
-                  FAR struct itimerspec *ovalue);
-int timer_gettime(timer_t timerid, FAR struct itimerspec *value);
+int timer_settime(timer_t timerid, int flags, FAR const struct itimerspec* value, FAR struct itimerspec* ovalue);
+int timer_gettime(timer_t timerid, FAR struct itimerspec* value);
 int timer_getoverrun(timer_t timerid);
 
-int clock_nanosleep(clockid_t clockid, int flags,
-                    FAR const struct timespec *rqtp,
-                    FAR struct timespec *rmtp);
-int nanosleep(FAR const struct timespec *rqtp, FAR struct timespec *rmtp);
+int clock_nanosleep(clockid_t clockid, int flags, FAR const struct timespec* rqtp, FAR struct timespec* rmtp);
+int nanosleep(FAR const struct timespec* rqtp, FAR struct timespec* rmtp);
 
 #ifdef CONFIG_LIBC_LOCALTIME
 void tzset(void);

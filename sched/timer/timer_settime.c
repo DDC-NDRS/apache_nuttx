@@ -202,26 +202,27 @@ static void timer_timeout(wdparm_t itimer) {
  * Assumptions:
  *
  ****************************************************************************/
-int /**/ timer_settime(timer_t timerid, int flags, FAR const struct itimerspec* value, FAR struct itimerspec* ovalue) {
+int /**/timer_settime(timer_t timerid, int flags, 
+                      FAR const struct itimerspec* value, 
+                      FAR struct itimerspec* ovalue) {
     FAR struct posix_timer_s* timer = timer_gethandle(timerid);
-    irqstate_t                intflags;
-    sclock_t                  delay;
-    int                       ret = OK;
+    irqstate_t intflags;
+    sclock_t   delay;
+    int        ret;
+
+    ret = OK;
 
     /* Some sanity checks */
-
     if (!timer || !value) {
         set_errno(EINVAL);
-        return ERROR;
+        return (ERROR);
     }
 
     if (ovalue) {
         /* Get the number of ticks before the underlying watchdog expires */
-
         delay = wd_gettime(&timer->pt_wdog);
 
         /* Convert that to a struct timespec and return it */
-
         clock_ticks2time(delay, &ovalue->it_value);
         clock_ticks2time(timer->pt_delay, &ovalue->it_interval);
     }
@@ -229,28 +230,23 @@ int /**/ timer_settime(timer_t timerid, int flags, FAR const struct itimerspec* 
     /* Disarm the timer (in case the timer was already armed when
      * timer_settime() is called).
      */
-
     wd_cancel(&timer->pt_wdog);
 
     /* Cancel any pending notification */
-
     nxsig_cancel_notification(&timer->pt_work);
 
     /* If the it_value member of value is zero, the timer will not be
      * re-armed
      */
-
-    if (value->it_value.tv_sec <= 0 && value->it_value.tv_nsec <= 0) {
-        return OK;
+    if ((value->it_value.tv_sec <= 0) && (value->it_value.tv_nsec <= 0)) {
+        return (OK);
     }
 
     /* Setup up any repetitive timer */
-
-    if (value->it_interval.tv_sec > 0 || value->it_interval.tv_nsec > 0) {
+    if ((value->it_interval.tv_sec > 0) || (value->it_interval.tv_nsec > 0)) {
         clock_time2ticks(&value->it_interval, &delay);
 
         /* REVISIT: Should pt_delay be sclock_t? */
-
         timer->pt_delay = (int)delay;
     }
     else {
@@ -260,14 +256,11 @@ int /**/ timer_settime(timer_t timerid, int flags, FAR const struct itimerspec* 
     /* We need to disable timer interrupts through the following section so
      * that the system timer is stable.
      */
-
     intflags = enter_critical_section();
 
     /* Check if abstime is selected */
-
     if ((flags & TIMER_ABSTIME) != 0) {
         /* Calculate a delay corresponding to the absolute time in 'value' */
-
         ret = clock_abstime2ticks(timer->pt_clock, &value->it_value, &delay);
     }
     else {
@@ -275,7 +268,6 @@ int /**/ timer_settime(timer_t timerid, int flags, FAR const struct itimerspec* 
          * to wait.  We have internal knowledge that clock_time2ticks always
          * returns success.
          */
-
         ret = clock_time2ticks(&value->it_value, &delay);
     }
 
@@ -292,7 +284,6 @@ int /**/ timer_settime(timer_t timerid, int flags, FAR const struct itimerspec* 
     }
 
     /* Then start the watchdog */
-
     if (delay >= 0) {
         ret = wd_start(&timer->pt_wdog, delay, timer_timeout, (wdparm_t)timer);
     }
@@ -305,7 +296,7 @@ errout:
         ret = ERROR;
     }
 
-    return ret;
+    return (ret);
 }
 
 #endif /* CONFIG_DISABLE_POSIX_TIMERS */
