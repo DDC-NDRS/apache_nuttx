@@ -56,6 +56,15 @@ static inline int gpio_pin_set_dt(const struct gpio_dt_spec* spec, int value) {
     return (0);
 }
 
+static inline int gpio_pin_set_raw(const struct device* port, gpio_pin_t pin, int value) {
+    struct gpio_dt_spec* spec = container_of(port, struct gpio_dt_spec, port);
+    uint32_t pinset = spec->pinset;
+    
+    stm32_gpiowrite(pinset, (bool)(value));
+
+    return (0);
+}
+
 static inline int gpio_pin_toggle_dt(const struct gpio_dt_spec* spec) {
     bool val = stm32_gpioread(spec->pinset);
     stm32_gpiowrite(spec->pinset, (val ^ 1));
@@ -93,7 +102,7 @@ static inline int gpio_add_callback(const struct device* port, struct gpio_callb
     int ret;
 
     // Hard coded, to use falling edge and generate interrupt (not event)
-    ret = stm32_gpiosetevent(pinset, false, true, false, callback->handler, NULL);
+    ret = stm32_gpiosetevent(pinset, false, true, false, (xcpt_t)callback->handler, NULL);
 
     return (ret);
 }

@@ -32,7 +32,8 @@ static inline bool gpio_is_ready_dt(const struct gpio_dt_spec* spec) {
 }
 
 static inline int gpio_pin_interrupt_configure_dt(const struct gpio_dt_spec* spec, gpio_flags_t flags) {
-    return gpio_pin_interrupt_configure(spec->port, spec->pin, flags);
+    /* Not compatible with Zephyr */
+    return (0);
 }
 
 static inline int gpio_pin_configure_dt(const struct gpio_dt_spec* spec, gpio_flags_t extra_flags) {
@@ -51,6 +52,15 @@ static inline int gpio_pin_get_dt(const struct gpio_dt_spec* spec) {
 
 static inline int gpio_pin_set_dt(const struct gpio_dt_spec* spec, int value) {
     s32k1xx_gpiowrite(spec->pinset, (bool)(value));
+
+    return (0);
+}
+
+static inline int gpio_pin_set_raw(const struct device* port, gpio_pin_t pin, int value) {
+    struct gpio_dt_spec* spec = container_of(port, struct gpio_dt_spec, port);
+    uint32_t pinset = spec->pinset;
+    
+    s32k1xx_gpiowrite(pinset, (bool)(value));
 
     return (0);
 }
@@ -90,7 +100,7 @@ static inline int gpio_add_callback(const struct device* port, struct gpio_callb
     struct gpio_dt_spec* spec   = container_of(port, struct gpio_dt_spec, port);
     auto                 pinset = spec->pinset;
 
-    auto ret = s32k1xx_pinirqattach(pinset, callback->handler, NULL);
+    auto ret = s32k1xx_pinirqattach(pinset, (xcpt_t)callback->handler, NULL);
     if (ret == 0) {
         /* Then make sure that interrupts are enabled on the pin */
         s32k1xx_pinirqenable(pinset);

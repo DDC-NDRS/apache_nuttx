@@ -10,6 +10,7 @@
 #include <nuttx/nuttx.h>
 #include <nuttx/config.h>
 #include <nuttx/board.h>
+#include <zephyr/sys/util.h>
 
 /**
  * @brief GPIO Driver APIs
@@ -225,6 +226,9 @@ typedef uint32_t gpio_flags_t;
 struct gpio_dt_spec {
     /** GPIO device controlling the pin */
     const struct device* port;
+
+	/** The pin's number on the device */
+	gpio_pin_t pin;
 
     /** GPIO pin setting */
     uint32_t pinset;
