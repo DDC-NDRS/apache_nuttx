@@ -308,7 +308,6 @@ extern "C"
  *   Configure a pin based on bit-encoded description of the pin.
  *
  ****************************************************************************/
-
 int s32k1xx_pinconfig(uint32_t cfgset);
 
 /****************************************************************************
@@ -346,7 +345,6 @@ void s32k1xx_gpiowrite(uint32_t pinset, bool value);
  *   Read one or zero from the selected GPIO pin
  *
  ****************************************************************************/
-
 bool s32k1xx_gpioread(uint32_t pinset);
 
 /****************************************************************************
@@ -387,7 +385,6 @@ void s32k1xx_pinirq_initialize(void);
  *   any failure to indicate the nature of the failure.
  *
  ****************************************************************************/
-
 int s32k1xx_pinirqattach(uint32_t pinset, xcpt_t pinisr, void *arg);
 
 /****************************************************************************

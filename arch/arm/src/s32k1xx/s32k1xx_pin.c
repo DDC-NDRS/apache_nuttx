@@ -21,7 +21,6 @@
 /****************************************************************************
  * Included Files
  ****************************************************************************/
-
 #include <nuttx/config.h>
 #include <arch/board/board.h>
 
@@ -47,152 +46,134 @@
  *   DMA/interrupts are disabled at the initial PIN configuration.
  *
  ****************************************************************************/
+int /**/ s32k1xx_pinconfig(uint32_t cfgset) {
+    uintptr_t    base;
+    uint32_t     regval;
+    unsigned int port;
+    unsigned int pin;
+    unsigned int mode;
 
-int s32k1xx_pinconfig(uint32_t cfgset)
-{
-  uintptr_t    base;
-  uint32_t     regval;
-  unsigned int port;
-  unsigned int pin;
-  unsigned int mode;
+    /* Get the port number and pin number */
 
-  /* Get the port number and pin number */
+    port = (cfgset & _PIN_PORT_MASK) >> _PIN_PORT_SHIFT;
+    pin  = (cfgset & _PIN_MASK) >> _PIN_SHIFT;
 
-  port = (cfgset & _PIN_PORT_MASK) >> _PIN_PORT_SHIFT;
-  pin  = (cfgset & _PIN_MASK)      >> _PIN_SHIFT;
+    DEBUGASSERT(port < S32K1XX_NPORTS);
+    if (port < S32K1XX_NPORTS) {
+        /* Get the base address of PORT block for this port */
 
-  DEBUGASSERT(port < S32K1XX_NPORTS);
-  if (port < S32K1XX_NPORTS)
-    {
-      /* Get the base address of PORT block for this port */
+        base = S32K1XX_PORT_BASE(port);
 
-      base =  S32K1XX_PORT_BASE(port);
+        /* Get the port mode */
 
-      /* Get the port mode */
+        mode = (cfgset & _PIN_MODE_MASK) >> _PIN_MODE_SHIFT;
 
-      mode = (cfgset & _PIN_MODE_MASK)  >> _PIN_MODE_SHIFT;
+        /* Special case analog port mode.  In this case, not of the digital
+         * options are applicable.
+         */
 
-      /* Special case analog port mode.  In this case, not of the digital
-       * options are applicable.
-       */
+        if (mode == PIN_MODE_ANALOG) {
+            /* Set the analog mode with all digital options zeroed */
 
-      if (mode == PIN_MODE_ANALOG)
-        {
-          /* Set the analog mode with all digital options zeroed */
-
-          regval = PORT_PCR_MUX_ANALOG | PORT_PCR_IRQC_DISABLED;
-          putreg32(regval, base + S32K1XX_PORT_PCR_OFFSET(pin));
+            regval = PORT_PCR_MUX_ANALOG | PORT_PCR_IRQC_DISABLED;
+            putreg32(regval, base + S32K1XX_PORT_PCR_OFFSET(pin));
         }
-      else
-        {
-          /* Configure the digital pin options */
+        else {
+            /* Configure the digital pin options */
 
-          regval = (mode << PORT_PCR_MUX_SHIFT);
-          if ((cfgset & _PIN_IO_MASK) == _PIN_INPUT)
-            {
-              /* Check for pull-up or pull-down */
+            regval = (mode << PORT_PCR_MUX_SHIFT);
+            if ((cfgset & _PIN_IO_MASK) == _PIN_INPUT) {
+                /* Check for pull-up or pull-down */
 
-              if ((cfgset & _PIN_INPUT_PULLMASK) == _PIN_INPUT_PULLDOWN)
-                {
-                  regval |= PORT_PCR_PE;
+                if ((cfgset & _PIN_INPUT_PULLMASK) == _PIN_INPUT_PULLDOWN) {
+                    regval |= PORT_PCR_PE;
                 }
-              else if ((cfgset & _PIN_INPUT_PULLMASK) == _PIN_INPUT_PULLUP)
-                {
-                  regval |= (PORT_PCR_PE | PORT_PCR_PS);
+                else if ((cfgset & _PIN_INPUT_PULLMASK) == _PIN_INPUT_PULLUP) {
+                    regval |= (PORT_PCR_PE | PORT_PCR_PS);
                 }
             }
-          else
-            {
-              /* Check for high drive output */
+            else {
+                /* Check for high drive output */
 
-              if ((cfgset & _PIN_OUTPUT_DRIVE_MASK) == _PIN_OUTPUT_HIGHDRIVE)
-                {
-                  regval |= PORT_PCR_DSE;
+                if ((cfgset & _PIN_OUTPUT_DRIVE_MASK) == _PIN_OUTPUT_HIGHDRIVE) {
+                    regval |= PORT_PCR_DSE;
                 }
             }
 
-          /* Check for passive filter enable.  Passive Filter configuration
-           * is valid in all digital pin muxing modes.
-           */
+            /* Check for passive filter enable.  Passive Filter configuration
+             * is valid in all digital pin muxing modes.
+             */
 
-          if ((cfgset & PIN_PASV_FILTER) != 0)
-            {
-              regval |= PORT_PCR_PFE;
+            if ((cfgset & PIN_PASV_FILTER) != 0) {
+                regval |= PORT_PCR_PFE;
             }
 
-          /* Set the digital mode with all of the selected options */
+            /* Set the digital mode with all of the selected options */
 
-          putreg32(regval, base + S32K1XX_PORT_PCR_OFFSET(pin));
+            putreg32(regval, base + S32K1XX_PORT_PCR_OFFSET(pin));
 
-          /* Check for digital filter enable.  Digital Filter configuration
-           * is valid in all digital pin muxing modes.
-           */
+            /* Check for digital filter enable.  Digital Filter configuration
+             * is valid in all digital pin muxing modes.
+             */
 
-          regval = getreg32(base + S32K1XX_PORT_DFER_OFFSET);
-          if ((cfgset & PIN_DIG_FILTER) != 0)
-            {
-              regval |= (1 << pin);
+            regval = getreg32(base + S32K1XX_PORT_DFER_OFFSET);
+            if ((cfgset & PIN_DIG_FILTER) != 0) {
+                regval |= (1 << pin);
             }
-          else
-            {
-              regval &= ~(1 << pin);
+            else {
+                regval &= ~(1 << pin);
             }
 
-          putreg32(regval, base + S32K1XX_PORT_DFER_OFFSET);
+            putreg32(regval, base + S32K1XX_PORT_DFER_OFFSET);
 
-          /* Check if we should disable each general-purpose pin from acting
-           * as an input
-           */
+            /* Check if we should disable each general-purpose pin from acting
+             * as an input
+             */
 
-          base   = S32K1XX_GPIO_BASE(port);
-          regval = getreg32(base + S32K1XX_GPIO_PIDR_OFFSET);
-          if ((cfgset & PIN_DISABLE_INPUT) != 0)
-            {
-              regval |= (1 << pin);
+            base   = S32K1XX_GPIO_BASE(port);
+            regval = getreg32(base + S32K1XX_GPIO_PIDR_OFFSET);
+            if ((cfgset & PIN_DISABLE_INPUT) != 0) {
+                regval |= (1 << pin);
             }
-          else
-            {
-              regval &= ~(1 << pin);
+            else {
+                regval &= ~(1 << pin);
             }
 
-          putreg32(regval, base + S32K1XX_GPIO_PIDR_OFFSET);
+            putreg32(regval, base + S32K1XX_GPIO_PIDR_OFFSET);
 
-          /* Additional configuration for the case of Alternative 1 (GPIO)
-           * modes
-           */
+            /* Additional configuration for the case of Alternative 1 (GPIO)
+             * modes
+             */
 
-          if (mode == PIN_MODE_GPIO)
-            {
-              /* Set the GPIO port direction */
+            if (mode == PIN_MODE_GPIO) {
+                /* Set the GPIO port direction */
 
-              base   = S32K1XX_GPIO_BASE(port);
-              regval = getreg32(base + S32K1XX_GPIO_PDDR_OFFSET);
-              if ((cfgset & _PIN_IO_MASK) == _PIN_INPUT)
-                {
-                  /* Select GPIO input */
+                base   = S32K1XX_GPIO_BASE(port);
+                regval = getreg32(base + S32K1XX_GPIO_PDDR_OFFSET);
+                if ((cfgset & _PIN_IO_MASK) == _PIN_INPUT) {
+                    /* Select GPIO input */
 
-                  regval &= ~(1 << pin);
-                  putreg32(regval, base + S32K1XX_GPIO_PDDR_OFFSET);
+                    regval &= ~(1 << pin);
+                    putreg32(regval, base + S32K1XX_GPIO_PDDR_OFFSET);
                 }
-              else /* if ((cfgset & _PIN_IO_MASK) == _PIN_OUTPUT) */
+                else /* if ((cfgset & _PIN_IO_MASK) == _PIN_OUTPUT) */
                 {
-                  /* Select GPIO input */
+                    /* Select GPIO input */
 
-                  regval |= (1 << pin);
-                  putreg32(regval, base + S32K1XX_GPIO_PDDR_OFFSET);
+                    regval |= (1 << pin);
+                    putreg32(regval, base + S32K1XX_GPIO_PDDR_OFFSET);
 
-                  /* Set the initial value of the GPIO output */
+                    /* Set the initial value of the GPIO output */
 
-                  s32k1xx_gpiowrite(cfgset,
-                                    ((cfgset & GPIO_OUTPUT_ONE) != 0));
+                    s32k1xx_gpiowrite(cfgset, ((cfgset & GPIO_OUTPUT_ONE) != 0));
                 }
             }
         }
 
-      return OK;
+        return OK;
     }
 
-  return -EINVAL;
+    return -EINVAL;
 }
 
 /****************************************************************************
@@ -210,30 +191,27 @@ int s32k1xx_pinconfig(uint32_t cfgset)
  *   width - Filter Length
  *
  ****************************************************************************/
+int s32k1xx_pinfilter(unsigned int port, bool lpo, unsigned int width) {
+    uintptr_t base;
+    uint32_t  regval;
 
-int s32k1xx_pinfilter(unsigned int port, bool lpo, unsigned int width)
-{
-  uintptr_t base;
-  uint32_t  regval;
+    DEBUGASSERT(port < S32K1XX_NPORTS);
+    if (port < S32K1XX_NPORTS) {
+        /* Get the base address of PORT block for this port */
 
-  DEBUGASSERT(port < S32K1XX_NPORTS);
-  if (port < S32K1XX_NPORTS)
-    {
-      /* Get the base address of PORT block for this port */
+        base = S32K1XX_PORT_BASE(port);
 
-      base =  S32K1XX_PORT_BASE(port);
+        /* Select clocking */
 
-      /* Select clocking */
+        regval = (lpo ? PORT_DFCR_CS : 0);
+        putreg32(regval, base + S32K1XX_PORT_DFCR_OFFSET);
 
-      regval = (lpo ? PORT_DFCR_CS : 0);
-      putreg32(regval, base + S32K1XX_PORT_DFCR_OFFSET);
+        /* Select the filter width */
 
-      /* Select the filter width */
-
-      DEBUGASSERT(width < 32);
-      putreg32(width, base + S32K1XX_PORT_DFWR_OFFSET);
-      return OK;
+        DEBUGASSERT(width < 32);
+        putreg32(width, base + S32K1XX_PORT_DFWR_OFFSET);
+        return OK;
     }
 
-  return -EINVAL;
+    return -EINVAL;
 }

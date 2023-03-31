@@ -70,7 +70,6 @@ extern "C"
  *   nature of the failure.
  *
  ****************************************************************************/
-
 int stm32_gpiosetevent(uint32_t pinset, bool risingedge, bool fallingedge,
                        bool event, xcpt_t func, void *arg);
 
