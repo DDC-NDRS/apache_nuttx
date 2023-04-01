@@ -122,7 +122,7 @@
 #endif
 
 /* #########################  Startup and Lowlevel Init  ######################## */
-
+#if defined(__ZEPHYR__)
 #ifndef __PROGRAM_START
 
 /**
@@ -205,6 +205,7 @@ __STATIC_FORCEINLINE void __TZ_set_STACKSEAL_S (uint32_t* stackTop) {
 }
 #endif
 
+#endif
 
 /* ##########################  Core Instruction Access  ######################### */
 /** \defgroup CMSIS_Core_InstructionInterface CMSIS Core Instruction Interface

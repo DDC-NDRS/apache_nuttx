@@ -217,7 +217,6 @@ static int gpint_attach(struct gpio_dev_s *dev,
   gpioinfo("Attaching the callback\n");
 
   /* Make sure the interrupt is disabled */
-
   stm32_gpiosetevent(g_gpiointinputs[stm32gpint->stm32gpio.id], false,
                      false, false, NULL, NULL);
 
@@ -238,7 +237,6 @@ static int gpint_enable(struct gpio_dev_s *dev, bool enable)
           gpioinfo("Enabling the interrupt\n");
 
           /* Configure the interrupt for rising edge */
-
           stm32_gpiosetevent(g_gpiointinputs[stm32gpint->stm32gpio.id],
                              true, false, false, stm32gpio_interrupt,
                              &g_gpint[stm32gpint->stm32gpio.id]);

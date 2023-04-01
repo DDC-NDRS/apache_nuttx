@@ -40,11 +40,12 @@ extern "C" {
 #define PINCTRL_STATE_PRIV_START 2U
 
 /** @} */
+typedef uint32_t pinctrl_soc_pin_t;
 
 /** Pin control state configuration. */
 struct pinctrl_state {
 	/** Pin configurations. */
-	void *pins;
+	const pinctrl_soc_pin_t* pins;
 	/** Number of pin configurations. */
 	uint8_t pin_cnt;
 	/** State identifier (see @ref PINCTRL_STATES). */
@@ -267,183 +268,6 @@ struct pinctrl_dev_config {
 #define PINCTRL_DT_INST_DEV_CONFIG_GET(inst) \
 	PINCTRL_DT_DEV_CONFIG_GET(DT_DRV_INST(inst))
 
-/**
- * @brief Find the state configuration for the given state id.
- *
- * @param config Pin controller configuration.
- * @param id Pin controller state id (see @ref PINCTRL_STATES).
- * @param state Found state.
- *
- * @retval 0 If state has been found.
- * @retval -ENOENT If the state has not been found.
- */
-int pinctrl_lookup_state(const struct pinctrl_dev_config* config, uint8_t id,
-                         const struct pinctrl_state** state);
-
-/**
- * @brief Configure a set of pins.
- *
- * This function will configure the necessary hardware blocks to make the
- * configuration immediately effective.
- *
- * @warning This function must never be used to configure pins used by an
- * instantiated device driver.
- *
- * @param pins List of pins to be configured.
- * @param pin_cnt Number of pins.
- * @param reg Device register (optional, use #PINCTRL_REG_NONE if not used).
- *
- * @retval 0 If succeeded
- * @retval -errno Negative errno for other failures.
- */
-int pinctrl_configure_pins(const pinctrl_soc_pin_t *pins, uint8_t pin_cnt,
-                           uintptr_t reg);
-
-/**
- * @brief Apply a state directly from the provided state configuration.
- *
- * @param config Pin control configuration.
- * @param state State.
- *
- * @retval 0 If succeeded
- * @retval -errno Negative errno for other failures.
- */
-static inline int pinctrl_apply_state_direct(
-	const struct pinctrl_dev_config *config,
-	const struct pinctrl_state *state)
-{
-	uintptr_t reg;
-
-#ifdef CONFIG_PINCTRL_STORE_REG
-	reg = config->reg;
-#else
-	ARG_UNUSED(config);
-	reg = PINCTRL_REG_NONE;
-#endif
-
-	return pinctrl_configure_pins(state->pins, state->pin_cnt, reg);
-}
-
-/**
- * @brief Apply a state from the given device configuration.
- *
- * @param config Pin control configuration.
- * @param id Id of the state to be applied (see @ref PINCTRL_STATES).
- *
- * @retval 0 If succeeded.
- * @retval -ENOENT If given state id does not exist.
- * @retval -errno Negative errno for other failures.
- */
-static inline int pinctrl_apply_state(const struct pinctrl_dev_config* config, uint8_t id) {
-	int ret;
-	const struct pinctrl_state *state;
-
-	ret = pinctrl_lookup_state(config, id, &state);
-	if (ret < 0) {
-		return ret;
-	}
-
-	return pinctrl_apply_state_direct(config, state);
-}
-
-#if defined(CONFIG_PINCTRL_DYNAMIC) || defined(__DOXYGEN__)
-/**
- * @defgroup pinctrl_interface_dynamic Dynamic Pin Control
- * @{
- */
-
-/**
- * @brief Helper macro to define the pins of a pin control state from
- * Devicetree.
- *
- * The name of the defined state pins variable is the same used by @p prop. This
- * macro is expected to be used in conjunction with #PINCTRL_DT_STATE_INIT.
- *
- * @param node_id Node identifier containing @p prop.
- * @param prop Property within @p node_id containing state configuration.
- *
- * @see #PINCTRL_DT_STATE_INIT
- */
-#define PINCTRL_DT_STATE_PINS_DEFINE(node_id, prop)			       \
-	static const pinctrl_soc_pin_t prop ## _pins[] =		       \
-	Z_PINCTRL_STATE_PINS_INIT(node_id, prop);			       \
-
-/**
- * @brief Utility macro to initialize a pin control state.
- *
- * This macro should be used in conjunction with #PINCTRL_DT_STATE_PINS_DEFINE
- * when using dynamic pin control to define an alternative state configuration
- * stored in Devicetree.
- *
- * Example:
- *
- * @code{.devicetree}
- * // board.dts
- *
- * /{
- *      zephyr,user {
- *              // uart0_alt_default node contains alternative pin config
- *              uart0_alt_default = <&uart0_alt_default>;
- *      };
- * };
- * @endcode
- *
- * @code{.c}
- * // application
- *
- * PINCTRL_DT_STATE_PINS_DEFINE(DT_PATH(zephyr_user), uart0_alt_default);
- *
- * static const struct pinctrl_state uart0_alt[] = {
- *     PINCTRL_DT_STATE_INIT(uart0_alt_default, PINCTRL_STATE_DEFAULT)
- * };
- * @endcode
- *
- * @param prop Property name in Devicetree containing state configuration.
- * @param state State represented by @p prop (see @ref PINCTRL_STATES).
- *
- * @see #PINCTRL_DT_STATE_PINS_DEFINE
- */
-#define PINCTRL_DT_STATE_INIT(prop, state)				       \
-	{								       \
-		.id = state,						       \
-		.pins = prop ## _pins,					       \
-		.pin_cnt = ARRAY_SIZE(prop ## _pins)			       \
-	}
-
-/**
- * @brief Update states with a new set.
- *
- * @note In order to guarantee device drivers correct operation the same states
- * have to be provided. For example, if @c default and @c sleep are in the
- * current list of states, it is expected that the new array of states also
- * contains both.
- *
- * @param config Pin control configuration.
- * @param states New states to be set.
- * @param state_cnt Number of new states to be set.
- *
- * @retval -EINVAL If the new configuration does not contain the same states as
- * the current active configuration.
- * @retval -ENOSYS If the functionality is not available.
- * @retval 0 On success.
- */
-int pinctrl_update_states(struct pinctrl_dev_config *config,
-			  const struct pinctrl_state *states,
-			  uint8_t state_cnt);
-
-/** @} */
-#else
-static inline int pinctrl_update_states(
-	struct pinctrl_dev_config *config,
-	const struct pinctrl_state *states, uint8_t state_cnt)
-{
-	ARG_UNUSED(config);
-	ARG_UNUSED(states);
-	ARG_UNUSED(state_cnt);
-	return -ENOSYS;
-}
-#endif /* defined(CONFIG_PINCTRL_DYNAMIC) || defined(__DOXYGEN__) */
-
 #ifdef __cplusplus
 }
 #endif
@@ -451,5 +275,12 @@ static inline int pinctrl_update_states(
 /**
  * @}
  */
+#if defined(CONFIG_ARCH_CHIP_S32K14X)
+#include <zephyr/drivers/s32k1xx/s32k1xx_pinctrl.h>
+#endif
+
+#if defined(CONFIG_ARCH_CHIP_STM32H7)
+#include <zephyr/drivers/stm32h7/stm32h7_pinctrl.h>
+#endif
 
 #endif /* ZEPHYR_INCLUDE_DRIVERS_PINCTRL_H_ */

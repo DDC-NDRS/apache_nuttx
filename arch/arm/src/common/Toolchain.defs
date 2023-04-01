@@ -268,7 +268,8 @@ ifneq ($(CONFIG_CXX_RTTI),y)
   ARCHCXXFLAGS += -fno-rtti
 endif
 
-ARCHOPTIMIZATION += -fno-common -Wall -Wshadow -Wundef
+# #CUSTOM@NDRS remove -Wshadow
+ARCHOPTIMIZATION += -fno-common -Wall -Wundef
 
 ifeq ($(CONFIG_ARM_TOOLCHAIN_ARMCLANG),y)
   ARCHOPTIMIZATION += -nostdlib

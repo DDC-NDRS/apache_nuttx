@@ -628,6 +628,8 @@ char *utf8_lcpy(char *dst, const char *src, size_t n);
 		(expr);                                                         \
 	})
 
+#define ARG_UNUSED(x) (void)(x)
+
 /**
  * @}
  */
