@@ -917,8 +917,8 @@ void s32k1xx_dmach_free(DMACH_HANDLE handle)
  *
  ****************************************************************************/
 
-int s32k1xx_dmach_xfrsetup(DMACH_HANDLE *handle,
-                           const struct s32k1xx_edma_xfrconfig_s *config)
+int /**/s32k1xx_dmach_xfrsetup(DMACH_HANDLE *handle,
+                               const struct s32k1xx_edma_xfrconfig_s *config)
 {
   struct s32k1xx_dmach_s *dmach = (struct s32k1xx_dmach_s *)handle;
 #if CONFIG_S32K1XX_EDMA_NTCD > 0

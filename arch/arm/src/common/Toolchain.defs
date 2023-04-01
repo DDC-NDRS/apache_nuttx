@@ -30,6 +30,9 @@
 #                   reliable code generation.
 #
 
+# CUSTOM@NDRS
+LDFLAGS += --print-memory-usage
+
 ifeq ($(CONFIG_DEBUG_CUSTOMOPT),y)
   ARCHOPTIMIZATION += $(CONFIG_DEBUG_OPTLEVEL)
 else ifeq ($(CONFIG_DEBUG_FULLOPT),y)
