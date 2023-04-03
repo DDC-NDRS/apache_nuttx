@@ -62,7 +62,7 @@
  * 0x2005:ffff - End of internal SRAM and end of heap (a
  */
 
-#define HEAP_BASE  ((uintptr_t)_ebss + CONFIG_IDLETHREAD_STACKSIZE)
+#define HEAP_BASE ((uintptr_t)_ebss + CONFIG_IDLETHREAD_STACKSIZE)
 
 /****************************************************************************
  * Public Data
@@ -93,9 +93,9 @@ const uintptr_t g_idle_topstack = HEAP_BASE;
  ****************************************************************************/
 
 #ifdef CONFIG_DEBUG_FEATURES
-#  define showprogress(c) arm_lowputc(c)
+#define showprogress(c) arm_lowputc(c)
 #else
-#  define showprogress(c)
+#define showprogress(c)
 #endif
 
 /****************************************************************************
@@ -117,42 +117,41 @@ void __start(void) noinstrument_function;
  *
  ****************************************************************************/
 
-static inline void stm32_tcmenable(void)
-{
-  uint32_t regval;
+static inline void stm32_tcmenable(void) {
+    uint32_t regval;
 
-  ARM_DSB();
-  ARM_ISB();
+    ARM_DSB();
+    ARM_ISB();
 
-  /* Enabled/disabled ITCM */
+    /* Enabled/disabled ITCM */
 
 #ifdef CONFIG_ARMV7M_ITCM
-  regval  = NVIC_TCMCR_EN | NVIC_TCMCR_RMW | NVIC_TCMCR_RETEN;
+    regval = NVIC_TCMCR_EN | NVIC_TCMCR_RMW | NVIC_TCMCR_RETEN;
 #else
-  regval  = getreg32(NVIC_ITCMCR);
-  regval &= ~NVIC_TCMCR_EN;
+    regval = getreg32(NVIC_ITCMCR);
+    regval &= ~NVIC_TCMCR_EN;
 #endif
-  putreg32(regval, NVIC_ITCMCR);
+    putreg32(regval, NVIC_ITCMCR);
 
-  /* Enabled/disabled DTCM */
+    /* Enabled/disabled DTCM */
 
 #ifdef CONFIG_ARMV7M_DTCM
-  /* As DTCM RAM on STM32H7 does not have ECC, so do not enable
-   * read-modify-write.
-   */
+    /* As DTCM RAM on STM32H7 does not have ECC, so do not enable
+     * read-modify-write.
+     */
 
-  regval  = NVIC_TCMCR_EN | NVIC_TCMCR_RETEN;
+    regval = NVIC_TCMCR_EN | NVIC_TCMCR_RETEN;
 #else
-  regval  = getreg32(NVIC_DTCMCR);
-  regval &= ~NVIC_TCMCR_EN;
+    regval = getreg32(NVIC_DTCMCR);
+    regval &= ~NVIC_TCMCR_EN;
 #endif
-  putreg32(regval, NVIC_DTCMCR);
+    putreg32(regval, NVIC_DTCMCR);
 
-  ARM_DSB();
-  ARM_ISB();
+    ARM_DSB();
+    ARM_ISB();
 
 #ifdef CONFIG_ARMV7M_ITCM
-  /* Copy TCM code from flash to ITCM */
+    /* Copy TCM code from flash to ITCM */
 
 #warning Missing logic
 #endif
@@ -169,113 +168,92 @@ static inline void stm32_tcmenable(void)
  *   This is the reset entry point.
  *
  ****************************************************************************/
+void /**/__start(void) {
+    uint32_t const* src;
+    uint32_t* dest;
 
-void __start(void)
-{
-  const uint32_t *src;
-  uint32_t *dest;
+    #ifdef CONFIG_ARMV7M_STACKCHECK
+    /* Set the stack limit before we attempt to call any functions */
+    __asm__ volatile("sub r10, sp, %0" : : "r"(CONFIG_IDLETHREAD_STACKSIZE - 64) :);
+    #endif
 
-#ifdef CONFIG_ARMV7M_STACKCHECK
-  /* Set the stack limit before we attempt to call any functions */
+    /* If enabled reset the MPU */
+    mpu_early_reset();
 
-  __asm__ volatile("sub r10, sp, %0" : :
-                   "r"(CONFIG_IDLETHREAD_STACKSIZE - 64) :);
-#endif
-
-  /* If enabled reset the MPU */
-
-  mpu_early_reset();
-
-/* Clear .bss.  We'll do this inline (vs. calling memset) just to be
-   * certain that there are no issues with the state of global variables.
-   */
-
-  for (dest = (uint32_t *)_sbss; dest < (uint32_t *)_ebss; )
-    {
-      *dest++ = 0;
+    /* Clear .bss.  We'll do this inline (vs. calling memset) just to be
+     * certain that there are no issues with the state of global variables.
+     */
+    for (dest = (uint32_t*)_sbss; dest < (uint32_t*)_ebss;) {
+        *dest++ = 0UL;
     }
 
-  /* Move the initialized data section from his temporary holding spot in
-   * FLASH into the correct place in SRAM.  The correct place in SRAM is
-   * give by _sdata and _edata.  The temporary location is in FLASH at the
-   * end of all of the other read-only data (.text, .rodata) at _eronly.
-   */
-
-  for (src = (const uint32_t *)_eronly,
-       dest = (uint32_t *)_sdata; dest < (uint32_t *)_edata;
-      )
-    {
-      *dest++ = *src++;
+    /* Move the initialized data section from his temporary holding spot in
+     * FLASH into the correct place in SRAM.  The correct place in SRAM is
+     * give by _sdata and _edata.  The temporary location is in FLASH at the
+     * end of all of the other read-only data (.text, .rodata) at _eronly.
+     */
+    for (src = (uint32_t const*)_eronly, dest = (uint32_t*)_sdata; dest < (uint32_t*)_edata;) {
+        *dest++ = *src++;
     }
 
-  /* Copy any necessary code sections from FLASH to RAM.  The correct
-   * destination in SRAM is given by _sramfuncs and _eramfuncs.  The
-   * temporary location is in flash after the data initialization code
-   * at _framfuncs.  This should be done before stm32_clockconfig() is
-   * called (in case it has some dependency on initialized C variables).
-   */
-
-#ifdef CONFIG_ARCH_RAMFUNCS
-  for (src = (const uint32_t *)_framfuncs,
-       dest = (uint32_t *)_sramfuncs; dest < (uint32_t *)_eramfuncs;
-      )
-    {
-      *dest++ = *src++;
+    /* Copy any necessary code sections from FLASH to RAM.  The correct
+     * destination in SRAM is given by _sramfuncs and _eramfuncs.  The
+     * temporary location is in flash after the data initialization code
+     * at _framfuncs.  This should be done before stm32_clockconfig() is
+     * called (in case it has some dependency on initialized C variables).
+     */
+    #ifdef CONFIG_ARCH_RAMFUNCS
+    for (src = (uint32_t const*)_framfuncs, dest = (uint32_t*)_sramfuncs; dest < (uint32_t*)_eramfuncs;) {
+        *dest++ = *src++;
     }
-#endif
+    #endif
 
-  /* Configure the UART so that we can get debug output as soon as possible */
+    /* Configure the UART so that we can get debug output as soon as possible */
+    stm32_clockconfig();
+    arm_fpuconfig();
+    stm32_lowsetup();
+    showprogress('A');
 
-  stm32_clockconfig();
-  arm_fpuconfig();
-  stm32_lowsetup();
-  showprogress('A');
+    /* Enable/disable tightly coupled memories */
+    stm32_tcmenable();
 
-  /* Enable/disable tightly coupled memories */
+    /* Initialize onboard resources */
+    stm32_boardinitialize();
+    showprogress('B');
 
-  stm32_tcmenable();
+    /* Enable I- and D-Caches */
+    up_enable_icache();
+    up_enable_dcache();
+    showprogress('C');
 
-  /* Initialize onboard resources */
+    #ifdef CONFIG_SCHED_IRQMONITOR
+    up_perf_init((void*)STM32_SYSCLK_FREQUENCY);
+    #endif
 
-  stm32_boardinitialize();
-  showprogress('B');
+    /* Perform early serial initialization */
+    #ifdef USE_EARLYSERIALINIT
+    arm_earlyserialinit();
+    #endif
+    showprogress('D');
 
-  /* Enable I- and D-Caches */
+    /* For the case of the separate user-/kernel-space build, perform whatever
+     * platform specific initialization of the user memory is required.
+     * Normally this just means initializing the user space .data and .bss
+     * segments.
+     */
+    #ifdef CONFIG_BUILD_PROTECTED
+    stm32_userspace();
+    #endif
+    showprogress('E');
 
-  up_enable_icache();
-  up_enable_dcache();
-  showprogress('C');
+    /* Then start NuttX */
+    showprogress('\r');
+    showprogress('\n');
 
-#ifdef CONFIG_SCHED_IRQMONITOR
-  up_perf_init((void *)STM32_SYSCLK_FREQUENCY);
-#endif
+    nx_start();
 
-  /* Perform early serial initialization */
-
-#ifdef USE_EARLYSERIALINIT
-  arm_earlyserialinit();
-#endif
-  showprogress('D');
-
-  /* For the case of the separate user-/kernel-space build, perform whatever
-   * platform specific initialization of the user memory is required.
-   * Normally this just means initializing the user space .data and .bss
-   * segments.
-   */
-
-#ifdef CONFIG_BUILD_PROTECTED
-  stm32_userspace();
-#endif
-  showprogress('E');
-
-  /* Then start NuttX */
-
-  showprogress('\r');
-  showprogress('\n');
-
-  nx_start();
-
-  /* Shouldn't get here */
-
-  for (; ; );
+    /* Shouldn't get here */
+    for (;;) {
+        /* pass */
+    }
 }

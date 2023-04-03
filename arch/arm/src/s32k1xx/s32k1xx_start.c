@@ -21,7 +21,6 @@
 /****************************************************************************
  * Included Files
  ****************************************************************************/
-
 #include <nuttx/config.h>
 
 #include <stdint.h>
@@ -36,7 +35,7 @@
 #include "nvic.h"
 
 #ifdef CONFIG_BUILD_PROTECTED
-#  include "s32k1xx_userspace.h"
+#include "s32k1xx_userspace.h"
 #endif
 
 #include "hardware/s32k1xx_lmem.h"
@@ -87,8 +86,7 @@
  *
  * NOTE:  ARM EABI requires 64 bit stack alignment.
  */
-
-#define HEAP_BASE      ((uintptr_t)_ebss + CONFIG_IDLETHREAD_STACKSIZE)
+#define HEAP_BASE ((uintptr_t)_ebss + CONFIG_IDLETHREAD_STACKSIZE)
 
 /****************************************************************************
  * Name: showprogress
@@ -97,17 +95,15 @@
  *   Print a character on the UART to show boot status.
  *
  ****************************************************************************/
-
 #if defined(HAVE_LPUART_CONSOLE) && defined(CONFIG_DEBUG_FEATURES)
-#  define showprogress(c) s32k1xx_lowputc(c)
+#define showprogress(c) s32k1xx_lowputc(c)
 #else
-#  define showprogress(c)
+#define showprogress(c)
 #endif
 
 /****************************************************************************
  * Public Data
  ****************************************************************************/
-
 /* g_idle_topstack: _sbss is the start of the BSS region as defined by the
  * linker script. _ebss lies at the end of the BSS region. The idle task
  * stack starts at the end of BSS and is of size CONFIG_IDLETHREAD_STACKSIZE.
@@ -117,7 +113,6 @@
  * g_idle_topstack is a read-only variable the provides this computed
  * address.
  */
-
 const uintptr_t g_idle_topstack = HEAP_BASE;
 
 /****************************************************************************
@@ -131,17 +126,13 @@ const uintptr_t g_idle_topstack = HEAP_BASE;
  *   IInvalidate and enable code cache.
  *
  ****************************************************************************/
-
 #ifdef CONFIG_S32K1XX_HAVE_LMEM
-static inline void s32k1xx_cache_config(void)
-{
-  uint32_t regval;
+static inline void s32k1xx_cache_config(void) {
+    uint32_t regval;
 
-  /* Invalidate and enable code cache */
-
-  regval = (LMEM_PCCCR_ENCACHE | LMEM_PCCCR_INVW0 | LMEM_PCCCR_INVW1 |
-            LMEM_PCCCR_GO);
-  putreg32(regval, S32K1XX_LMEM_PCCCR);
+    /* Invalidate and enable code cache */
+    regval = (LMEM_PCCCR_ENCACHE | LMEM_PCCCR_INVW0 | LMEM_PCCCR_INVW1 | LMEM_PCCCR_GO);
+    putreg32(regval, S32K1XX_LMEM_PCCCR);
 }
 #endif
 
@@ -152,21 +143,18 @@ static inline void s32k1xx_cache_config(void)
  *   Enable all bus masters.
  *
  ****************************************************************************/
-
 #if defined(CONFIG_ARCH_USE_MPU) && defined(CONFIG_S32K1XX_ENET)
-static inline void s32k1xx_mpu_config(void)
-{
-  uint32_t regval;
+static inline void s32k1xx_mpu_config(void) {
+    uint32_t regval;
 
-  /* Bus masters 0-2 are already enabled r/w/x in supervisor and user modes
-   * after reset.  Enable also bus master 3 (ENET) in S/U modes in default
-   * region 0:  User=r+w+x, Supervisor=same as used.
-   */
+    /* Bus masters 0-2 are already enabled r/w/x in supervisor and user modes
+     * after reset.  Enable also bus master 3 (ENET) in S/U modes in default
+     * region 0:  User=r+w+x, Supervisor=same as used.
+     */
 
-  regval = (MPU_RGDAAC_M3UM_XACCESS | MPU_RGDAAC_M3UM_WACCESS |
-            MPU_RGDAAC_M3UM_RACCESS | MPU_RGDAAC_M3SM_M3UM);
+    regval = (MPU_RGDAAC_M3UM_XACCESS | MPU_RGDAAC_M3UM_WACCESS | MPU_RGDAAC_M3UM_RACCESS | MPU_RGDAAC_M3SM_M3UM);
 
-  putreg32(regval, S32K1XX_MPU_RGDAAC(0));
+    putreg32(regval, S32K1XX_MPU_RGDAAC(0));
 }
 #endif
 
@@ -181,130 +169,108 @@ static inline void s32k1xx_mpu_config(void)
  *   This is the reset entry point.
  *
  ****************************************************************************/
+void /**/__start(void) {
+    #ifdef CONFIG_BOOT_RUNFROMFLASH
+    uint32_t const* src;
+    #endif
+    uint32_t* dest;
 
-void __start(void)
-{
-#ifdef CONFIG_BOOT_RUNFROMFLASH
-  const uint32_t *src;
-#endif
-  uint32_t *dest;
+    /* Make sure that interrupts are disabled */
+    __asm__ __volatile__("\tcpsid  i\n");
 
-  /* Make sure that interrupts are disabled */
+    #ifdef CONFIG_S32K1XX_WDT_DISABLE
+    /* Disable the watchdog timer */
+    s32k1xx_wdog_disable();
+    #endif
 
-  __asm__ __volatile__ ("\tcpsid  i\n");
+    #ifdef CONFIG_S32K1XX_HAVE_LMEM
+    /* Initialize the cache (if supported) */
+    s32k1xx_cache_config();
+    #endif
 
-#ifdef CONFIG_S32K1XX_WDT_DISABLE
-  /* Disable the watchdog timer */
-
-  s32k1xx_wdog_disable();
-#endif
-
-#ifdef CONFIG_S32K1XX_HAVE_LMEM
-  /* Initialize the cache (if supported) */
-
-  s32k1xx_cache_config();
-#endif
-
-  /* Clear .bss.  We'll do this inline (vs. calling memset) just to be
-   * certain that there are no issues with the state of global variables.
-   */
-
-  for (dest = (uint32_t *)_sbss; dest < (uint32_t *)_ebss; )
-    {
-      *dest++ = 0;
+    /* Clear .bss.  We'll do this inline (vs. calling memset) just to be
+     * certain that there are no issues with the state of global variables.
+     */
+    for (dest = (uint32_t*)_sbss; dest < (uint32_t*)_ebss;) {
+        *dest++ = 0UL;
     }
 
-#ifdef CONFIG_BOOT_RUNFROMFLASH
-  /* Move the initialized data section from his temporary holding spot in
-   * FLASH into the correct place in SRAM.  The correct place in SRAM is
-   * give by _sdata and _edata.  The temporary location is in FLASH at the
-   * end of all of the other read-only data (.text, .rodata) at _eronly.
-   */
-
-  for (src = (const uint32_t *)_eronly,
-       dest = (uint32_t *)_sdata; dest < (uint32_t *)_edata;
-      )
-    {
-      *dest++ = *src++;
+    #ifdef CONFIG_BOOT_RUNFROMFLASH
+    /* Move the initialized data section from his temporary holding spot in
+     * FLASH into the correct place in SRAM.  The correct place in SRAM is
+     * give by _sdata and _edata.  The temporary location is in FLASH at the
+     * end of all of the other read-only data (.text, .rodata) at _eronly.
+     */
+    for (src = (uint32_t const*)_eronly, dest = (uint32_t*)_sdata; dest < (uint32_t*)_edata;) {
+        *dest++ = *src++;
     }
-#endif
+    #endif
 
-  /* Copy any necessary code sections from FLASH to RAM.  The correct
-   * destination in SRAM is given by _sramfuncs and _eramfuncs.  The
-   * temporary location is in flash after the data initialization code
-   * at _framfuncs.  This should be done before s32k1xx_clockconfig() is
-   * called (in case it has some dependency on initialized C variables).
-   */
-
-#ifdef CONFIG_ARCH_RAMFUNCS
-  for (src = (const uint32_t *)_framfuncs,
-       dest = (uint32_t *)_sramfuncs; dest < (uint32_t *)_eramfuncs;
-      )
-    {
-      *dest++ = *src++;
+    /* Copy any necessary code sections from FLASH to RAM.  The correct
+     * destination in SRAM is given by _sramfuncs and _eramfuncs.  The
+     * temporary location is in flash after the data initialization code
+     * at _framfuncs.  This should be done before s32k1xx_clockconfig() is
+     * called (in case it has some dependency on initialized C variables).
+     */
+    #ifdef CONFIG_ARCH_RAMFUNCS
+    for (src = (uint32_t const*)_framfuncs, dest = (uint32_t*)_sramfuncs; dest < (uint32_t*)_eramfuncs;) {
+        *dest++ = *src++;
     }
-#endif
+    #endif
 
-  /* Configure the clocking and the console uart so that we can get debug
-   * output as soon as possible.  NOTE: That this logic must not assume that
-   * .bss or .data have been initialized.
-   */
+    /* Configure the clocking and the console uart so that we can get debug
+     * output as soon as possible.  NOTE: That this logic must not assume that
+     * .bss or .data have been initialized.
+     */
+    DEBUGVERIFY(s32k1xx_clockconfig(&g_initial_clkconfig));
+    s32k1xx_lowsetup();
+    showprogress('B');
 
-  DEBUGVERIFY(s32k1xx_clockconfig(&g_initial_clkconfig));
-  s32k1xx_lowsetup();
-  showprogress('B');
+    /* Initialize the FPU (if configured) */
+    arm_fpuconfig();
+    showprogress('C');
 
-  /* Initialize the FPU (if configured) */
+    #if defined(CONFIG_ARCH_USE_MPU) && defined(CONFIG_S32K1XX_ENET)
+    /* Enable all MPU bus masters */
+    s32k1xx_mpu_config();
+    showprogress('D');
+    #endif
 
-  arm_fpuconfig();
-  showprogress('C');
+    /* Perform early serial initialization */
+    #ifdef USE_EARLYSERIALINIT
+    s32k1xx_earlyserialinit();
+    #endif
+    showprogress('E');
 
-#if defined(CONFIG_ARCH_USE_MPU) && defined(CONFIG_S32K1XX_ENET)
+    #ifdef CONFIG_S32K1XX_PROGMEM
+    s32k1xx_progmem_init();
+    #endif
 
-  /* Enable all MPU bus masters */
+    #ifdef CONFIG_S32K1XX_EEEPROM
+    s32k1xx_eeeprom_init();
+    #endif
 
-  s32k1xx_mpu_config();
-  showprogress('D');
-#endif
+    /* For the case of the separate user-/kernel-space build, perform whatever
+     * platform specific initialization of the user memory is required.
+     * Normally this just means initializing the user space .data and .bss
+     * segments.
+     */
+    #ifdef CONFIG_BUILD_PROTECTED
+    s32k1xx_userspace();
+    showprogress('F');
+    #endif
 
-  /* Perform early serial initialization */
+    /* Initialize on-board resources */
+    s32k1xx_board_initialize();
+    showprogress('G');
 
-#ifdef USE_EARLYSERIALINIT
-  s32k1xx_earlyserialinit();
-#endif
-  showprogress('E');
+    /* Then start NuttX */
+    showprogress('\r');
+    showprogress('\n');
+    nx_start();
 
-#ifdef CONFIG_S32K1XX_PROGMEM
-  s32k1xx_progmem_init();
-#endif
-
-#ifdef CONFIG_S32K1XX_EEEPROM
-  s32k1xx_eeeprom_init();
-#endif
-
-  /* For the case of the separate user-/kernel-space build, perform whatever
-   * platform specific initialization of the user memory is required.
-   * Normally this just means initializing the user space .data and .bss
-   * segments.
-   */
-
-#ifdef CONFIG_BUILD_PROTECTED
-  s32k1xx_userspace();
-  showprogress('F');
-#endif
-
-  /* Initialize on-board resources */
-
-  s32k1xx_board_initialize();
-  showprogress('G');
-
-  /* Then start NuttX */
-
-  showprogress('\r');
-  showprogress('\n');
-  nx_start();
-
-  /* Shouldn't get here */
-
-  for (; ; );
+    /* Shouldn't get here */
+    for (;;) {
+        /* pass */
+    }
 }

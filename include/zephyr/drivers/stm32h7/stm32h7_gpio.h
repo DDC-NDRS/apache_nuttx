@@ -58,9 +58,8 @@ static inline int gpio_pin_set_dt(const struct gpio_dt_spec* spec, int value) {
 
 static inline int gpio_pin_set_raw(const struct device* port, gpio_pin_t pin, int value) {
     struct gpio_dt_spec* spec = container_of(port, struct gpio_dt_spec, port);
-    uint32_t pinset = spec->pinset;
     
-    stm32_gpiowrite(pinset, (bool)(value));
+    stm32_gpiowrite(spec->pinset, (bool)(value));
 
     return (0);
 }
@@ -70,6 +69,15 @@ static inline int gpio_pin_toggle_dt(const struct gpio_dt_spec* spec) {
     stm32_gpiowrite(spec->pinset, (val ^ 1));
 
     return (0);
+}
+
+static inline int gpio_pin_get_raw(const struct device* port, gpio_pin_t pin) {
+    struct gpio_dt_spec* spec = container_of(port, struct gpio_dt_spec, port);
+    uint32_t pinset = spec->pinset;
+    
+    bool val = stm32_gpioread(spec->pinset);
+
+    return ((int)val);
 }
 
 /**

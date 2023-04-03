@@ -421,6 +421,21 @@ static inline int spi_write_dt(const struct spi_dt_spec* spec,
     return spi_write(spec->bus, &spec->config, tx_bufs);
 }
 
+/**
+ * @brief Release the SPI device specified in @p spi_dt_spec.
+ *
+ * This is equivalent to:
+ *
+ *     spi_release(spec->bus, &spec->config);
+ *
+ * @param spec SPI specification from devicetree
+ *
+ * @return a value from spi_release().
+ */
+static inline int spi_release_dt(const struct spi_dt_spec* spec) {
+	return (0);
+}
+
 #ifdef __cplusplus
 }
 #endif

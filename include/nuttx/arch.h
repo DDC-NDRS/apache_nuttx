@@ -2126,7 +2126,6 @@ void up_udelay(useconds_t microseconds);
  *   be CONFIG_USEC_PER_TICK.
  *
  ****************************************************************************/
-
 #ifndef CONFIG_SCHED_TICKLESS
 void nxsched_process_timer(void);
 #endif
@@ -2215,7 +2214,6 @@ void nxsched_process_cpuload_ticks(uint32_t ticks);
  *   logic.
  *
  ****************************************************************************/
-
 void irq_dispatch(int irq, FAR void *context);
 
 /****************************************************************************
