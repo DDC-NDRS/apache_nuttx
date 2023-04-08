@@ -254,13 +254,12 @@ void /**/s32k1xx_periphclocks(unsigned int count, const struct peripheral_clock_
  *   being clocked.
  *
  ****************************************************************************/
-int s32k1xx_get_pclkfreq(enum clock_names_e clkname, uint32_t* frequency) {
+int /**/s32k1xx_get_pclkfreq(enum clock_names_e clkname, uint32_t* frequency) {
     uint32_t* ctrlp;
     uint32_t  freq = 0;
     int       ret  = -ENODEV;
 
     /* Check if the clock is enabled */
-
     ctrlp = s32k1xx_get_pclkctrl(clkname);
     if ((*ctrlp & PCC_CGC) != 0) {
         if ((g_periph_features[clkname] & HAS_INT_CLOCK_FROM_BUS_CLOCK) != 0) {
@@ -316,7 +315,7 @@ int s32k1xx_get_pclkfreq(enum clock_names_e clkname, uint32_t* frequency) {
         *frequency = freq;
     }
 
-    return ret;
+    return (ret);
 }
 
 /****************************************************************************

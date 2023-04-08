@@ -2166,8 +2166,8 @@ void s32k1xx_clock_pm_register(void) {
  *   failure.
  *
  ****************************************************************************/
-uint32_t s32k1xx_get_coreclk(void) {
-    uint32_t coreclk = 0;
+uint32_t /**/s32k1xx_get_coreclk(void) {
+    uint32_t coreclk;
     uint32_t regval;
     uint32_t divider;
     #ifdef CONFIG_S32K1XX_HAVE_SPLL
@@ -2176,12 +2176,10 @@ uint32_t s32k1xx_get_coreclk(void) {
     #endif
 
     /* Get the core clock divider */
-
     regval  = getreg32(S32K1XX_SCG_CSR);
     divider = ((regval & SCG_CSR_DIVCORE_MASK) >> SCG_CSR_DIVCORE_SHIFT) + 1;
 
     /* Handle according to the selection clock source */
-
     switch (regval & SCG_CSR_SCS_MASK) {
         case SCG_CSR_SCS_SOSC : /* System OSC */
             coreclk = BOARD_XTAL_FREQUENCY;
@@ -2212,16 +2210,16 @@ uint32_t s32k1xx_get_coreclk(void) {
         case SCG_CSR_SPLL_FIRC : /* System PLL */
 
             /* Coreclock = Fxtal * mult / (2 * prediv) */
-
             regval = getreg32(S32K1XX_SCG_SPLLCFG);
             prediv = ((regval & SCG_SPLLCFG_PREDIV_MASK) >> SCG_SPLLCFG_PREDIV_SHIFT) + 1;
             mult   = ((regval & SCG_SPLLCFG_MULT_MASK) >> SCG_SPLLCFG_MULT_SHIFT) + 16;
 
-            coreclk = ((BOARD_XTAL_FREQUENCY / 2) * mult) / prediv;
+            coreclk = ((BOARD_XTAL_FREQUENCY / 2UL) * mult) / prediv;
             break;
         #endif
 
         default :
+            coreclk = 0UL;
             return 0;
     }
 
@@ -2243,7 +2241,7 @@ uint32_t s32k1xx_get_coreclk(void) {
  *   any failure.
  *
  ****************************************************************************/
-uint32_t s32k1xx_get_sysclk(enum scg_system_clock_type_e type) {
+uint32_t /**/s32k1xx_get_sysclk(enum scg_system_clock_type_e type) {
     enum scg_system_clock_src_e clksrc;
     uint32_t regval;
     uint32_t divider;
@@ -2295,11 +2293,12 @@ uint32_t s32k1xx_get_sysclk(enum scg_system_clock_type_e type) {
  *   The frequency of the requested asynchronous clock source.
  *
  ****************************************************************************/
-uint32_t s32k1xx_get_asnchfreq(enum clock_names_e clksrc, enum scg_async_clock_type_e type) {
+uint32_t /**/s32k1xx_get_asnchfreq(enum clock_names_e clksrc, enum scg_async_clock_type_e type) {
     uint32_t regval;
-    uint32_t freq = 0;
-    uint32_t div  = 0;
+    uint32_t freq;
+    uint32_t div;
 
+    div = 0UL;
     switch (type) {
         case SCG_ASYNC_CLOCK_DIV1 : {
             switch (clksrc) {
@@ -2331,7 +2330,6 @@ uint32_t s32k1xx_get_asnchfreq(enum clock_names_e clksrc, enum scg_async_clock_t
 
                 default : {
                     /* Invalid clock source type */
-
                     freq = 0;
                     DEBUGPANIC();
                 } break;

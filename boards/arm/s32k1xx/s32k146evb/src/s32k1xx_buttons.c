@@ -27,22 +27,17 @@
 /****************************************************************************
  * Included Files
  ****************************************************************************/
-
 #include <nuttx/config.h>
 
 #include <stdint.h>
 #include <errno.h>
 
 #include <nuttx/board.h>
-
 #include "s32k1xx_pin.h"
-
 #include <arch/board/board.h>
-
 #include "s32k146evb.h"
 
-#ifdef CONFIG_ARCH_BUTTONS
-
+#if defined(CONFIG_ARCH_BUTTONS)
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
@@ -57,39 +52,32 @@
  *   interrupt handlers.
  *
  ****************************************************************************/
+uint32_t board_button_initialize(void) {
+    /* Configure the GPIO pins as interrupting inputs */
+    s32k1xx_pinconfig(GPIO_SW2);
+    s32k1xx_pinconfig(GPIO_SW3);
 
-uint32_t board_button_initialize(void)
-{
-  /* Configure the GPIO pins as interrupting inputs */
-
-  s32k1xx_pinconfig(GPIO_SW2);
-  s32k1xx_pinconfig(GPIO_SW3);
-
-  return NUM_BUTTONS;
+    return (NUM_BUTTONS);
 }
 
 /****************************************************************************
  * Name: board_buttons
  ****************************************************************************/
+uint32_t board_buttons(void) {
+    uint32_t ret = 0;
 
-uint32_t board_buttons(void)
-{
-  uint32_t ret = 0;
-
-  if (s32k1xx_gpioread(GPIO_SW2))
-    {
-      ret |= BUTTON_SW2_BIT;
+    if (s32k1xx_gpioread(GPIO_SW2)) {
+        ret |= BUTTON_SW2_BIT;
     }
 
-  if (s32k1xx_gpioread(GPIO_SW3))
-    {
-      ret |= BUTTON_SW3_BIT;
+    if (s32k1xx_gpioread(GPIO_SW3)) {
+        ret |= BUTTON_SW3_BIT;
     }
 
-  return ret;
+    return (ret);
 }
 
-#ifdef CONFIG_ARCH_IRQBUTTONS
+#if defined(CONFIG_ARCH_IRQBUTTONS)
 /****************************************************************************
  * Button support.
  *
@@ -111,42 +99,33 @@ uint32_t board_buttons(void)
  *   value.
  *
  ****************************************************************************/
+int board_button_irq(int id, xcpt_t irqhandler, void* arg) {
+    uint32_t pinset;
+    int ret;
 
-int board_button_irq(int id, xcpt_t irqhandler, void *arg)
-{
-  uint32_t pinset;
-  int ret;
-
-  /* Map the button id to the GPIO bit set */
-
-  if (id == BUTTON_SW2)
-    {
-      pinset = GPIO_SW2;
+    /* Map the button id to the GPIO bit set */
+    if (id == BUTTON_SW2) {
+        pinset = GPIO_SW2;
     }
-  else if (id == BUTTON_SW3)
-    {
-      pinset = GPIO_SW3;
+    else if (id == BUTTON_SW3) {
+        pinset = GPIO_SW3;
     }
-  else
-    {
-      return -EINVAL;
+    else {
+        return -EINVAL;
     }
 
-  /* The button has already been configured as an interrupting input (by
-   * board_button_initialize() above).
-   *
-   * Attach the new button handler.
-   */
-
-  ret = s32k1xx_pinirqattach(pinset, irqhandler, NULL);
-  if (ret >= 0)
-    {
-      /* Then make sure that interrupts are enabled on the pin */
-
-      s32k1xx_pinirqenable(pinset);
+    /* The button has already been configured as an interrupting input (by
+     * board_button_initialize() above).
+     *
+     * Attach the new button handler.
+     */
+    ret = s32k1xx_pinirqattach(pinset, irqhandler, NULL);
+    if (ret >= 0) {
+        /* Then make sure that interrupts are enabled on the pin */
+        s32k1xx_pinirqenable(pinset);
     }
 
-  return ret;
+    return (ret);
 }
 #endif /* CONFIG_ARCH_IRQBUTTONS */
 #endif /* CONFIG_ARCH_BUTTONS */
