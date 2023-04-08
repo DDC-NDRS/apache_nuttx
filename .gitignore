@@ -28,6 +28,7 @@
 *.ddc
 *.dds
 *.su
+*.ld.tmp
 *~
 .depend
 /.config

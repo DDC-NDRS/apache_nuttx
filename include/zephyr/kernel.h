@@ -14,7 +14,12 @@
 #define ZEPHYR_INCLUDE_KERNEL_H_
 
 #include <nuttx/config.h>
+#include <nuttx/clock.h>
 #include <nuttx/wqueue.h>
+#include <pthread.h>
+#include <errno.h>
+#include <poll.h>
+#include <fcntl.h>
 
 #include <errno.h>
 #include <limits.h>
@@ -170,6 +175,10 @@ static inline int32_t k_usleep(int32_t us) {
 
     ret = usleep((useconds_t)us);
     return (int32_t)(ret);
+}
+
+static inline int64_t k_uptime_ticks(void) {
+	return ((int64_t)clock_systime_ticks());
 }
 
 /**
@@ -387,6 +396,132 @@ static inline int k_work_schedule(struct k_work_delayable* dwork,
 static inline void k_busy_wait(uint32_t usec_to_wait) {
     (void) usleep(usec_to_wait);
 }
+
+// NuttX equivalent for k_poll_event structure
+typedef struct pollfd k_poll_event;
+
+static inline void k_poll_event_init(k_poll_event* event, uint32_t type, int mode, void* obj) {
+	event->arg = obj;
+}
+
+static inline int k_poll(k_poll_event* events, int num_events, k_timeout_t timeout) {
+	int ret = poll(events, num_events, (timeout.ticks / TICK_PER_MSEC));
+
+	return (ret);
+}
+
+static inline void k_poll_signal_init(struct k_poll_signal* sig) {
+
+}
+
+static inline int k_poll_signal_raise(struct k_poll_signal* sig, int result) {
+	return (0);
+}
+
+/* LINES 5,000+ */
+/* public - polling modes */
+/* polling API - PRIVATE */
+
+#ifdef CONFIG_POLL
+#define _INIT_OBJ_POLL_EVENT(obj) do { (obj)->poll_event = NULL; } while (false)
+#else
+#define _INIT_OBJ_POLL_EVENT(obj) do { } while (false)
+#endif
+
+/* private - types bit positions */
+enum _poll_types_bits {
+    /* can be used to ignore an event */
+    _POLL_TYPE_IGNORE,
+
+    /* to be signaled by k_poll_signal_raise() */
+    _POLL_TYPE_SIGNAL,
+
+    /* semaphore availability */
+    _POLL_TYPE_SEM_AVAILABLE,
+
+    /* queue/FIFO/LIFO data availability */
+    _POLL_TYPE_DATA_AVAILABLE,
+
+    /* msgq data availability */
+    _POLL_TYPE_MSGQ_DATA_AVAILABLE,
+
+    /* pipe data availability */
+    _POLL_TYPE_PIPE_DATA_AVAILABLE,
+
+    _POLL_NUM_TYPES
+};
+
+#define Z_POLL_TYPE_BIT(type) (1U << ((type) - 1U))
+
+/* private - states bit positions */
+enum _poll_states_bits {
+    /* default state when creating event */
+    _POLL_STATE_NOT_READY,
+
+    /* signaled by k_poll_signal_raise() */
+    _POLL_STATE_SIGNALED,
+
+    /* semaphore is available */
+    _POLL_STATE_SEM_AVAILABLE,
+
+    /* data is available to read on queue/FIFO/LIFO */
+    _POLL_STATE_DATA_AVAILABLE,
+
+    /* queue/FIFO/LIFO wait was cancelled */
+    _POLL_STATE_CANCELLED,
+
+    /* data is available to read on a message queue */
+    _POLL_STATE_MSGQ_DATA_AVAILABLE,
+
+    /* data is available to read from a pipe */
+    _POLL_STATE_PIPE_DATA_AVAILABLE,
+
+    _POLL_NUM_STATES
+};
+
+#define Z_POLL_STATE_BIT(state) (1U << ((state) - 1U))
+
+/* public - values for k_poll_event.type bitfield */
+#define K_POLL_TYPE_IGNORE 0
+#define K_POLL_TYPE_SIGNAL Z_POLL_TYPE_BIT(_POLL_TYPE_SIGNAL)
+#define K_POLL_TYPE_SEM_AVAILABLE Z_POLL_TYPE_BIT(_POLL_TYPE_SEM_AVAILABLE)
+#define K_POLL_TYPE_DATA_AVAILABLE Z_POLL_TYPE_BIT(_POLL_TYPE_DATA_AVAILABLE)
+#define K_POLL_TYPE_FIFO_DATA_AVAILABLE K_POLL_TYPE_DATA_AVAILABLE
+#define K_POLL_TYPE_MSGQ_DATA_AVAILABLE Z_POLL_TYPE_BIT(_POLL_TYPE_MSGQ_DATA_AVAILABLE)
+#define K_POLL_TYPE_PIPE_DATA_AVAILABLE Z_POLL_TYPE_BIT(_POLL_TYPE_PIPE_DATA_AVAILABLE)
+
+/* public - polling modes */
+enum k_poll_modes {
+    /* polling thread does not take ownership of objects when available */
+    K_POLL_MODE_NOTIFY_ONLY = 0,
+
+    K_POLL_NUM_MODES
+};
+
+/* public - values for k_poll_event.state bitfield */
+#define K_POLL_STATE_NOT_READY 0
+#define K_POLL_STATE_SIGNALED Z_POLL_STATE_BIT(_POLL_STATE_SIGNALED)
+#define K_POLL_STATE_SEM_AVAILABLE Z_POLL_STATE_BIT(_POLL_STATE_SEM_AVAILABLE)
+#define K_POLL_STATE_DATA_AVAILABLE Z_POLL_STATE_BIT(_POLL_STATE_DATA_AVAILABLE)
+#define K_POLL_STATE_FIFO_DATA_AVAILABLE K_POLL_STATE_DATA_AVAILABLE
+#define K_POLL_STATE_MSGQ_DATA_AVAILABLE Z_POLL_STATE_BIT(_POLL_STATE_MSGQ_DATA_AVAILABLE)
+#define K_POLL_STATE_PIPE_DATA_AVAILABLE Z_POLL_STATE_BIT(_POLL_STATE_PIPE_DATA_AVAILABLE)
+#define K_POLL_STATE_CANCELLED Z_POLL_STATE_BIT(_POLL_STATE_CANCELLED)
+
+/* public - poll signal object */
+struct k_poll_signal {
+    /** PRIVATE - DO NOT TOUCH */
+    sys_dlist_t poll_events;
+
+    /**
+     * 1 if the event has been signaled, 0 otherwise. Stays set to 1 until
+     * user resets it to 0.
+     */
+    unsigned int signaled;
+
+    /** custom result value passed to k_poll_signal_raise() if needed */
+    int result;
+};
 
 #ifdef __cplusplus
 }
