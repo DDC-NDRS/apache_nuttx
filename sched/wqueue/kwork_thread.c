@@ -47,27 +47,23 @@
  ****************************************************************************/
 
 #ifndef CONFIG_SCHED_CRITMONITOR_MAXTIME_WQUEUE
-#  define CONFIG_SCHED_CRITMONITOR_MAXTIME_WQUEUE 0
+#define CONFIG_SCHED_CRITMONITOR_MAXTIME_WQUEUE 0
 #endif
 
 #if CONFIG_SCHED_CRITMONITOR_MAXTIME_WQUEUE > 0
-#  define CALL_WORKER(worker, arg) \
-     do \
-       { \
-         uint32_t start; \
-         uint32_t elapsed; \
-         start = up_perf_gettime(); \
-         worker(arg); \
-         elapsed = up_perf_gettime() - start; \
-         if (elapsed > CONFIG_SCHED_CRITMONITOR_MAXTIME_WQUEUE) \
-           { \
-             serr("WORKER %p execute too long %"PRIu32"\n", \
-                   worker, elapsed); \
-           } \
-       } \
-     while (0)
+#define CALL_WORKER(worker, arg)            \
+    do {                                    \
+        uint32_t start;                     \
+        uint32_t elapsed;                   \
+        start = up_perf_gettime();          \
+        worker(arg);                        \
+        elapsed = up_perf_gettime() - start;        \
+        if (elapsed > CONFIG_SCHED_CRITMONITOR_MAXTIME_WQUEUE) {        \
+            serr("WORKER %p execute too long %" PRIu32 "\n", worker, elapsed);  \
+        }                                   \
+    } while (0)
 #else
-#  define CALL_WORKER(worker, arg) worker(arg)
+#define CALL_WORKER(worker, arg) worker(arg)
 #endif
 
 /****************************************************************************
@@ -77,10 +73,9 @@
 #if defined(CONFIG_SCHED_HPWORK)
 /* The state of the kernel mode, high priority work queue(s). */
 
-struct hp_wqueue_s g_hpwork =
-{
-  {NULL, NULL},
-  SEM_INITIALIZER(0),
+struct hp_wqueue_s g_hpwork = {
+    {NULL, NULL},
+    SEM_INITIALIZER(0),
 };
 
 #endif /* CONFIG_SCHED_HPWORK */
@@ -88,10 +83,9 @@ struct hp_wqueue_s g_hpwork =
 #if defined(CONFIG_SCHED_LPWORK)
 /* The state of the kernel mode, low priority work queue(s). */
 
-struct lp_wqueue_s g_lpwork =
-{
-  {NULL, NULL},
-  SEM_INITIALIZER(0),
+struct lp_wqueue_s g_lpwork = {
+    {NULL, NULL},
+    SEM_INITIALIZER(0),
 };
 
 #endif /* CONFIG_SCHED_LPWORK */
@@ -121,72 +115,63 @@ struct lp_wqueue_s g_lpwork =
  *   Does not return
  *
  ****************************************************************************/
+static int /**/work_thread(int argc, FAR char* argv[]) {
+    FAR struct kwork_wqueue_s* wqueue;
+    FAR struct work_s*         work;
+    worker_t                   worker;
+    irqstate_t                 flags;
+    FAR void*                  arg;
 
-static int work_thread(int argc, FAR char *argv[])
-{
-  FAR struct kwork_wqueue_s *wqueue;
-  FAR struct work_s *work;
-  worker_t worker;
-  irqstate_t flags;
-  FAR void *arg;
+    wqueue = (FAR struct kwork_wqueue_s*)((uintptr_t)strtoul(argv[1], NULL, 0));
 
-  wqueue = (FAR struct kwork_wqueue_s *)
-           ((uintptr_t)strtoul(argv[1], NULL, 0));
+    flags = enter_critical_section();
 
-  flags = enter_critical_section();
+    /* Loop forever */
+    for (;;) {
+        /* Then process queued work.  work_process will not return until: (1)
+         * there is no further work in the work queue, and (2) semaphore is
+         * posted.
+         */
+        nxsem_wait_uninterruptible(&wqueue->sem);
 
-  /* Loop forever */
+        /* And check each entry in the work queue.  Since we have disabled
+         * interrupts we know:  (1) we will not be suspended unless we do
+         * so ourselves, and (2) there will be no changes to the work queue
+         */
 
-  for (; ; )
-    {
-      /* Then process queued work.  work_process will not return until: (1)
-       * there is no further work in the work queue, and (2) semaphore is
-       * posted.
-       */
-
-      nxsem_wait_uninterruptible(&wqueue->sem);
-
-      /* And check each entry in the work queue.  Since we have disabled
-       * interrupts we know:  (1) we will not be suspended unless we do
-       * so ourselves, and (2) there will be no changes to the work queue
-       */
-
-      /* Remove the ready-to-execute work from the list */
-
-      while ((work = (FAR struct work_s *)dq_remfirst(&wqueue->q)) != NULL)
-        {
-          if (work->worker == NULL)
-            {
-              continue;
+        /* Remove the ready-to-execute work from the list */
+        while ((work = (FAR struct work_s*)dq_remfirst(&wqueue->q)) != NULL) {
+            if (work->worker == NULL) {
+                continue;
             }
 
-          /* Extract the work description from the entry (in case the work
-           * instance will be re-used after it has been de-queued).
-           */
+            /* Extract the work description from the entry (in case the work
+             * instance will be re-used after it has been de-queued).
+             */
 
-          worker = work->worker;
+            worker = work->worker;
 
-          /* Extract the work argument (before re-enabling interrupts) */
+            /* Extract the work argument (before re-enabling interrupts) */
 
-          arg = work->arg;
+            arg = work->arg;
 
-          /* Mark the work as no longer being queued */
+            /* Mark the work as no longer being queued */
 
-          work->worker = NULL;
+            work->worker = NULL;
 
-          /* Do the work.  Re-enable interrupts while the work is being
-           * performed... we don't have any idea how long this will take!
-           */
+            /* Do the work.  Re-enable interrupts while the work is being
+             * performed... we don't have any idea how long this will take!
+             */
 
-          leave_critical_section(flags);
-          CALL_WORKER(worker, arg);
-          flags = enter_critical_section();
+            leave_critical_section(flags);
+            CALL_WORKER(worker, arg);
+            flags = enter_critical_section();
         }
     }
 
-  leave_critical_section(flags);
+    leave_critical_section(flags);
 
-  return OK; /* To keep some compilers happy */
+    return OK; /* To keep some compilers happy */
 }
 
 /****************************************************************************
@@ -207,44 +192,38 @@ static int work_thread(int argc, FAR char *argv[])
  *   A negated errno value is returned on failure.
  *
  ****************************************************************************/
+static int work_thread_create(FAR char const* name, int priority, int stack_size, int nthread,
+                              FAR struct kwork_wqueue_s* wqueue) {
+    FAR char* argv[2];
+    char      args[32];
+    int       wndx;
+    int       pid;
 
-static int work_thread_create(FAR const char *name, int priority,
-                              int stack_size, int nthread,
-                              FAR struct kwork_wqueue_s *wqueue)
-{
-  FAR char *argv[2];
-  char args[32];
-  int wndx;
-  int pid;
+    snprintf(args, sizeof(args), "0x%" PRIxPTR, (uintptr_t)wqueue);
+    argv[0] = args;
+    argv[1] = NULL;
 
-  snprintf(args, sizeof(args), "0x%" PRIxPTR, (uintptr_t)wqueue);
-  argv[0] = args;
-  argv[1] = NULL;
+    /* Don't permit any of the threads to run until we have fully initialized
+     * g_hpwork and g_lpwork.
+     */
 
-  /* Don't permit any of the threads to run until we have fully initialized
-   * g_hpwork and g_lpwork.
-   */
+    sched_lock();
 
-  sched_lock();
+    for (wndx = 0; wndx < nthread; wndx++) {
+        pid = kthread_create(name, priority, stack_size, work_thread, argv);
 
-  for (wndx = 0; wndx < nthread; wndx++)
-    {
-      pid = kthread_create(name, priority, stack_size,
-                           work_thread, argv);
-
-      DEBUGASSERT(pid > 0);
-      if (pid < 0)
-        {
-          serr("ERROR: work_thread_create %d failed: %d\n", wndx, pid);
-          sched_unlock();
-          return pid;
+        DEBUGASSERT(pid > 0);
+        if (pid < 0) {
+            serr("ERROR: work_thread_create %d failed: %d\n", wndx, pid);
+            sched_unlock();
+            return pid;
         }
 
-      wqueue->worker[wndx].pid  = pid;
+        wqueue->worker[wndx].pid = pid;
     }
 
-  sched_unlock();
-  return OK;
+    sched_unlock();
+    return OK;
 }
 
 /****************************************************************************
@@ -268,35 +247,31 @@ static int work_thread_create(FAR const char *name, int priority,
  *
  ****************************************************************************/
 
-void work_foreach(int qid, work_foreach_t handler, FAR void *arg)
-{
-  FAR struct kwork_wqueue_s *wqueue;
-  int nthread;
-  int wndx;
+void work_foreach(int qid, work_foreach_t handler, FAR void* arg) {
+    FAR struct kwork_wqueue_s* wqueue;
+    int                        nthread;
+    int                        wndx;
 
 #ifdef CONFIG_SCHED_HPWORK
-  if (qid == HPWORK)
-    {
-      wqueue  = (FAR struct kwork_wqueue_s *)&g_hpwork;
-      nthread = CONFIG_SCHED_HPNTHREADS;
+    if (qid == HPWORK) {
+        wqueue  = (FAR struct kwork_wqueue_s*)&g_hpwork;
+        nthread = CONFIG_SCHED_HPNTHREADS;
     }
-  else
+    else
 #endif
 #ifdef CONFIG_SCHED_LPWORK
-  if (qid == LPWORK)
-    {
-      wqueue  = (FAR struct kwork_wqueue_s *)&g_lpwork;
-      nthread = CONFIG_SCHED_LPNTHREADS;
+        if (qid == LPWORK) {
+        wqueue  = (FAR struct kwork_wqueue_s*)&g_lpwork;
+        nthread = CONFIG_SCHED_LPNTHREADS;
     }
-  else
+    else
 #endif
     {
-      return;
+        return;
     }
 
-  for (wndx = 0; wndx < nthread; wndx++)
-    {
-      handler(wqueue->worker[wndx].pid, arg);
+    for (wndx = 0; wndx < nthread; wndx++) {
+        handler(wqueue->worker[wndx].pid, arg);
     }
 }
 
@@ -315,16 +290,13 @@ void work_foreach(int qid, work_foreach_t handler, FAR void *arg)
  ****************************************************************************/
 
 #if defined(CONFIG_SCHED_HPWORK)
-int work_start_highpri(void)
-{
-  /* Start the high-priority, kernel mode worker thread(s) */
+int work_start_highpri(void) {
+    /* Start the high-priority, kernel mode worker thread(s) */
 
-  sinfo("Starting high-priority kernel worker thread(s)\n");
+    sinfo("Starting high-priority kernel worker thread(s)\n");
 
-  return work_thread_create(HPWORKNAME, CONFIG_SCHED_HPWORKPRIORITY,
-                            CONFIG_SCHED_HPWORKSTACKSIZE,
-                            CONFIG_SCHED_HPNTHREADS,
-                            (FAR struct kwork_wqueue_s *)&g_hpwork);
+    return work_thread_create(HPWORKNAME, CONFIG_SCHED_HPWORKPRIORITY, CONFIG_SCHED_HPWORKSTACKSIZE,
+                              CONFIG_SCHED_HPNTHREADS, (FAR struct kwork_wqueue_s*)&g_hpwork);
 }
 #endif /* CONFIG_SCHED_HPWORK */
 
@@ -341,18 +313,14 @@ int work_start_highpri(void)
  *   A negated errno value is returned on failure.
  *
  ****************************************************************************/
-
 #if defined(CONFIG_SCHED_LPWORK)
-int work_start_lowpri(void)
-{
-  /* Start the low-priority, kernel mode worker thread(s) */
+int work_start_lowpri(void) {
+    /* Start the low-priority, kernel mode worker thread(s) */
 
-  sinfo("Starting low-priority kernel worker thread(s)\n");
+    sinfo("Starting low-priority kernel worker thread(s)\n");
 
-  return work_thread_create(LPWORKNAME, CONFIG_SCHED_LPWORKPRIORITY,
-                            CONFIG_SCHED_LPWORKSTACKSIZE,
-                            CONFIG_SCHED_LPNTHREADS,
-                            (FAR struct kwork_wqueue_s *)&g_lpwork);
+    return work_thread_create(LPWORKNAME, CONFIG_SCHED_LPWORKPRIORITY, CONFIG_SCHED_LPWORKSTACKSIZE,
+                              CONFIG_SCHED_LPNTHREADS, (FAR struct kwork_wqueue_s*)&g_lpwork);
 }
 #endif /* CONFIG_SCHED_LPWORK */
 

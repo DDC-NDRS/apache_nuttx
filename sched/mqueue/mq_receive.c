@@ -69,54 +69,49 @@
  *   (see mq_receive() for the list list valid return values).
  *
  ****************************************************************************/
+ssize_t file_mq_receive(FAR struct file* mq, FAR char* msg, size_t msglen, FAR unsigned int* prio) {
+    FAR struct mqueue_inode_s* msgq;
+    FAR struct mqueue_msg_s*   mqmsg;
+    irqstate_t flags;
+    ssize_t ret;
 
-ssize_t file_mq_receive(FAR struct file *mq, FAR char *msg, size_t msglen,
-                        FAR unsigned int *prio)
-{
-  FAR struct mqueue_inode_s *msgq;
-  FAR struct mqueue_msg_s *mqmsg;
-  irqstate_t flags;
-  ssize_t ret;
+    DEBUGASSERT(up_interrupt_context() == false);
 
-  DEBUGASSERT(up_interrupt_context() == false);
+    /* Verify the input parameters and, in case of an error, set
+     * errno appropriately.
+     */
 
-  /* Verify the input parameters and, in case of an error, set
-   * errno appropriately.
-   */
-
-  ret = nxmq_verify_receive(mq, msg, msglen);
-  if (ret < 0)
-    {
-      return ret;
+    ret = nxmq_verify_receive(mq, msg, msglen);
+    if (ret < 0) {
+        return ret;
     }
 
-  msgq = mq->f_inode->i_private;
+    msgq = mq->f_inode->i_private;
 
-  /* Furthermore, nxmq_wait_receive() expects to have interrupts disabled
-   * because messages can be sent from interrupt level.
-   */
+    /* Furthermore, nxmq_wait_receive() expects to have interrupts disabled
+     * because messages can be sent from interrupt level.
+     */
 
-  flags = enter_critical_section();
+    flags = enter_critical_section();
 
-  /* Get the message from the message queue */
+    /* Get the message from the message queue */
 
-  ret = nxmq_wait_receive(msgq, mq->f_oflags, &mqmsg);
+    ret = nxmq_wait_receive(msgq, mq->f_oflags, &mqmsg);
 
-  /* Check if we got a message from the message queue.  We might
-   * not have a message if:
-   *
-   * - The message queue is empty and O_NONBLOCK is set in the mq
-   * - The wait was interrupted by a signal
-   */
+    /* Check if we got a message from the message queue.  We might
+     * not have a message if:
+     *
+     * - The message queue is empty and O_NONBLOCK is set in the mq
+     * - The wait was interrupted by a signal
+     */
 
-  if (ret == OK)
-    {
-      ret = nxmq_do_receive(msgq, mqmsg, msg, prio);
+    if (ret == OK) {
+        ret = nxmq_do_receive(msgq, mqmsg, msg, prio);
     }
 
-  leave_critical_section(flags);
+    leave_critical_section(flags);
 
-  return ret;
+    return ret;
 }
 
 /****************************************************************************
@@ -146,20 +141,16 @@ ssize_t file_mq_receive(FAR struct file *mq, FAR char *msg, size_t msglen,
  *   (see mq_receive() for the list list valid return values).
  *
  ****************************************************************************/
+ssize_t nxmq_receive(mqd_t mqdes, FAR char* msg, size_t msglen, FAR unsigned int* prio) {
+    FAR struct file* filep;
+    int ret;
 
-ssize_t nxmq_receive(mqd_t mqdes, FAR char *msg, size_t msglen,
-                     FAR unsigned int *prio)
-{
-  FAR struct file *filep;
-  int ret;
-
-  ret = fs_getfilep(mqdes, &filep);
-  if (ret < 0)
-    {
-      return ret;
+    ret = fs_getfilep(mqdes, &filep);
+    if (ret < 0) {
+        return ret;
     }
 
-  return file_mq_receive(filep, msg, msglen, prio);
+    return file_mq_receive(filep, msg, msglen, prio);
 }
 
 /****************************************************************************
@@ -199,25 +190,21 @@ ssize_t nxmq_receive(mqd_t mqdes, FAR char *msg, size_t msglen,
  *   EINVAL   Invalid 'msg' or 'mqdes'
  *
  ****************************************************************************/
+ssize_t /**/mq_receive(mqd_t mqdes, FAR char* msg, size_t msglen, FAR unsigned int* prio) {
+    int ret;
 
-ssize_t mq_receive(mqd_t mqdes, FAR char *msg, size_t msglen,
-                   FAR unsigned int *prio)
-{
-  int ret;
+    /* mq_receive() is a cancellation point */
 
-  /* mq_receive() is a cancellation point */
+    enter_cancellation_point();
 
-  enter_cancellation_point();
+    /* Let nxmq_receive do all of the work */
 
-  /* Let nxmq_receive do all of the work */
-
-  ret = nxmq_receive(mqdes, msg, msglen, prio);
-  if (ret < 0)
-    {
-      set_errno(-ret);
-      ret = ERROR;
+    ret = nxmq_receive(mqdes, msg, msglen, prio);
+    if (ret < 0) {
+        set_errno(-ret);
+        ret = ERROR;
     }
 
-  leave_cancellation_point();
-  return ret;
+    leave_cancellation_point();
+    return ret;
 }

@@ -21,7 +21,6 @@
 /****************************************************************************
  * Included Files
  ****************************************************************************/
-
 #include <nuttx/config.h>
 
 #include <errno.h>
@@ -39,7 +38,6 @@
  ****************************************************************************/
 
 /* Common exception entrypoint */
-
 void exception_common(void);
 
 /****************************************************************************
@@ -50,46 +48,40 @@ void exception_common(void);
  *   dispatched by hardware to 'vector'
  *
  ****************************************************************************/
+int /**/arm_ramvec_attach(int irq, up_vector_t vector) {
+    int ret = -EINVAL;
 
-int arm_ramvec_attach(int irq, up_vector_t vector)
-{
-  int ret = -EINVAL;
+    irqinfo("%s IRQ%d\n", vector ? "Attaching" : "Detaching", irq);
 
-  irqinfo("%s IRQ%d\n", vector ? "Attaching" : "Detaching", irq);
+    if ((unsigned)irq < ARMV7M_VECTAB_SIZE) {
+        irqstate_t flags;
 
-  if ((unsigned)irq < ARMV7M_VECTAB_SIZE)
-    {
-      irqstate_t flags;
+        /* If the new vector is NULL, then the vector is being detached. In
+         * this case, disable the itnerrupt and direct any interrupts to the
+         * common exception handler.
+         */
+        flags = enter_critical_section();
+        if (vector == NULL) {
+            /* Disable the interrupt if we can before detaching it.  We might
+             * not be able to do this for all interrupts.
+             */
 
-      /* If the new vector is NULL, then the vector is being detached. In
-       * this case, disable the itnerrupt and direct any interrupts to the
-       * common exception handler.
-       */
+            up_disable_irq(irq);
 
-      flags = enter_critical_section();
-      if (vector == NULL)
-        {
-          /* Disable the interrupt if we can before detaching it.  We might
-           * not be able to do this for all interrupts.
-           */
+            /* Detaching the vector really means re-attaching it to the
+             * common exception handler.
+             */
 
-          up_disable_irq(irq);
-
-          /* Detaching the vector really means re-attaching it to the
-           * common exception handler.
-           */
-
-           vector = exception_common;
+            vector = exception_common;
         }
 
-      /* Save the new vector in the vector table */
-
-      g_ram_vectors[irq] = vector;
-      leave_critical_section(flags);
-      ret = OK;
+        /* Save the new vector in the vector table */
+        g_ram_vectors[irq] = vector;
+        leave_critical_section(flags);
+        ret = OK;
     }
 
-  return ret;
+    return ret;
 }
 
 #endif /* !CONFIG_ARCH_RAMVECTORS */

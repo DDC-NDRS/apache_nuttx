@@ -400,7 +400,6 @@ void up_release_stack(FAR struct tcb_s *dtcb, uint8_t ttype);
  *   rtcb: Refers to the running task which will be blocked.
  *
  ****************************************************************************/
-
 void up_switch_context(FAR struct tcb_s *tcb, FAR struct tcb_s *rtcb);
 
 /****************************************************************************
@@ -2127,7 +2126,6 @@ void up_udelay(useconds_t microseconds);
  *   be CONFIG_USEC_PER_TICK.
  *
  ****************************************************************************/
-
 #ifndef CONFIG_SCHED_TICKLESS
 void nxsched_process_timer(void);
 #endif
@@ -2216,7 +2214,6 @@ void nxsched_process_cpuload_ticks(uint32_t ticks);
  *   logic.
  *
  ****************************************************************************/
-
 void irq_dispatch(int irq, FAR void *context);
 
 /****************************************************************************

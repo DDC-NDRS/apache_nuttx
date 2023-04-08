@@ -50,32 +50,26 @@
  *
  ****************************************************************************/
 
-#if defined(CONFIG_SERIAL_RXDMA) && \
-   (defined(CONFIG_TTY_SIGINT) || defined(CONFIG_TTY_SIGTSTP) || \
-    defined(CONFIG_TTY_FORCE_PANIC) || defined(CONFIG_TTY_LAUNCH))
-static int uart_recvchars_check_special(FAR uart_dev_t *dev)
-{
-  FAR struct uart_dmaxfer_s *xfer = &dev->dmarx;
-  int signo;
+#if defined(CONFIG_SERIAL_RXDMA) && (defined(CONFIG_TTY_SIGINT) || defined(CONFIG_TTY_SIGTSTP) ||                      \
+                                     defined(CONFIG_TTY_FORCE_PANIC) || defined(CONFIG_TTY_LAUNCH))
+static int uart_recvchars_check_special(FAR uart_dev_t* dev) {
+    FAR struct uart_dmaxfer_s* xfer = &dev->dmarx;
+    int                        signo;
 
-  /* Check if the valid DMAed data is in one or two contiguous regions */
+    /* Check if the valid DMAed data is in one or two contiguous regions */
 
-  if (xfer->nbytes <= xfer->length)
-    {
-      return uart_check_special(dev, xfer->buffer, xfer->nbytes);
+    if (xfer->nbytes <= xfer->length) {
+        return uart_check_special(dev, xfer->buffer, xfer->nbytes);
     }
-  else
-    {
-      /* REVISIT:  Additional signals could be in the second region. */
+    else {
+        /* REVISIT:  Additional signals could be in the second region. */
 
-      signo = uart_check_special(dev, xfer->buffer, xfer->length);
-      if (signo != 0)
-        {
-          return signo;
+        signo = uart_check_special(dev, xfer->buffer, xfer->length);
+        if (signo != 0) {
+            return signo;
         }
 
-      return uart_check_special(dev, xfer->nbuffer,
-                                xfer->nbytes - xfer->length);
+        return uart_check_special(dev, xfer->nbuffer, xfer->nbytes - xfer->length);
     }
 }
 #endif
@@ -91,35 +85,29 @@ static int uart_recvchars_check_special(FAR uart_dev_t *dev)
  *   Set up to transfer bytes from the TX circular buffer using DMA
  *
  ****************************************************************************/
-
 #ifdef CONFIG_SERIAL_TXDMA
-void uart_xmitchars_dma(FAR uart_dev_t *dev)
-{
-  FAR struct uart_dmaxfer_s *xfer = &dev->dmatx;
+void uart_xmitchars_dma(FAR uart_dev_t* dev) {
+    FAR struct uart_dmaxfer_s* xfer = &dev->dmatx;
 
-  if (dev->xmit.head == dev->xmit.tail)
-    {
-      /* No data to transfer. */
-
-      return;
+    if (dev->xmit.head == dev->xmit.tail) {
+        /* No data to transfer. */
+        return;
     }
 
-  if (dev->xmit.tail < dev->xmit.head)
-    {
-      xfer->buffer  = &dev->xmit.buffer[dev->xmit.tail];
-      xfer->length  = dev->xmit.head - dev->xmit.tail;
-      xfer->nbuffer = NULL;
-      xfer->nlength = 0;
+    if (dev->xmit.tail < dev->xmit.head) {
+        xfer->buffer  = &dev->xmit.buffer[dev->xmit.tail];
+        xfer->length  = dev->xmit.head - dev->xmit.tail;
+        xfer->nbuffer = NULL;
+        xfer->nlength = 0;
     }
-  else
-    {
-      xfer->buffer  = &dev->xmit.buffer[dev->xmit.tail];
-      xfer->length  = dev->xmit.size - dev->xmit.tail;
-      xfer->nbuffer = dev->xmit.buffer;
-      xfer->nlength = dev->xmit.head;
+    else {
+        xfer->buffer  = &dev->xmit.buffer[dev->xmit.tail];
+        xfer->length  = dev->xmit.size - dev->xmit.tail;
+        xfer->nbuffer = dev->xmit.buffer;
+        xfer->nlength = dev->xmit.head;
     }
 
-  uart_dmasend(dev);
+    uart_dmasend(dev);
 }
 #endif
 
@@ -133,37 +121,33 @@ void uart_xmitchars_dma(FAR uart_dev_t *dev)
  *   buffer.
  *
  ****************************************************************************/
-
 #ifdef CONFIG_SERIAL_TXDMA
-void uart_xmitchars_done(FAR uart_dev_t *dev)
-{
-  FAR struct uart_dmaxfer_s *xfer = &dev->dmatx;
-  size_t nbytes = xfer->nbytes;
-  struct uart_buffer_s *txbuf = &dev->xmit;
+void uart_xmitchars_done(FAR uart_dev_t* dev) {
+    FAR struct uart_dmaxfer_s* xfer   = &dev->dmatx;
+    size_t                     nbytes = xfer->nbytes;
+    struct uart_buffer_s*      txbuf  = &dev->xmit;
 
-  /* Skip the update if the tail position change which mean
-   * someone reset (e.g. TCOFLUSH) the xmit buffer during DMA.
-   */
+    /* Skip the update if the tail position change which mean
+     * someone reset (e.g. TCOFLUSH) the xmit buffer during DMA.
+     */
 
-  if (xfer->buffer == &txbuf->buffer[txbuf->tail])
-    {
-      /* Move tail for nbytes. */
+    if (xfer->buffer == &txbuf->buffer[txbuf->tail]) {
+        /* Move tail for nbytes. */
 
-      txbuf->tail  = (txbuf->tail + nbytes) % txbuf->size;
+        txbuf->tail = (txbuf->tail + nbytes) % txbuf->size;
     }
 
-  /* Reset xmit buffer. */
+    /* Reset xmit buffer. */
 
-  xfer->nbytes = 0;
-  xfer->length = xfer->nlength = 0;
+    xfer->nbytes = 0;
+    xfer->length = xfer->nlength = 0;
 
-  /* If any bytes were removed from the buffer, inform any waiters there
-   * there is space available.
-   */
+    /* If any bytes were removed from the buffer, inform any waiters there
+     * there is space available.
+     */
 
-  if (nbytes)
-    {
-      uart_datasent(dev);
+    if (nbytes) {
+        uart_datasent(dev);
     }
 }
 #endif
@@ -177,124 +161,109 @@ void uart_xmitchars_done(FAR uart_dev_t *dev)
  ****************************************************************************/
 
 #ifdef CONFIG_SERIAL_RXDMA
-void uart_recvchars_dma(FAR uart_dev_t *dev)
-{
-  FAR struct uart_dmaxfer_s *xfer = &dev->dmarx;
-  FAR struct uart_buffer_s *rxbuf = &dev->recv;
+void /**/ uart_recvchars_dma(FAR uart_dev_t* dev) {
+    FAR struct uart_dmaxfer_s* xfer  = &dev->dmarx;
+    FAR struct uart_buffer_s*  rxbuf = &dev->recv;
 #ifdef CONFIG_SERIAL_IFLOWCONTROL_WATERMARKS
-  unsigned int nbuffered;
-  unsigned int watermark;
+    unsigned int nbuffered;
+    unsigned int watermark;
 #endif
-  bool is_full;
-  int nexthead;
+    bool is_full;
+    int  nexthead;
 
-  /* If RX buffer is empty move tail and head to zero position */
+    /* If RX buffer is empty move tail and head to zero position */
 
-  if (rxbuf->head == rxbuf->tail)
-    {
-      rxbuf->head = 0;
-      rxbuf->tail = 0;
+    if (rxbuf->head == rxbuf->tail) {
+        rxbuf->head = 0;
+        rxbuf->tail = 0;
     }
 
-  /* Get the next head index and check if there is room to adding another
-   * byte to the buffer.
-   */
+    /* Get the next head index and check if there is room to adding another
+     * byte to the buffer.
+     */
 
-  nexthead = rxbuf->head + 1;
-  if (nexthead >= rxbuf->size)
-    {
-      nexthead = 0;
+    nexthead = rxbuf->head + 1;
+    if (nexthead >= rxbuf->size) {
+        nexthead = 0;
     }
 
-  is_full = nexthead == rxbuf->tail;
+    is_full = nexthead == rxbuf->tail;
 
 #ifdef CONFIG_SERIAL_IFLOWCONTROL_WATERMARKS
-  /* Pre-calculate the watermark level that we will need to test against. */
+    /* Pre-calculate the watermark level that we will need to test against. */
 
-  watermark = (CONFIG_SERIAL_IFLOWCONTROL_UPPER_WATERMARK * rxbuf->size) /
-              100;
+    watermark = (CONFIG_SERIAL_IFLOWCONTROL_UPPER_WATERMARK * rxbuf->size) / 100;
 #endif
 
 #ifdef CONFIG_SERIAL_IFLOWCONTROL
 #ifdef CONFIG_SERIAL_IFLOWCONTROL_WATERMARKS
-  /* How many bytes are buffered */
+    /* How many bytes are buffered */
 
-  if (rxbuf->head >= rxbuf->tail)
-    {
-      nbuffered = rxbuf->head - rxbuf->tail;
+    if (rxbuf->head >= rxbuf->tail) {
+        nbuffered = rxbuf->head - rxbuf->tail;
     }
-  else
-    {
-      nbuffered = rxbuf->size - rxbuf->tail + rxbuf->head;
+    else {
+        nbuffered = rxbuf->size - rxbuf->tail + rxbuf->head;
     }
 
-  /* Is the level now above the watermark level that we need to report? */
+    /* Is the level now above the watermark level that we need to report? */
 
-  if (nbuffered >= watermark)
-    {
-      /* Let the lower level driver know that the watermark level has been
-       * crossed.  It will probably activate RX flow control.
-       */
+    if (nbuffered >= watermark) {
+        /* Let the lower level driver know that the watermark level has been
+         * crossed.  It will probably activate RX flow control.
+         */
 
-      if (uart_rxflowcontrol(dev, nbuffered, true))
-        {
-          /* Low-level driver activated RX flow control, return now. */
+        if (uart_rxflowcontrol(dev, nbuffered, true)) {
+            /* Low-level driver activated RX flow control, return now. */
 
-          return;
+            return;
         }
     }
 
 #else
-  /* Check if RX buffer is full and allow serial low-level driver to pause
-   * processing. This allows proper utilization of hardware flow control.
-   */
+    /* Check if RX buffer is full and allow serial low-level driver to pause
+     * processing. This allows proper utilization of hardware flow control.
+     */
 
-  if (is_full)
-    {
-      if (uart_rxflowcontrol(dev, rxbuf->size, true))
-        {
-          /* Low-level driver activated RX flow control, return now. */
+    if (is_full) {
+        if (uart_rxflowcontrol(dev, rxbuf->size, true)) {
+            /* Low-level driver activated RX flow control, return now. */
 
-          return;
+            return;
         }
     }
 #endif
 #endif
 
-  if (is_full)
-    {
-      /* If there is no free space in receive buffer we cannot start DMA
-       * transfer.
-       */
+    if (is_full) {
+        /* If there is no free space in receive buffer we cannot start DMA
+         * transfer.
+         */
 
-      return;
+        return;
     }
 
-  if (rxbuf->tail <= rxbuf->head)
-    {
-      xfer->buffer  = &rxbuf->buffer[rxbuf->head];
-      xfer->nbuffer = rxbuf->buffer;
+    if (rxbuf->tail <= rxbuf->head) {
+        xfer->buffer  = &rxbuf->buffer[rxbuf->head];
+        xfer->nbuffer = rxbuf->buffer;
 
-      if (rxbuf->tail > 0)
-        {
-          xfer->length  = rxbuf->size - rxbuf->head;
-          xfer->nlength = rxbuf->tail - 1;
+        if (rxbuf->tail > 0) {
+            xfer->length  = rxbuf->size - rxbuf->head;
+            xfer->nlength = rxbuf->tail - 1;
         }
-      else
-        {
-          xfer->length  = rxbuf->size - rxbuf->head - 1;
-          xfer->nlength = 0;
+        else {
+            xfer->length  = rxbuf->size - rxbuf->head - 1;
+            xfer->nlength = 0;
         }
     }
-  else
-    {
-      xfer->buffer  = &rxbuf->buffer[rxbuf->head];
-      xfer->length  = rxbuf->tail - rxbuf->head - 1;
-      xfer->nbuffer = NULL;
-      xfer->nlength = 0;
+    else {
+        xfer->buffer  = &rxbuf->buffer[rxbuf->head];
+        xfer->length  = rxbuf->tail - rxbuf->head - 1;
+        xfer->nbuffer = NULL;
+        xfer->nlength = 0;
     }
 
-  uart_dmareceive(dev);
+    uart_dmareceive(dev);
 }
 #endif
 
@@ -310,45 +279,42 @@ void uart_recvchars_dma(FAR uart_dev_t *dev)
  ****************************************************************************/
 
 #ifdef CONFIG_SERIAL_RXDMA
-void uart_recvchars_done(FAR uart_dev_t *dev)
-{
-  FAR struct uart_dmaxfer_s *xfer = &dev->dmarx;
-  FAR struct uart_buffer_s *rxbuf = &dev->recv;
-  size_t nbytes = xfer->nbytes;
-#if defined(CONFIG_TTY_SIGINT) || defined(CONFIG_TTY_SIGTSTP) || \
-    defined(CONFIG_TTY_FORCE_PANIC) || defined(CONFIG_TTY_LAUNCH)
-  int signo = 0;
+void uart_recvchars_done(FAR uart_dev_t* dev) {
+    FAR struct uart_dmaxfer_s* xfer   = &dev->dmarx;
+    FAR struct uart_buffer_s*  rxbuf  = &dev->recv;
+    size_t                     nbytes = xfer->nbytes;
+#if defined(CONFIG_TTY_SIGINT) || defined(CONFIG_TTY_SIGTSTP) || defined(CONFIG_TTY_FORCE_PANIC) ||                    \
+    defined(CONFIG_TTY_LAUNCH)
+    int signo = 0;
 
-  /* Check if the SIGINT character is anywhere in the newly received DMA
-   * buffer.
-   */
+    /* Check if the SIGINT character is anywhere in the newly received DMA
+     * buffer.
+     */
 
-  signo = uart_recvchars_check_special(dev);
+    signo = uart_recvchars_check_special(dev);
 #endif
 
-  /* Move head for nbytes. */
+    /* Move head for nbytes. */
 
-  rxbuf->head  = (rxbuf->head + nbytes) % rxbuf->size;
-  xfer->nbytes = 0;
-  xfer->length = xfer->nlength = 0;
+    rxbuf->head  = (rxbuf->head + nbytes) % rxbuf->size;
+    xfer->nbytes = 0;
+    xfer->length = xfer->nlength = 0;
 
-  /* If any bytes were added to the buffer, inform any waiters there is new
-   * incoming data available.
-   */
+    /* If any bytes were added to the buffer, inform any waiters there is new
+     * incoming data available.
+     */
 
-  if (nbytes)
-    {
-      uart_datareceived(dev);
+    if (nbytes) {
+        uart_datareceived(dev);
     }
 
-#if defined(CONFIG_TTY_SIGINT) || defined(CONFIG_TTY_SIGTSTP) || \
-    defined(CONFIG_TTY_FORCE_PANIC) || defined(CONFIG_TTY_LAUNCH)
-  /* Send the signal if necessary */
+#if defined(CONFIG_TTY_SIGINT) || defined(CONFIG_TTY_SIGTSTP) || defined(CONFIG_TTY_FORCE_PANIC) ||                    \
+    defined(CONFIG_TTY_LAUNCH)
+    /* Send the signal if necessary */
 
-  if (signo != 0)
-    {
-      nxsig_kill(dev->pid, signo);
-      uart_reset_sem(dev);
+    if (signo != 0) {
+        nxsig_kill(dev->pid, signo);
+        uart_reset_sem(dev);
     }
 #endif
 }

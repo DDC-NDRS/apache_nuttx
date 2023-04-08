@@ -30,6 +30,9 @@
 #                   reliable code generation.
 #
 
+# CUSTOM@NDRS
+LDFLAGS += --print-memory-usage
+
 ifeq ($(CONFIG_DEBUG_CUSTOMOPT),y)
   ARCHOPTIMIZATION += $(CONFIG_DEBUG_OPTLEVEL)
 else ifeq ($(CONFIG_DEBUG_FULLOPT),y)
@@ -264,7 +267,8 @@ ifneq ($(CONFIG_CXX_RTTI),y)
   ARCHCXXFLAGS += -fno-rtti
 endif
 
-ARCHOPTIMIZATION += -fno-common -Wall -Wshadow -Wundef
+# #CUSTOM@NDRS remove -Wshadow
+ARCHOPTIMIZATION += -fno-common -Wall -Wundef
 
 ifeq ($(CONFIG_ARM_TOOLCHAIN_ARMCLANG),y)
   ARCHOPTIMIZATION += -nostdlib

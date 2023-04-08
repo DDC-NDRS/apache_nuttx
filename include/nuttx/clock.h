@@ -434,9 +434,8 @@ clock_t clock_systime_ticks(void);
  *   Always returns OK (0)
  *
  ****************************************************************************/
-
-int clock_time2ticks(FAR const struct timespec *reltime,
-                     FAR sclock_t *ticks);
+int clock_time2ticks(FAR const struct timespec* reltime,
+                     FAR sclock_t* ticks);
 
 /****************************************************************************
  * Name: clock_ticks2time

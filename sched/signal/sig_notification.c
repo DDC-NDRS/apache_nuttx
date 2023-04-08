@@ -40,9 +40,9 @@
  ****************************************************************************/
 
 #ifdef CONFIG_SIG_EVTHREAD_HPWORK
-#  define SIG_EVTHREAD_WORK HPWORK
+#define SIG_EVTHREAD_WORK HPWORK
 #else
-#  define SIG_EVTHREAD_WORK LPWORK
+#define SIG_EVTHREAD_WORK LPWORK
 #endif
 
 /****************************************************************************
@@ -60,15 +60,14 @@
  ****************************************************************************/
 
 #ifdef CONFIG_SIG_EVTHREAD
-static void nxsig_notification_worker(FAR void *arg)
-{
-  FAR struct sigwork_s *work = (FAR struct sigwork_s *)arg;
+static void nxsig_notification_worker(FAR void* arg) {
+    FAR struct sigwork_s* work = (FAR struct sigwork_s*)arg;
 
-  DEBUGASSERT(work != NULL);
+    DEBUGASSERT(work != NULL);
 
-  /* Perform the callback */
+    /* Perform the callback */
 
-  work->func(work->value);
+    work->func(work->value);
 }
 
 #endif /* CONFIG_SIG_EVTHREAD */
@@ -99,63 +98,56 @@ static void nxsig_notification_worker(FAR void *arg)
  *   returned on success.  A negated errno value is returned on failure.
  *
  ****************************************************************************/
+int /**/nxsig_notification(pid_t pid, FAR struct sigevent* event, int code, FAR struct sigwork_s* work) {
+    sinfo("pid=%" PRIu16 " signo=%d code=%d sival_ptr=%p\n", pid, event->sigev_signo, code,
+          event->sigev_value.sival_ptr);
 
-int nxsig_notification(pid_t pid, FAR struct sigevent *event,
-                       int code, FAR struct sigwork_s *work)
-{
-  sinfo("pid=%" PRIu16 " signo=%d code=%d sival_ptr=%p\n",
-         pid, event->sigev_signo, code, event->sigev_value.sival_ptr);
+    /* Notify client via a signal? */
 
-  /* Notify client via a signal? */
-
-  if (event->sigev_notify == SIGEV_SIGNAL)
-    {
+    if (event->sigev_notify == SIGEV_SIGNAL) {
 #ifdef CONFIG_SCHED_HAVE_PARENT
-      FAR struct tcb_s *rtcb = this_task();
+        FAR struct tcb_s* rtcb = this_task();
 #endif
-      siginfo_t info;
+        siginfo_t info;
 
-      /* Yes.. Create the siginfo structure */
+        /* Yes.. Create the siginfo structure */
 
-      info.si_signo  = event->sigev_signo;
-      info.si_code   = code;
-      info.si_errno  = OK;
+        info.si_signo = event->sigev_signo;
+        info.si_code  = code;
+        info.si_errno = OK;
 #ifdef CONFIG_SCHED_HAVE_PARENT
-      info.si_pid    = rtcb->pid;
-      info.si_status = OK;
+        info.si_pid    = rtcb->pid;
+        info.si_status = OK;
 #endif
 
-      /* Some compilers (e.g., SDCC), do not permit assignment of aggregates.
-       * Use of memcpy() is overkill;  We could just copy the larger of the
-       * nt and FAR void * members in the union.  memcpy(), however, does
-       * not require that we know which is larger.
-       */
+        /* Some compilers (e.g., SDCC), do not permit assignment of aggregates.
+         * Use of memcpy() is overkill;  We could just copy the larger of the
+         * nt and FAR void * members in the union.  memcpy(), however, does
+         * not require that we know which is larger.
+         */
 
-      memcpy(&info.si_value, &event->sigev_value, sizeof(union sigval));
+        memcpy(&info.si_value, &event->sigev_value, sizeof(union sigval));
 
-      /* Send the signal */
+        /* Send the signal */
 
-      return nxsig_dispatch(pid, &info);
+        return nxsig_dispatch(pid, &info);
     }
 
 #ifdef CONFIG_SIG_EVTHREAD
-  /* Notify the client via a function call */
+    /* Notify the client via a function call */
+    else if (event->sigev_notify == SIGEV_THREAD) {
+        /* Initialize the work information */
 
-  else if (event->sigev_notify == SIGEV_THREAD)
-    {
-      /* Initialize the work information */
+        work->value = event->sigev_value;
+        work->func  = event->sigev_notify_function;
 
-      work->value = event->sigev_value;
-      work->func  = event->sigev_notify_function;
+        /* Then queue the work */
 
-      /* Then queue the work */
-
-      return work_queue(SIG_EVTHREAD_WORK, &work->work,
-                        nxsig_notification_worker, work, 0);
+        return work_queue(SIG_EVTHREAD_WORK, &work->work, nxsig_notification_worker, work, 0);
     }
 #endif
 
-  return event->sigev_notify == SIGEV_NONE ? OK : -ENOSYS;
+    return event->sigev_notify == SIGEV_NONE ? OK : -ENOSYS;
 }
 
 /****************************************************************************
@@ -173,8 +165,7 @@ int nxsig_notification(pid_t pid, FAR struct sigevent *event,
  ****************************************************************************/
 
 #ifdef CONFIG_SIG_EVTHREAD
-void nxsig_cancel_notification(FAR struct sigwork_s *work)
-{
-  work_cancel(SIG_EVTHREAD_WORK, &work->work);
+void nxsig_cancel_notification(FAR struct sigwork_s* work) {
+    work_cancel(SIG_EVTHREAD_WORK, &work->work);
 }
 #endif

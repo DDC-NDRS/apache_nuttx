@@ -112,7 +112,6 @@ extern clock_t g_wdtickbase;
  *   Called from interrupt handler logic with interrupts disabled.
  *
  ****************************************************************************/
-
 #ifdef CONFIG_SCHED_TICKLESS
 unsigned int wd_timer(int ticks, bool noswitches);
 #else

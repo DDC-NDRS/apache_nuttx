@@ -48,50 +48,58 @@
  ****************************************************************************/
 
 /* Base addresses for each GPIO block */
+const uint32_t g_gpiobase[STM32H7_NGPIO] = {
+    #if (STM32H7_NGPIO > 0)
+    STM32_GPIOA_BASE,
+    #endif
 
-const uint32_t g_gpiobase[STM32H7_NGPIO] =
-{
-#if STM32H7_NGPIO > 0
-  STM32_GPIOA_BASE,
-#endif
-#if STM32H7_NGPIO > 1
-  STM32_GPIOB_BASE,
-#endif
-#if STM32H7_NGPIO > 2
-  STM32_GPIOC_BASE,
-#endif
-#if STM32H7_NGPIO > 3
-  STM32_GPIOD_BASE,
-#endif
-#if STM32H7_NGPIO > 4
-  STM32_GPIOE_BASE,
-#endif
-#if STM32H7_NGPIO > 5
-#  if defined(CONFIG_STM32H7_HAVE_GPIOF)
-  STM32_GPIOF_BASE,
-#  else
-  0,
-#  endif
-#endif
-#if STM32H7_NGPIO > 6
-#  if defined(CONFIG_STM32H7_HAVE_GPIOG)
-  STM32_GPIOG_BASE,
-#  else
-  0,
-#  endif
-#endif
-#if STM32H7_NGPIO > 7
-  STM32_GPIOH_BASE,
-#endif
-#if STM32H7_NGPIO > 8
-  STM32_GPIOI_BASE,
-#endif
-#if STM32H7_NGPIO > 9
-  STM32_GPIOJ_BASE,
-#endif
-#if STM32H7_NGPIO > 10
-  STM32_GPIOK_BASE,
-#endif
+    #if (STM32H7_NGPIO > 1)
+    STM32_GPIOB_BASE,
+    #endif
+
+    #if (STM32H7_NGPIO > 2)
+    STM32_GPIOC_BASE,
+    #endif
+
+    #if (STM32H7_NGPIO > 3)
+    STM32_GPIOD_BASE,
+    #endif
+
+    #if (STM32H7_NGPIO > 4)
+    STM32_GPIOE_BASE,
+    #endif
+
+    #if (STM32H7_NGPIO > 5)
+    #if defined(CONFIG_STM32H7_HAVE_GPIOF)
+    STM32_GPIOF_BASE,
+    #else
+    0,
+    #endif
+    #endif
+
+    #if (STM32H7_NGPIO > 6)
+    #if defined(CONFIG_STM32H7_HAVE_GPIOG)
+    STM32_GPIOG_BASE,
+    #else
+    0,
+    #endif
+    #endif
+
+    #if (STM32H7_NGPIO > 7)
+    STM32_GPIOH_BASE,
+    #endif
+
+    #if (STM32H7_NGPIO > 8)
+    STM32_GPIOI_BASE,
+    #endif
+
+    #if (STM32H7_NGPIO > 9)
+    STM32_GPIOJ_BASE,
+    #endif
+
+    #if (STM32H7_NGPIO > 10)
+    STM32_GPIOK_BASE,
+    #endif
 };
 
 /****************************************************************************
@@ -112,9 +120,8 @@ const uint32_t g_gpiobase[STM32H7_NGPIO] =
  *   no mutual exclusion is necessary.
  *
  ****************************************************************************/
-
-void stm32_gpioinit(void)
-{
+void stm32_gpioinit(void) {
+    /* pass */
 }
 
 /****************************************************************************
@@ -133,252 +140,228 @@ void stm32_gpioinit(void)
  *
  * To-Do: Auto Power Enable
  ****************************************************************************/
+int stm32_configgpio(uint32_t cfgset) {
+    uintptr_t    base;
+    uint32_t     regval;
+    uint32_t     setting;
+    uint32_t     alt_setting;
+    unsigned int regoffset;
+    unsigned int port;
+    unsigned int pin;
+    unsigned int pos;
+    unsigned int pinmode;
+    irqstate_t   flags;
 
-int stm32_configgpio(uint32_t cfgset)
-{
-  uintptr_t base;
-  uint32_t regval;
-  uint32_t setting;
-  uint32_t alt_setting;
-  unsigned int regoffset;
-  unsigned int port;
-  unsigned int pin;
-  unsigned int pos;
-  unsigned int pinmode;
-  irqstate_t flags;
+    /* Verify that this hardware supports the select GPIO port */
 
-  /* Verify that this hardware supports the select GPIO port */
-
-  port = (cfgset & GPIO_PORT_MASK) >> GPIO_PORT_SHIFT;
-  if (port >= STM32H7_NGPIO)
-    {
-      return -EINVAL;
+    port = (cfgset & GPIO_PORT_MASK) >> GPIO_PORT_SHIFT;
+    if (port >= STM32H7_NGPIO) {
+        return -EINVAL;
     }
 
-  /* Get the port base address */
+    /* Get the port base address */
 
-  base = g_gpiobase[port];
-  if (base == 0)
-    {
-      return -EINVAL;
+    base = g_gpiobase[port];
+    if (base == 0) {
+        return -EINVAL;
     }
 
-  /* Get the pin number and select the port configuration register for that
-   * pin
-   */
+    /* Get the pin number and select the port configuration register for that
+     * pin
+     */
 
-  pin = (cfgset & GPIO_PIN_MASK) >> GPIO_PIN_SHIFT;
+    pin = (cfgset & GPIO_PIN_MASK) >> GPIO_PIN_SHIFT;
 
-  /* Set up the mode register (and remember whether the pin mode) */
+    /* Set up the mode register (and remember whether the pin mode) */
 
-  switch (cfgset & GPIO_MODE_MASK)
-    {
-      default:
-      case GPIO_INPUT:      /* Input mode */
-        pinmode = GPIO_MODER_INPUT;
-        break;
-
-      case GPIO_OUTPUT:     /* General purpose output mode */
-
-        /* Set the initial output value */
-
-        stm32_gpiowrite(cfgset, (cfgset & GPIO_OUTPUT_SET) != 0);
-        pinmode = GPIO_MODER_OUTPUT;
-        break;
-
-      case GPIO_ALT:        /* Alternate function mode */
-        pinmode = GPIO_MODER_ALT;
-        break;
-
-      case GPIO_ANALOG:     /* Analog mode */
-        pinmode = GPIO_MODER_ANALOG;
-        break;
-    }
-
-  /* Interrupts must be disabled from here on out so that we have mutually
-   * exclusive access to all of the GPIO configuration registers.
-   */
-
-  flags = enter_critical_section();
-
-  /* Determine the alternate function (Only alternate function pins) */
-
-  if (pinmode == GPIO_MODER_ALT)
-    {
-      setting = (cfgset & GPIO_AF_MASK) >> GPIO_AF_SHIFT;
-    }
-  else
-    {
-      setting = 0;
-    }
-
-  if (pinmode == GPIO_MODER_ALT)
-    {
-      alt_setting = (cfgset & GPIO_AF_MASK) >> GPIO_AF_SHIFT;
-    }
-  else
-    {
-      alt_setting = 0;
-    }
-
-  /* Set the alternate function (Only alternate function pins)
-   * This is done before configuring the Outputs on a change to
-   * an Alternate function.
-   */
-
-  if (alt_setting != 0)
-    {
-      if (pin < 8)
-        {
-          regoffset = STM32_GPIO_AFRL_OFFSET;
-          pos       = pin;
-        }
-      else
-        {
-          regoffset = STM32_GPIO_AFRH_OFFSET;
-          pos       = pin - 8;
-        }
-
-      regval  = getreg32(base + regoffset);
-      regval &= ~GPIO_AFR_MASK(pos);
-      regval |= (alt_setting << GPIO_AFR_SHIFT(pos));
-      putreg32(regval, base + regoffset);
-    }
-
-  /* Now apply the configuration to the mode register */
-
-  regval  = getreg32(base + STM32_GPIO_MODER_OFFSET);
-  regval &= ~GPIO_MODER_MASK(pin);
-  regval |= ((uint32_t)pinmode << GPIO_MODER_SHIFT(pin));
-  putreg32(regval, base + STM32_GPIO_MODER_OFFSET);
-
-  /* Set up the pull-up/pull-down configuration (all but analog pins) */
-
-  setting = GPIO_PUPDR_NONE;
-  if (pinmode != GPIO_MODER_ANALOG)
-    {
-      switch (cfgset & GPIO_PUPD_MASK)
-        {
-          default:
-          case GPIO_FLOAT:      /* No pull-up, pull-down */
+    switch (cfgset & GPIO_MODE_MASK) {
+        default :
+        case GPIO_INPUT : /* Input mode */
+            pinmode = GPIO_MODER_INPUT;
             break;
 
-          case GPIO_PULLUP:     /* Pull-up */
-            setting = GPIO_PUPDR_PULLUP;
+        case GPIO_OUTPUT : /* General purpose output mode */
+
+            /* Set the initial output value */
+
+            stm32_gpiowrite(cfgset, (cfgset & GPIO_OUTPUT_SET) != 0);
+            pinmode = GPIO_MODER_OUTPUT;
             break;
 
-          case GPIO_PULLDOWN:   /* Pull-down */
-            setting = GPIO_PUPDR_PULLDOWN;
+        case GPIO_ALT : /* Alternate function mode */
+            pinmode = GPIO_MODER_ALT;
             break;
-        }
+
+        case GPIO_ANALOG : /* Analog mode */
+            pinmode = GPIO_MODER_ANALOG;
+            break;
     }
 
-  regval  = getreg32(base + STM32_GPIO_PUPDR_OFFSET);
-  regval &= ~GPIO_PUPDR_MASK(pin);
-  regval |= (setting << GPIO_PUPDR_SHIFT(pin));
-  putreg32(regval, base + STM32_GPIO_PUPDR_OFFSET);
+    /* Interrupts must be disabled from here on out so that we have mutually
+     * exclusive access to all of the GPIO configuration registers.
+     */
 
-  /* Set the alternate function (Only alternate function pins)
-   * This is done after configuring the the pin's connection
-   * on a change away from an Alternate function.
-   */
+    flags = enter_critical_section();
 
-  if (alt_setting == 0)
-      {
-        if (pin < 8)
-          {
+    /* Determine the alternate function (Only alternate function pins) */
+
+    if (pinmode == GPIO_MODER_ALT) {
+        setting = (cfgset & GPIO_AF_MASK) >> GPIO_AF_SHIFT;
+    }
+    else {
+        setting = 0;
+    }
+
+    if (pinmode == GPIO_MODER_ALT) {
+        alt_setting = (cfgset & GPIO_AF_MASK) >> GPIO_AF_SHIFT;
+    }
+    else {
+        alt_setting = 0;
+    }
+
+    /* Set the alternate function (Only alternate function pins)
+     * This is done before configuring the Outputs on a change to
+     * an Alternate function.
+     */
+
+    if (alt_setting != 0) {
+        if (pin < 8) {
             regoffset = STM32_GPIO_AFRL_OFFSET;
             pos       = pin;
-          }
-        else
-          {
+        }
+        else {
             regoffset = STM32_GPIO_AFRH_OFFSET;
             pos       = pin - 8;
-          }
+        }
 
-        regval  = getreg32(base + regoffset);
+        regval = getreg32(base + regoffset);
         regval &= ~GPIO_AFR_MASK(pos);
         regval |= (alt_setting << GPIO_AFR_SHIFT(pos));
         putreg32(regval, base + regoffset);
-      }
+    }
 
-  /* Set speed (Only outputs and alternate function pins) */
+    /* Now apply the configuration to the mode register */
 
-  if (pinmode == GPIO_MODER_OUTPUT || pinmode == GPIO_MODER_ALT)
-    {
-      switch (cfgset & GPIO_SPEED_MASK)
-        {
-          default:
-          case GPIO_SPEED_2MHz:    /* 2 MHz Low speed output */
-            setting = GPIO_OSPEED_2MHz;
-            break;
+    regval = getreg32(base + STM32_GPIO_MODER_OFFSET);
+    regval &= ~GPIO_MODER_MASK(pin);
+    regval |= ((uint32_t)pinmode << GPIO_MODER_SHIFT(pin));
+    putreg32(regval, base + STM32_GPIO_MODER_OFFSET);
 
-          case GPIO_SPEED_25MHz:   /* 25 MHz Medium speed output */
-            setting = GPIO_OSPEED_25MHz;
-            break;
+    /* Set up the pull-up/pull-down configuration (all but analog pins) */
 
-          case GPIO_SPEED_50MHz:   /* 50 MHz Fast speed output  */
-            setting = GPIO_OSPEED_50MHz;
-            break;
+    setting = GPIO_PUPDR_NONE;
+    if (pinmode != GPIO_MODER_ANALOG) {
+        switch (cfgset & GPIO_PUPD_MASK) {
+            default :
+            case GPIO_FLOAT : /* No pull-up, pull-down */
+                break;
 
-          case GPIO_SPEED_100MHz:   /* 100 MHz High speed output */
-            setting = GPIO_OSPEED_100MHz;
-            break;
+            case GPIO_PULLUP : /* Pull-up */
+                setting = GPIO_PUPDR_PULLUP;
+                break;
+
+            case GPIO_PULLDOWN : /* Pull-down */
+                setting = GPIO_PUPDR_PULLDOWN;
+                break;
         }
     }
-  else
-    {
-      setting = 0;
+
+    regval = getreg32(base + STM32_GPIO_PUPDR_OFFSET);
+    regval &= ~GPIO_PUPDR_MASK(pin);
+    regval |= (setting << GPIO_PUPDR_SHIFT(pin));
+    putreg32(regval, base + STM32_GPIO_PUPDR_OFFSET);
+
+    /* Set the alternate function (Only alternate function pins)
+     * This is done after configuring the the pin's connection
+     * on a change away from an Alternate function.
+     */
+
+    if (alt_setting == 0) {
+        if (pin < 8) {
+            regoffset = STM32_GPIO_AFRL_OFFSET;
+            pos       = pin;
+        }
+        else {
+            regoffset = STM32_GPIO_AFRH_OFFSET;
+            pos       = pin - 8;
+        }
+
+        regval = getreg32(base + regoffset);
+        regval &= ~GPIO_AFR_MASK(pos);
+        regval |= (alt_setting << GPIO_AFR_SHIFT(pos));
+        putreg32(regval, base + regoffset);
     }
 
-  regval  = getreg32(base + STM32_GPIO_OSPEED_OFFSET);
-  regval &= ~GPIO_OSPEED_MASK(pin);
-  regval |= (setting << GPIO_OSPEED_SHIFT(pin));
-  putreg32(regval, base + STM32_GPIO_OSPEED_OFFSET);
+    /* Set speed (Only outputs and alternate function pins) */
 
-  /* Set push-pull/open-drain (Only outputs and alternate function pins) */
+    if (pinmode == GPIO_MODER_OUTPUT || pinmode == GPIO_MODER_ALT) {
+        switch (cfgset & GPIO_SPEED_MASK) {
+            default :
+            case GPIO_SPEED_2MHz : /* 2 MHz Low speed output */
+                setting = GPIO_OSPEED_2MHz;
+                break;
 
-  regval  = getreg32(base + STM32_GPIO_OTYPER_OFFSET);
-  setting = GPIO_OTYPER_OD(pin);
+            case GPIO_SPEED_25MHz : /* 25 MHz Medium speed output */
+                setting = GPIO_OSPEED_25MHz;
+                break;
 
-  if ((pinmode == GPIO_MODER_OUTPUT || pinmode == GPIO_MODER_ALT) &&
-      (cfgset & GPIO_OPENDRAIN) != 0)
-    {
-      regval |= setting;
+            case GPIO_SPEED_50MHz : /* 50 MHz Fast speed output  */
+                setting = GPIO_OSPEED_50MHz;
+                break;
+
+            case GPIO_SPEED_100MHz : /* 100 MHz High speed output */
+                setting = GPIO_OSPEED_100MHz;
+                break;
+        }
     }
-  else
-    {
-      regval &= ~setting;
-    }
-
-  putreg32(regval, base + STM32_GPIO_OTYPER_OFFSET);
-
-  /* Otherwise, it is an input pin.  Should it configured as an EXTI
-   * interrupt?
-   */
-
-  if (pinmode != GPIO_MODER_OUTPUT && (cfgset & GPIO_EXTI) != 0)
-    {
-      /* Selection of the EXTI line source is performed through the EXTIx
-       * bits in the SYSCFG_EXTICRx registers.
-       */
-
-      uint32_t regaddr;
-      int shift;
-
-      /* Set the bits in the SYSCFG EXTICR register */
-
-      regaddr = STM32_SYSCFG_EXTICR(pin);
-      regval  = getreg32(regaddr);
-      shift   = SYSCFG_EXTICR_EXTI_SHIFT(pin);
-      regval &= ~(SYSCFG_EXTICR_PORT_MASK << shift);
-      regval |= (((uint32_t)port) << shift);
-
-      putreg32(regval, regaddr);
+    else {
+        setting = 0;
     }
 
-  leave_critical_section(flags);
-  return OK;
+    regval = getreg32(base + STM32_GPIO_OSPEED_OFFSET);
+    regval &= ~GPIO_OSPEED_MASK(pin);
+    regval |= (setting << GPIO_OSPEED_SHIFT(pin));
+    putreg32(regval, base + STM32_GPIO_OSPEED_OFFSET);
+
+    /* Set push-pull/open-drain (Only outputs and alternate function pins) */
+
+    regval  = getreg32(base + STM32_GPIO_OTYPER_OFFSET);
+    setting = GPIO_OTYPER_OD(pin);
+
+    if ((pinmode == GPIO_MODER_OUTPUT || pinmode == GPIO_MODER_ALT) && (cfgset & GPIO_OPENDRAIN) != 0) {
+        regval |= setting;
+    }
+    else {
+        regval &= ~setting;
+    }
+
+    putreg32(regval, base + STM32_GPIO_OTYPER_OFFSET);
+
+    /* Otherwise, it is an input pin.  Should it configured as an EXTI
+     * interrupt?
+     */
+
+    if (pinmode != GPIO_MODER_OUTPUT && (cfgset & GPIO_EXTI) != 0) {
+        /* Selection of the EXTI line source is performed through the EXTIx
+         * bits in the SYSCFG_EXTICRx registers.
+         */
+
+        uint32_t regaddr;
+        int      shift;
+
+        /* Set the bits in the SYSCFG EXTICR register */
+
+        regaddr = STM32_SYSCFG_EXTICR(pin);
+        regval  = getreg32(regaddr);
+        shift   = SYSCFG_EXTICR_EXTI_SHIFT(pin);
+        regval &= ~(SYSCFG_EXTICR_PORT_MASK << shift);
+        regval |= (((uint32_t)port) << shift);
+
+        putreg32(regval, regaddr);
+    }
+
+    leave_critical_section(flags);
+    return OK;
 }
 
 /****************************************************************************
@@ -401,17 +384,15 @@ int stm32_configgpio(uint32_t cfgset)
  *
  * To-Do: Auto Power Disable
  ****************************************************************************/
+int stm32_unconfiggpio(uint32_t cfgset) {
+    /* Reuse port and pin number and set it to default HiZ INPUT */
 
-int stm32_unconfiggpio(uint32_t cfgset)
-{
-  /* Reuse port and pin number and set it to default HiZ INPUT */
+    cfgset &= GPIO_PORT_MASK | GPIO_PIN_MASK;
+    cfgset |= GPIO_INPUT | GPIO_FLOAT;
 
-  cfgset &= GPIO_PORT_MASK | GPIO_PIN_MASK;
-  cfgset |= GPIO_INPUT | GPIO_FLOAT;
+    /* To-Do: Mark its unuse for automatic power saving options */
 
-  /* To-Do: Mark its unuse for automatic power saving options */
-
-  return stm32_configgpio(cfgset);
+    return stm32_configgpio(cfgset);
 }
 
 /****************************************************************************
@@ -421,38 +402,32 @@ int stm32_unconfiggpio(uint32_t cfgset)
  *   Write one or zero to the selected GPIO pin
  *
  ****************************************************************************/
+void stm32_gpiowrite(uint32_t pinset, bool value) {
+    uint32_t     base;
+    uint32_t     bit;
+    unsigned int port;
+    unsigned int pin;
 
-void stm32_gpiowrite(uint32_t pinset, bool value)
-{
-  uint32_t base;
-  uint32_t bit;
-  unsigned int port;
-  unsigned int pin;
+    port = (pinset & GPIO_PORT_MASK) >> GPIO_PORT_SHIFT;
+    if (port < STM32H7_NGPIO) {
+        /* Get the port base address */
 
-  port = (pinset & GPIO_PORT_MASK) >> GPIO_PORT_SHIFT;
-  if (port < STM32H7_NGPIO)
-    {
-      /* Get the port base address */
+        base = g_gpiobase[port];
+        if (base != 0) {
+            /* Get the pin number  */
 
-      base = g_gpiobase[port];
-      if (base != 0)
-        {
-          /* Get the pin number  */
+            pin = (pinset & GPIO_PIN_MASK) >> GPIO_PIN_SHIFT;
 
-          pin = (pinset & GPIO_PIN_MASK) >> GPIO_PIN_SHIFT;
+            /* Set or clear the output on the pin */
 
-          /* Set or clear the output on the pin */
-
-          if (value)
-            {
-              bit = GPIO_BSRR_SET(pin);
+            if (value) {
+                bit = GPIO_BSRR_SET(pin);
             }
-          else
-            {
-              bit = GPIO_BSRR_RESET(pin);
+            else {
+                bit = GPIO_BSRR_RESET(pin);
             }
 
-          putreg32(bit, base + STM32_GPIO_BSRR_OFFSET);
+            putreg32(bit, base + STM32_GPIO_BSRR_OFFSET);
         }
     }
 }
@@ -464,30 +439,25 @@ void stm32_gpiowrite(uint32_t pinset, bool value)
  *   Read one or zero from the selected GPIO pin
  *
  ****************************************************************************/
+bool stm32_gpioread(uint32_t pinset) {
+    uint32_t     base;
+    unsigned int port;
+    unsigned int pin;
 
-bool stm32_gpioread(uint32_t pinset)
-{
-  uint32_t base;
-  unsigned int port;
-  unsigned int pin;
+    port = (pinset & GPIO_PORT_MASK) >> GPIO_PORT_SHIFT;
+    if (port < STM32H7_NGPIO) {
+        /* Get the port base address */
 
-  port = (pinset & GPIO_PORT_MASK) >> GPIO_PORT_SHIFT;
-  if (port < STM32H7_NGPIO)
-    {
-      /* Get the port base address */
+        base = g_gpiobase[port];
+        if (base != 0) {
+            /* Get the pin number and return the input state of that pin */
 
-      base = g_gpiobase[port];
-      if (base != 0)
-        {
-          /* Get the pin number and return the input state of that pin */
-
-          pin = (pinset & GPIO_PIN_MASK) >> GPIO_PIN_SHIFT;
-          return ((getreg32(base + STM32_GPIO_IDR_OFFSET) &
-                  (1 << pin)) != 0);
+            pin = (pinset & GPIO_PIN_MASK) >> GPIO_PIN_SHIFT;
+            return ((getreg32(base + STM32_GPIO_IDR_OFFSET) & (1 << pin)) != 0);
         }
     }
 
-  return 0;
+    return 0;
 }
 
 /****************************************************************************
@@ -512,20 +482,17 @@ bool stm32_gpioread(uint32_t pinset)
  *   None
  *
  ****************************************************************************/
-
 #ifdef CONFIG_STM32H7_SYSCFG_IOCOMPENSATION
-void stm32_iocompensation(void)
-{
-  /* Enable I/O Compensation.  Writing '1' to the CMPCR power-down bit
-   * enables the I/O compensation cell.
-   */
+void stm32_iocompensation(void) {
+    /* Enable I/O Compensation.  Writing '1' to the CMPCR power-down bit
+     * enables the I/O compensation cell.
+     */
 
-  putreg32(SYSCFG_CCCSR_EN, STM32_SYSCFG_CCCSR);
+    putreg32(SYSCFG_CCCSR_EN, STM32_SYSCFG_CCCSR);
 
-  /* Wait for compensation cell to become ready */
+    /* Wait for compensation cell to become ready */
 
-  while ((getreg32(STM32_SYSCFG_CCCSR) & SYSCFG_CCCSR_READY) == 0)
-    {
+    while ((getreg32(STM32_SYSCFG_CCCSR) & SYSCFG_CCCSR_READY) == 0) {
     }
 }
 #endif

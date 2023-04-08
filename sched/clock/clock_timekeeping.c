@@ -21,7 +21,6 @@
 /****************************************************************************
  * Included Files
  ****************************************************************************/
-
 #include <nuttx/config.h>
 
 #ifdef CONFIG_CLOCK_TIMEKEEPING
@@ -40,13 +39,11 @@
 /****************************************************************************
  * Pre-processor Definitions
  ****************************************************************************/
-
 #define NTP_MAX_ADJUST 500
 
 /****************************************************************************
  * Private Data
  ****************************************************************************/
-
 static struct timespec g_clock_wall_time;
 static uint64_t        g_clock_last_counter;
 static uint64_t        g_clock_mask;
@@ -59,43 +56,38 @@ static long            g_clock_adjust;
 /****************************************************************************
  * Name: clock_get_current_time
  ****************************************************************************/
+static int clock_get_current_time(FAR struct timespec* ts, FAR struct timespec* base) {
+    irqstate_t flags;
+    uint64_t   counter;
+    uint64_t   offset;
+    uint64_t   nsec;
+    time_t     sec;
+    int        ret;
 
-static int clock_get_current_time(FAR struct timespec *ts,
-                                  FAR struct timespec *base)
-{
-  irqstate_t flags;
-  uint64_t counter;
-  uint64_t offset;
-  uint64_t nsec;
-  time_t sec;
-  int ret;
+    flags = enter_critical_section();
 
-  flags = enter_critical_section();
-
-  ret = up_timer_gettick(&counter);
-  if (ret < 0)
-    {
-      goto errout_in_critical_section;
+    ret = up_timer_gettick(&counter);
+    if (ret < 0) {
+        goto errout_in_critical_section;
     }
 
-  offset = (counter - g_clock_last_counter) & g_clock_mask;
-  nsec   = offset * NSEC_PER_TICK;
-  sec    = nsec   / NSEC_PER_SEC;
-  nsec  -= sec    * NSEC_PER_SEC;
+    offset = (counter - g_clock_last_counter) & g_clock_mask;
+    nsec   = offset * NSEC_PER_TICK;
+    sec    = nsec / NSEC_PER_SEC;
+    nsec  -= sec * NSEC_PER_SEC;
 
-  nsec  += base->tv_nsec;
-  if (nsec >= NSEC_PER_SEC)
-    {
-      nsec -= NSEC_PER_SEC;
-      sec  += 1;
+    nsec += base->tv_nsec;
+    if (nsec >= NSEC_PER_SEC) {
+        nsec -= NSEC_PER_SEC;
+        sec += 1;
     }
 
-  ts->tv_nsec = nsec;
-  ts->tv_sec = base->tv_sec + sec;
+    ts->tv_nsec = nsec;
+    ts->tv_sec  = base->tv_sec + sec;
 
 errout_in_critical_section:
-  leave_critical_section(flags);
-  return ret;
+    leave_critical_section(flags);
+    return ret;
 }
 
 /****************************************************************************
@@ -105,38 +97,33 @@ errout_in_critical_section:
 /****************************************************************************
  * Name: clock_timekeeping_get_wall_time
  ****************************************************************************/
-
-int clock_timekeeping_get_wall_time(FAR struct timespec *ts)
-{
-  return clock_get_current_time(ts, &g_clock_wall_time);
+int clock_timekeeping_get_wall_time(FAR struct timespec* ts) {
+    return clock_get_current_time(ts, &g_clock_wall_time);
 }
 
 /****************************************************************************
  * Name: clock_timekeeping_set_wall_time
  ****************************************************************************/
+int clock_timekeeping_set_wall_time(FAR const struct timespec* ts) {
+    irqstate_t flags;
+    uint64_t   counter;
+    int        ret;
 
-int clock_timekeeping_set_wall_time(FAR const struct timespec *ts)
-{
-  irqstate_t flags;
-  uint64_t counter;
-  int ret;
+    flags = enter_critical_section();
 
-  flags = enter_critical_section();
-
-  ret = up_timer_gettick(&counter);
-  if (ret < 0)
-    {
-      goto errout_in_critical_section;
+    ret = up_timer_gettick(&counter);
+    if (ret < 0) {
+        goto errout_in_critical_section;
     }
 
-  memcpy(&g_clock_wall_time, ts, sizeof(struct timespec));
+    memcpy(&g_clock_wall_time, ts, sizeof(struct timespec));
 
-  g_clock_adjust       = 0;
-  g_clock_last_counter = counter;
+    g_clock_adjust       = 0;
+    g_clock_last_counter = counter;
 
 errout_in_critical_section:
-  leave_critical_section(flags);
-  return ret;
+    leave_critical_section(flags);
+    return ret;
 }
 
 /****************************************************************************
@@ -174,122 +161,105 @@ errout_in_critical_section:
  *   It is also supported for Linux compatibility.
  *
  ****************************************************************************/
+int adjtime(FAR const struct timeval* delta, FAR struct timeval* olddelta) {
+    irqstate_t flags;
+    long       adjust_usec;
 
-int adjtime(FAR const struct timeval *delta, FAR struct timeval *olddelta)
-{
-  irqstate_t flags;
-  long adjust_usec;
-
-  if (!delta)
-    {
-      set_errno(EINVAL);
-      return -1;
+    if (!delta) {
+        set_errno(EINVAL);
+        return -1;
     }
 
-  flags = enter_critical_section();
+    flags = enter_critical_section();
 
-  adjust_usec = delta->tv_sec * USEC_PER_SEC + delta->tv_usec;
+    adjust_usec = delta->tv_sec * USEC_PER_SEC + delta->tv_usec;
 
-  if (olddelta)
-    {
-      olddelta->tv_usec = g_clock_adjust;
+    if (olddelta) {
+        olddelta->tv_usec = g_clock_adjust;
     }
 
-  g_clock_adjust = adjust_usec;
+    g_clock_adjust = adjust_usec;
 
-  leave_critical_section(flags);
+    leave_critical_section(flags);
 
-  return OK;
+    return OK;
 }
 
 /****************************************************************************
  * Name: clock_update_wall_time
  ****************************************************************************/
+void /**/ clock_update_wall_time(void) {
+    irqstate_t flags;
+    uint64_t   counter;
+    uint64_t   offset;
+    int64_t    nsec;
+    time_t     sec;
+    int        ret;
 
-void clock_update_wall_time(void)
-{
-  irqstate_t flags;
-  uint64_t counter;
-  uint64_t offset;
-  int64_t nsec;
-  time_t sec;
-  int ret;
+    flags = enter_critical_section();
 
-  flags = enter_critical_section();
-
-  ret = up_timer_gettick(&counter);
-  if (ret < 0)
-    {
-      goto errout_in_critical_section;
+    ret = up_timer_gettick(&counter);
+    if (ret < 0) {
+        goto errout_in_critical_section;
     }
 
-  offset = (counter - g_clock_last_counter) & g_clock_mask;
-  if (offset == 0)
-    {
-      goto errout_in_critical_section;
+    offset = (counter - g_clock_last_counter) & g_clock_mask;
+    if (offset == 0) {
+        goto errout_in_critical_section;
     }
 
-  nsec  = offset * NSEC_PER_TICK;
-  sec   = nsec / NSEC_PER_SEC;
-  nsec -= sec * NSEC_PER_SEC;
+    nsec = offset * NSEC_PER_TICK;
+    sec  = nsec / NSEC_PER_SEC;
+    nsec -= sec * NSEC_PER_SEC;
 
-  nsec += g_clock_wall_time.tv_nsec;
-  if (nsec >= NSEC_PER_SEC)
-    {
-      nsec -= NSEC_PER_SEC;
-      sec  += 1;
+    nsec += g_clock_wall_time.tv_nsec;
+    if (nsec >= NSEC_PER_SEC) {
+        nsec -= NSEC_PER_SEC;
+        sec += 1;
     }
 
-  if (g_clock_adjust != 0 && sec > 0)
-    {
-      long adjust = NTP_MAX_ADJUST * (long)sec;
-      if (g_clock_adjust < adjust && g_clock_adjust > -adjust)
-        {
-          adjust = g_clock_adjust;
+    if (g_clock_adjust != 0 && sec > 0) {
+        long adjust = NTP_MAX_ADJUST * (long)sec;
+        if (g_clock_adjust < adjust && g_clock_adjust > -adjust) {
+            adjust = g_clock_adjust;
         }
 
-      nsec += adjust * NSEC_PER_USEC;
+        nsec += adjust * NSEC_PER_USEC;
 
-      while (nsec < 0)
-        {
-          nsec += NSEC_PER_SEC;
-          sec  -= 1;
+        while (nsec < 0) {
+            nsec += NSEC_PER_SEC;
+            sec -= 1;
         }
 
-      while (nsec >= NSEC_PER_SEC)
-        {
-          nsec -= NSEC_PER_SEC;
-          sec  += 1;
+        while (nsec >= NSEC_PER_SEC) {
+            nsec -= NSEC_PER_SEC;
+            sec += 1;
         }
     }
 
-  g_clock_wall_time.tv_sec += sec;
-  g_clock_wall_time.tv_nsec = (long)nsec;
+    g_clock_wall_time.tv_sec += sec;
+    g_clock_wall_time.tv_nsec = (long)nsec;
 
-  g_clock_last_counter = counter;
+    g_clock_last_counter = counter;
 
 errout_in_critical_section:
-  leave_critical_section(flags);
+    leave_critical_section(flags);
 }
 
 /****************************************************************************
  * Name: clock_inittimekeeping
  ****************************************************************************/
+void clock_inittimekeeping(FAR const struct timespec* tp) {
+    up_timer_getmask(&g_clock_mask);
 
-void clock_inittimekeeping(FAR const struct timespec *tp)
-{
-  up_timer_getmask(&g_clock_mask);
-
-  if (tp)
-    {
-      memcpy(&g_clock_wall_time, tp, sizeof(struct timespec));
+    if (tp) {
+        memcpy(&g_clock_wall_time, tp, sizeof(struct timespec));
     }
-  else
-    {
-      clock_basetime(&g_clock_wall_time);
+    else {
+        clock_basetime(&g_clock_wall_time);
     }
 
-  up_timer_gettick(&g_clock_last_counter);
+    up_timer_gettick(&g_clock_last_counter);
 }
 
 #endif /* CONFIG_CLOCK_TIMEKEEPING */

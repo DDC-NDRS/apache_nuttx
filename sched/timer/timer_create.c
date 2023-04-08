@@ -49,54 +49,45 @@
  *   Allocate one POSIX timer and place it into the allocated timer list.
  *
  ****************************************************************************/
+static FAR struct posix_timer_s* /**/timer_allocate(void) {
+    FAR struct posix_timer_s* ret;
+    irqstate_t flags;
+    uint8_t    pt_flags;
 
-static FAR struct posix_timer_s *timer_allocate(void)
-{
-  FAR struct posix_timer_s *ret;
-  irqstate_t flags;
-  uint8_t pt_flags;
+    /* Try to get a preallocated timer from the free list */
 
-  /* Try to get a preallocated timer from the free list */
+    #if (CONFIG_PREALLOC_TIMERS > 0)
+    flags = enter_critical_section();
+    ret   = (FAR struct posix_timer_s*)sq_remfirst((FAR sq_queue_t*)&g_freetimers);
+    leave_critical_section(flags);
 
-#if CONFIG_PREALLOC_TIMERS > 0
-  flags = enter_critical_section();
-  ret   = (FAR struct posix_timer_s *)
-    sq_remfirst((FAR sq_queue_t *)&g_freetimers);
-  leave_critical_section(flags);
+    /* Did we get one? */
 
-  /* Did we get one? */
-
-  if (ret)
-    {
-      pt_flags = PT_FLAGS_PREALLOCATED;
+    if (ret) {
+        pt_flags = PT_FLAGS_PREALLOCATED;
     }
-  else
-#endif
+    else
+    #endif
     {
-      /* Allocate a new timer from the heap */
-
-      ret = (FAR struct posix_timer_s *)
-        kmm_malloc(sizeof(struct posix_timer_s));
-      pt_flags = 0;
+        /* Allocate a new timer from the heap */
+        ret      = (FAR struct posix_timer_s*)kmm_malloc(sizeof(struct posix_timer_s));
+        pt_flags = 0;
     }
 
-  /* If we have a timer, then put it into the allocated timer list */
+    /* If we have a timer, then put it into the allocated timer list */
+    if (ret) {
+        /* Initialize the timer structure */
+        memset(ret, 0, sizeof(struct posix_timer_s));
+        ret->pt_flags = pt_flags;
 
-  if (ret)
-    {
-      /* Initialize the timer structure */
+        /* And add it to the end of the list of allocated timers */
 
-      memset(ret, 0, sizeof(struct posix_timer_s));
-      ret->pt_flags = pt_flags;
-
-      /* And add it to the end of the list of allocated timers */
-
-      flags = enter_critical_section();
-      sq_addlast((FAR sq_entry_t *)ret, (FAR sq_queue_t *)&g_alloctimers);
-      leave_critical_section(flags);
+        flags = enter_critical_section();
+        sq_addlast((FAR sq_entry_t*)ret, (FAR sq_queue_t*)&g_alloctimers);
+        leave_critical_section(flags);
     }
 
-  return ret;
+    return (ret);
 }
 
 /****************************************************************************
@@ -150,68 +141,55 @@ static FAR struct posix_timer_s *timer_allocate(void)
  * Assumptions:
  *
  ****************************************************************************/
+int /**/timer_create(clockid_t clockid, FAR struct sigevent* evp, FAR timer_t* timerid) {
+    FAR struct posix_timer_s* ret;
 
-int timer_create(clockid_t clockid, FAR struct sigevent *evp,
-                 FAR timer_t *timerid)
-{
-  FAR struct posix_timer_s *ret;
+    /* Sanity checks. */
 
-  /* Sanity checks. */
-
-  if (timerid == NULL || (clockid != CLOCK_REALTIME &&
-      clockid != CLOCK_MONOTONIC && clockid != CLOCK_BOOTTIME))
-    {
-      set_errno(EINVAL);
-      return ERROR;
+    if ((timerid == NULL) || 
+        ((clockid != CLOCK_REALTIME) && (clockid != CLOCK_MONOTONIC) && (clockid != CLOCK_BOOTTIME))) {
+        set_errno(EINVAL);
+        return ERROR;
     }
 
-  /* Allocate a timer instance to contain the watchdog */
-
-  ret = timer_allocate();
-  if (!ret)
-    {
-      set_errno(EAGAIN);
-      return ERROR;
+    /* Allocate a timer instance to contain the watchdog */
+    ret = timer_allocate();
+    if (!ret) {
+        set_errno(EAGAIN);
+        return ERROR;
     }
 
-  /* Initialize the timer instance */
+    /* Initialize the timer instance */
+    ret->pt_clock = clockid;
+    ret->pt_crefs = 1;
+    ret->pt_owner = nxsched_getpid();
+    ret->pt_delay = 0;
 
-  ret->pt_clock = clockid;
-  ret->pt_crefs = 1;
-  ret->pt_owner = nxsched_getpid();
-  ret->pt_delay = 0;
-
-  /* Was a struct sigevent provided? */
-
-  if (evp)
-    {
-      /* Yes, copy the entire struct sigevent content */
-
-      memcpy(&ret->pt_event, evp, sizeof(struct sigevent));
+    /* Was a struct sigevent provided? */
+    if (evp) {
+        /* Yes, copy the entire struct sigevent content */
+        memcpy(&ret->pt_event, evp, sizeof(struct sigevent));
     }
-  else
-    {
-      /* "If the evp argument is NULL, the effect is as if the evp argument
-       *  pointed to a sigevent structure with the sigev_notify member
-       *  having the value SIGEV_SIGNAL, the sigev_signo having a default
-       *  signal number, and the sigev_value member having the value of the
-       *  timer ID."
-       */
+    else {
+        /* "If the evp argument is NULL, the effect is as if the evp argument
+         *  pointed to a sigevent structure with the sigev_notify member
+         *  having the value SIGEV_SIGNAL, the sigev_signo having a default
+         *  signal number, and the sigev_value member having the value of the
+         *  timer ID."
+         */
+        ret->pt_event.sigev_notify          = SIGEV_SIGNAL;
+        ret->pt_event.sigev_signo           = SIGALRM;
+        ret->pt_event.sigev_value.sival_ptr = ret;
 
-      ret->pt_event.sigev_notify            = SIGEV_SIGNAL;
-      ret->pt_event.sigev_signo             = SIGALRM;
-      ret->pt_event.sigev_value.sival_ptr   = ret;
-
-#ifdef CONFIG_SIG_EVTHREAD
-      ret->pt_event.sigev_notify_function   = NULL;
-      ret->pt_event.sigev_notify_attributes = NULL;
-#endif
+        #ifdef CONFIG_SIG_EVTHREAD
+        ret->pt_event.sigev_notify_function   = NULL;
+        ret->pt_event.sigev_notify_attributes = NULL;
+        #endif
     }
 
-  /* Return the timer */
-
-  *timerid = ret;
-  return OK;
+    /* Return the timer */
+    *timerid = ret;
+    return (OK);
 }
 
 #endif /* CONFIG_DISABLE_POSIX_TIMERS */

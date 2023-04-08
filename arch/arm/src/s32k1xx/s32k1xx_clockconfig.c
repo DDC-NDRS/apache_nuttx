@@ -55,7 +55,6 @@
 /****************************************************************************
  * Included Files
  ****************************************************************************/
-
 #include <nuttx/config.h>
 
 #include <stdint.h>
@@ -74,35 +73,33 @@
 #include "s32k1xx_clockconfig.h"
 #include "s32k1xx_start.h"
 
-#include <arch/board/board.h>  /* Include last.  May have dependencies */
+#include <arch/board/board.h> /* Include last.  May have dependencies */
 
 /****************************************************************************
  * Pre-processor Definitions
  ****************************************************************************/
 
 /* Temporary system clock source configurations. */
+#define TMP_SIRC_CLK 0
+#define TMP_FIRC_CLK 1
+#define TMP_SOSC_CLK 2
+#define TMP_SPLL_CLK 3
 
-#define TMP_SIRC_CLK    0
-#define TMP_FIRC_CLK    1
-#define TMP_SOSC_CLK    2
-#define TMP_SPLL_CLK    3
+#define TMP_SYS_DIV  0
+#define TMP_BUS_DIV  1
+#define TMP_SLOW_DIV 2
 
-#define TMP_SYS_DIV     0
-#define TMP_BUS_DIV     1
-#define TMP_SLOW_DIV    2
-
-#define TMP_SYS_CLK_NO  4
-#define TMP_SYS_DIV_NO  3
+#define TMP_SYS_CLK_NO 4
+#define TMP_SYS_DIV_NO 3
 
 /* Supports arrays of  maximum clock frequencies of system clocks in all
  * power modes
  */
-
-#define MODES_MAX_NO    7
-#define SYS_CLK_MAX_NO  3
-#define CORE_CLK_INDEX  0
-#define BUS_CLK_INDEX   1
-#define SLOW_CLK_INDEX  2
+#define MODES_MAX_NO   7
+#define SYS_CLK_MAX_NO 3
+#define CORE_CLK_INDEX 0
+#define BUS_CLK_INDEX  1
+#define SLOW_CLK_INDEX 2
 
 /* Time to wait for clocks to stabilize, ie., number of cycles when core
  * runs at maximum speed - 112 MHz.
@@ -125,10 +122,8 @@
  ****************************************************************************/
 
 #ifdef CONFIG_PM
-static void up_pm_notify(struct pm_callback_s *cb, int dowmin,
-                         enum pm_state_e pmstate);
-static int  up_pm_prepare(struct pm_callback_s *cb, int domain,
-                          enum pm_state_e pmstate);
+static void up_pm_notify(struct pm_callback_s* cb, int dowmin, enum pm_state_e pmstate);
+static int  up_pm_prepare(struct pm_callback_s* cb, int domain, enum pm_state_e pmstate);
 #endif
 
 /****************************************************************************
@@ -138,71 +133,62 @@ static int  up_pm_prepare(struct pm_callback_s *cb, int domain,
 /****************************************************************************
  * Private Data
  ****************************************************************************/
-
-static const uint8_t g_tmp_sysclk[TMP_SYS_CLK_NO][TMP_SYS_DIV_NO] =
-{
-  {
-    1,                                      /* SIRC SYS_CLK divider, range 1..16 */
-    1,                                      /* SIRC BUS_CLK divider, range 1..16 */
-    2                                       /* SIRC SLOW_CLK divider, range 1..16 */
-  },
-  {
-    1,                                      /* FIRC SYS_CLK divider, range 1..16 */
-    2,                                      /* FIRC BUS_CLK divider, range 1..16 */
-    4                                       /* FIRC SLOW_CLK divider, range 1..16 */
-  },
-  {
-    1,                                      /* SOSC SYS_CLK divider, range 1..16 */
-    2,                                      /* SOSC BUS_CLK divider, range 1..16 */
-    2                                       /* SOSC SLOW_CLK divider, range 1..16 */
-  },
-  {
-    3,                                      /* SPLL SYS_CLK divider, range 1..16 */
-    2,                                      /* SPLL BUS_CLK divider, range 1..16 */
-    2                                       /* SPLL SLOW_CLK divider, range 1..16 */
-  }
+static const uint8_t g_tmp_sysclk[TMP_SYS_CLK_NO][TMP_SYS_DIV_NO] = {
+    {
+        1, /* SIRC SYS_CLK divider, range 1..16 */
+        1, /* SIRC BUS_CLK divider, range 1..16 */
+        2  /* SIRC SLOW_CLK divider, range 1..16 */
+    },
+    {
+        1, /* FIRC SYS_CLK divider, range 1..16 */
+        2, /* FIRC BUS_CLK divider, range 1..16 */
+        4  /* FIRC SLOW_CLK divider, range 1..16 */
+    },
+    {
+        1, /* SOSC SYS_CLK divider, range 1..16 */
+        2, /* SOSC BUS_CLK divider, range 1..16 */
+        2  /* SOSC SLOW_CLK divider, range 1..16 */
+    },
+    {
+        3, /* SPLL SYS_CLK divider, range 1..16 */
+        2, /* SPLL BUS_CLK divider, range 1..16 */
+        2  /* SPLL SLOW_CLK divider, range 1..16 */
+    }
 };
 
 /* The maximum clock frequencies of system clocks in all power modes */
-
 /* SYS_CLK      BUS_CLK      SLOW_CLK */
-
-static const uint32_t g_vlpr_maxsysclks[MODES_MAX_NO][SYS_CLK_MAX_NO] =
-{
-  {         0ul,       0ul,         0ul },  /* Invalid entry */
-  {   4000000ul, 4000000ul,   1000000ul },  /* Maximum frequencies when system clock is SOSC */
-  {   4000000ul, 4000000ul,   1000000ul },  /* Maximum frequencies when system clock is SIRC */
-  {   4000000ul, 4000000ul,   1000000ul },  /* Maximum frequencies when system clock is FIRC */
-  {         0ul,       0ul,         0ul },  /* Invalid entry */
-  {         0ul,       0ul,         0ul },  /* Invalid entry */
-  {   4000000ul, 4000000ul,   1000000ul },  /* Maximum frequencies when system clock is SPLL */
+static const uint32_t g_vlpr_maxsysclks[MODES_MAX_NO][SYS_CLK_MAX_NO] = {
+    {      0ul,       0ul,       0ul}, /* Invalid entry */
+    {4000000ul, 4000000ul, 1000000ul}, /* Maximum frequencies when system clock is SOSC */
+    {4000000ul, 4000000ul, 1000000ul}, /* Maximum frequencies when system clock is SIRC */
+    {4000000ul, 4000000ul, 1000000ul}, /* Maximum frequencies when system clock is FIRC */
+    {      0ul,       0ul,       0ul}, /* Invalid entry */
+    {      0ul,       0ul,       0ul}, /* Invalid entry */
+    {4000000ul, 4000000ul, 1000000ul}, /* Maximum frequencies when system clock is SPLL */
 };
 
 /* SYS_CLK      BUS_CLK      SLOW_CLK */
-
-static const uint32_t g_run_maxsysclks[MODES_MAX_NO][SYS_CLK_MAX_NO] =
-{
-  {         0ul,        0ul,         0ul }, /* Invalid entry */
-  {  80000000ul, 48000000ul,  26670000ul }, /* Maximum frequencies when system clock is SOSC */
-  {  80000000ul, 48000000ul,  26670000ul }, /* Maximum frequencies when system clock is SIRC */
-  {  80000000ul, 48000000ul,  26670000ul }, /* Maximum frequencies when system clock is FIRC */
-  {         0ul,        0ul,         0ul }, /* Invalid entry */
-  {         0ul,        0ul,         0ul }, /* Invalid entry */
-  {  80000000ul, 40000000ul,  26670000ul }, /* Maximum frequencies when system clock is SPLL */
+static const uint32_t g_run_maxsysclks[MODES_MAX_NO][SYS_CLK_MAX_NO] = {
+    {       0ul,        0ul,        0ul}, /* Invalid entry */
+    {80000000ul, 48000000ul, 26670000ul}, /* Maximum frequencies when system clock is SOSC */
+    {80000000ul, 48000000ul, 26670000ul}, /* Maximum frequencies when system clock is SIRC */
+    {80000000ul, 48000000ul, 26670000ul}, /* Maximum frequencies when system clock is FIRC */
+    {       0ul,        0ul,        0ul}, /* Invalid entry */
+    {       0ul,        0ul,        0ul}, /* Invalid entry */
+    {80000000ul, 40000000ul, 26670000ul}, /* Maximum frequencies when system clock is SPLL */
 };
+
 #ifdef CONFIG_S32K1XX_HAVE_HSRUN
-
 /* SYS_CLK      BUS_CLK      SLOW_CLK */
-
-static const uint32_t g_hsrun_maxsysclks[MODES_MAX_NO][SYS_CLK_MAX_NO] =
-{
-  {         0ul,        0ul,         0ul },  /* Invalid entry */
-  { 112000000ul, 56000000ul,  28000000ul },  /* Maximum frequencies when system clock is SOSC */
-  { 112000000ul, 56000000ul,  28000000ul },  /* Maximum frequencies when system clock is SIRC */
-  { 112000000ul, 56000000ul,  28000000ul },  /* Maximum frequencies when system clock is FIRC */
-  {         0ul,        0ul,         0ul },  /* Invalid entry */
-  {         0ul,        0ul,         0ul },  /* Invalid entry */
-  { 112000000ul, 56000000ul,  28000000ul },  /* Maximum frequencies when system clock is SPLL */
+static const uint32_t g_hsrun_maxsysclks[MODES_MAX_NO][SYS_CLK_MAX_NO] = {
+    {        0ul,        0ul,        0ul}, /* Invalid entry */
+    {112000000ul, 56000000ul, 28000000ul}, /* Maximum frequencies when system clock is SOSC */
+    {112000000ul, 56000000ul, 28000000ul}, /* Maximum frequencies when system clock is SIRC */
+    {112000000ul, 56000000ul, 28000000ul}, /* Maximum frequencies when system clock is FIRC */
+    {        0ul,        0ul,        0ul}, /* Invalid entry */
+    {        0ul,        0ul,        0ul}, /* Invalid entry */
+    {112000000ul, 56000000ul, 28000000ul}, /* Maximum frequencies when system clock is SPLL */
 };
 #endif
 
@@ -215,10 +201,9 @@ static uint32_t g_tclkfreq[NUMBER_OF_TCLK_INPUTS];  /* TCLKx clocks */
 #endif
 
 #ifdef CONFIG_PM
-static  struct pm_callback_s g_clock_pmcb =
-{
-  .notify       = up_pm_notify,
-  .prepare      = up_pm_prepare,
+static struct pm_callback_s g_clock_pmcb = {
+    .notify  = up_pm_notify,
+    .prepare = up_pm_prepare,
 };
 #endif
 
@@ -239,11 +224,8 @@ static  struct pm_callback_s g_clock_pmcb =
  *   The current system clock source.
  *
  ****************************************************************************/
-
-static inline uint32_t s32k1xx_get_scgclk_source(void)
-{
-  return ((getreg32(S32K1XX_SCG_CSR) & SCG_CSR_SCS_MASK) >>
-           SCG_CSR_SCS_SHIFT);
+static inline uint32_t s32k1xx_get_scgclk_source(void) {
+    return ((getreg32(S32K1XX_SCG_CSR) & SCG_CSR_SCS_MASK) >> SCG_CSR_SCS_SHIFT);
 }
 
 /****************************************************************************
@@ -259,18 +241,14 @@ static inline uint32_t s32k1xx_get_scgclk_source(void)
  *   The SOSC frequency.  Zero is returned if the SOSC is invalid.
  *
  ****************************************************************************/
+static uint32_t s32k1xx_get_soscfreq(void) {
+    /* Check if the SOSC is valid */
 
-static uint32_t s32k1xx_get_soscfreq(void)
-{
-  /* Check if the SOSC is valid */
-
-  if ((getreg32(S32K1XX_SCG_SOSCCSR) & SCG_SOSCCSR_SOSCVLD) != 0)
-    {
-      return BOARD_XTAL_FREQUENCY;
+    if ((getreg32(S32K1XX_SCG_SOSCCSR) & SCG_SOSCCSR_SOSCVLD) != 0) {
+        return BOARD_XTAL_FREQUENCY;
     }
-  else
-    {
-      return 0;
+    else {
+        return 0;
     }
 }
 
@@ -287,22 +265,16 @@ static uint32_t s32k1xx_get_soscfreq(void)
  *   The SIRC frequency.  Zero is returned if the SIRC is invalid.
  *
  ****************************************************************************/
-
-static uint32_t s32k1xx_get_sircfreq(void)
-{
-  /* Check if the SIRC is valid */
-
-  if ((getreg32(S32K1XX_SCG_SIRCCSR) & SCG_SIRCCSR_SIRCVLD) != 0)
-    {
-      /* Only high range is supported */
-
-      if ((getreg32(S32K1XX_SCG_SIRCCFG) & SCG_SIRCCFG_RANGE) != 0)
-        {
-          return SCG_SIRC_HIGHRANGE_FREQUENCY;
+static uint32_t s32k1xx_get_sircfreq(void) {
+    /* Check if the SIRC is valid */
+    if ((getreg32(S32K1XX_SCG_SIRCCSR) & SCG_SIRCCSR_SIRCVLD) != 0) {
+        /* Only high range is supported */
+        if ((getreg32(S32K1XX_SCG_SIRCCFG) & SCG_SIRCCFG_RANGE) != 0) {
+            return SCG_SIRC_HIGHRANGE_FREQUENCY;
         }
     }
 
-  return 0;
+    return 0;
 }
 
 /****************************************************************************
@@ -318,18 +290,13 @@ static uint32_t s32k1xx_get_sircfreq(void)
  *   The FIRC frequency.  Zero is returned if the FIRC is invalid.
  *
  ****************************************************************************/
-
-static uint32_t s32k1xx_get_fircfreq(void)
-{
-  /* Check if the FIRC is valid */
-
-  if ((getreg32(S32K1XX_SCG_FIRCCSR) & SCG_FIRCCSR_FIRCVLD) != 0)
-    {
-      return SCG_FIRC_FREQUENCY0;
+static uint32_t s32k1xx_get_fircfreq(void) {
+    /* Check if the FIRC is valid */
+    if ((getreg32(S32K1XX_SCG_FIRCCSR) & SCG_FIRCCSR_FIRCVLD) != 0) {
+        return SCG_FIRC_FREQUENCY0;
     }
-  else
-    {
-      return 0;
+    else {
+        return 0;
     }
 }
 
@@ -346,40 +313,33 @@ static uint32_t s32k1xx_get_fircfreq(void)
  *   The SPLL frequency.  Zero is returned if the SPLL is invalid.
  *
  ****************************************************************************/
-
 #ifdef CONFIG_S32K1XX_HAVE_SPLL
-static uint32_t s32k1xx_get_spllfreq(void)
-{
-  uint32_t freq;
-  uint32_t regval;
-  uint32_t prediv;
-  uint32_t mult;
+static uint32_t s32k1xx_get_spllfreq(void) {
+    uint32_t freq;
+    uint32_t regval;
+    uint32_t prediv;
+    uint32_t mult;
 
-  /* Check if the SPLL is valid */
+    /* Check if the SPLL is valid */
 
-  if ((getreg32(S32K1XX_SCG_SPLLCSR) & SCG_SPLLCSR_SPLLVLD) != 0)
-    {
-      /* Get System Oscillator frequency. */
+    if ((getreg32(S32K1XX_SCG_SPLLCSR) & SCG_SPLLCSR_SPLLVLD) != 0) {
+        /* Get System Oscillator frequency. */
 
-      freq = s32k1xx_get_soscfreq();
-      if (freq != 0)
-        {
-          regval = getreg32(S32K1XX_SCG_SPLLCFG);
-          prediv = ((regval & SCG_SPLLCFG_PREDIV_MASK) >>
-                     SCG_SPLLCFG_PREDIV_SHIFT) + 1;
-          mult   = ((regval & SCG_SPLLCFG_MULT_MASK) >>
-                     SCG_SPLLCFG_MULT_SHIFT) + 16;
+        freq = s32k1xx_get_soscfreq();
+        if (freq != 0) {
+            regval = getreg32(S32K1XX_SCG_SPLLCFG);
+            prediv = ((regval & SCG_SPLLCFG_PREDIV_MASK) >> SCG_SPLLCFG_PREDIV_SHIFT) + 1;
+            mult   = ((regval & SCG_SPLLCFG_MULT_MASK)   >> SCG_SPLLCFG_MULT_SHIFT)   + 16;
 
-          freq  /= prediv;
-          freq  *= mult;
-          freq >>= 1;  /* Divide VCO by 2. */
+            freq  /= prediv;
+            freq  *= mult;
+            freq >>= 1;                     /* Divide VCO by 2. */
         }
 
-      return freq;
+        return freq;
     }
-  else
-    {
-      return 0;
+    else {
+        return 0;
     }
 }
 #endif
@@ -397,36 +357,33 @@ static uint32_t s32k1xx_get_spllfreq(void)
  *   The requested clock source frequency.  Zero is returned on any error.
  *
  ****************************************************************************/
+static uint32_t s32k1xx_get_srcfreq(enum scg_system_clock_src_e src) {
+    uint32_t srcfreq = 0;
 
-static uint32_t s32k1xx_get_srcfreq(enum scg_system_clock_src_e src)
-{
-  uint32_t srcfreq = 0;
+    switch (src) {
+        case SCG_SYSTEM_CLOCK_SRC_SYS_OSC :
+            srcfreq = s32k1xx_get_soscfreq();
+            break;
 
-  switch (src)
-    {
-      case SCG_SYSTEM_CLOCK_SRC_SYS_OSC:
-        srcfreq = s32k1xx_get_soscfreq();
-        break;
+        case SCG_SYSTEM_CLOCK_SRC_SIRC :
+            srcfreq = s32k1xx_get_sircfreq();
+            break;
 
-      case SCG_SYSTEM_CLOCK_SRC_SIRC:
-        srcfreq = s32k1xx_get_sircfreq();
-        break;
+        case SCG_SYSTEM_CLOCK_SRC_FIRC :
+            srcfreq = s32k1xx_get_fircfreq();
+            break;
 
-      case SCG_SYSTEM_CLOCK_SRC_FIRC:
-        srcfreq = s32k1xx_get_fircfreq();
-        break;
+        #ifdef CONFIG_S32K1XX_HAVE_SPLL
+        case SCG_SYSTEM_CLOCK_SRC_SYS_PLL :
+            srcfreq = s32k1xx_get_spllfreq();
+            break;
+        #endif
 
-#ifdef CONFIG_S32K1XX_HAVE_SPLL
-      case SCG_SYSTEM_CLOCK_SRC_SYS_PLL:
-        srcfreq = s32k1xx_get_spllfreq();
-        break;
-#endif
-
-      default:
-        break;
+        default :
+            break;
     }
 
-  return srcfreq;
+    return srcfreq;
 }
 
 /****************************************************************************
@@ -444,129 +401,88 @@ static uint32_t s32k1xx_get_srcfreq(enum scg_system_clock_src_e src)
  *   any failure.
  *
  ****************************************************************************/
+static int s32k1xx_set_sysclk_cfg(enum scg_system_clock_mode_e mode, const struct scg_system_clock_config_s* config) {
+    uint32_t srcfreq      = 0;
+    uint32_t sysfreq_mul  = (uint32_t)config->divcore;
+    uint32_t busfreq_mul  = (uint32_t)config->divcore * (uint32_t)config->divbus;
+    uint32_t slowfreq_mul = (uint32_t)config->divcore * (uint32_t)config->divslow;
+    uint32_t regval;
+    int      ret = OK;
 
-static int
-s32k1xx_set_sysclk_cfg(enum scg_system_clock_mode_e mode,
-                             const struct scg_system_clock_config_s *config)
-{
-  uint32_t srcfreq      = 0;
-  uint32_t sysfreq_mul  = (uint32_t)config->divcore;
-  uint32_t busfreq_mul  = (uint32_t)config->divcore *
-                          (uint32_t)config->divbus;
-  uint32_t slowfreq_mul = (uint32_t)config->divcore *
-                          (uint32_t)config->divslow;
-  uint32_t regval;
-  int ret               = OK;
+    DEBUGASSERT(mode != SCG_SYSTEM_CLOCK_MODE_CURRENT);
 
-  DEBUGASSERT(mode != SCG_SYSTEM_CLOCK_MODE_CURRENT);
+    srcfreq = s32k1xx_get_srcfreq(config->src) >> 4;
 
-  srcfreq = s32k1xx_get_srcfreq(config->src) >> 4;
-
-  switch (mode)
-    {
-      case SCG_SYSTEM_CLOCK_MODE_RUN:    /* Run mode */
-
-        /* Verify the frequencies of sys, bus and slow clocks. */
-
-          if ((srcfreq > (sysfreq_mul *
-                (g_run_maxsysclks[(uint32_t)config->src][CORE_CLK_INDEX] >>
-                 4))) ||
-              (srcfreq > (busfreq_mul *
-                (g_run_maxsysclks[(uint32_t)config->src][BUS_CLK_INDEX] >>
-                 4))) ||
-              (srcfreq > (slowfreq_mul *
-                (g_run_maxsysclks[(uint32_t)config->src][SLOW_CLK_INDEX] >>
-                 4))))
-            {
-              /* Configuration for the next system clock source is not
-               * valid.
-               */
-
-              ret = -EINVAL;
+    switch (mode) {
+        case SCG_SYSTEM_CLOCK_MODE_RUN : /* Run mode */
+            /* Verify the frequencies of sys, bus and slow clocks. */
+            if ((srcfreq > (sysfreq_mul  * (g_run_maxsysclks[(uint32_t)config->src][CORE_CLK_INDEX] >> 4))) ||
+                (srcfreq > (busfreq_mul  * (g_run_maxsysclks[(uint32_t)config->src][BUS_CLK_INDEX]  >> 4))) ||
+                (srcfreq > (slowfreq_mul * (g_run_maxsysclks[(uint32_t)config->src][SLOW_CLK_INDEX] >> 4)))) {
+                /* Configuration for the next system clock source is not
+                 * valid.
+                 */
+                ret = -EINVAL;
             }
-          else
-            {
-              regval = (((uint32_t)config->src << SCG_RCCR_SCS_SHIFT) |
-                        SCG_RCCR_DIVCORE(config->divcore) |
-                        SCG_RCCR_DIVBUS(config->divbus)  |
-                        SCG_RCCR_DIVSLOW(config->divslow));
-              putreg32(regval, S32K1XX_SCG_RCCR);
+            else {
+                regval = (((uint32_t)config->src << SCG_RCCR_SCS_SHIFT) | SCG_RCCR_DIVCORE(config->divcore) |
+                          SCG_RCCR_DIVBUS(config->divbus) | SCG_RCCR_DIVSLOW(config->divslow));
+                putreg32(regval, S32K1XX_SCG_RCCR);
             }
-          break;
+            break;
 
-        case SCG_SYSTEM_CLOCK_MODE_VLPR:    /* Very Low Power Run mode */
-          DEBUGASSERT(SCG_SYSTEM_CLOCK_SRC_SIRC    == config->src);
+        case SCG_SYSTEM_CLOCK_MODE_VLPR : /* Very Low Power Run mode */
+            DEBUGASSERT(SCG_SYSTEM_CLOCK_SRC_SIRC == config->src);
 
-          /* Verify the frequencies of sys, bus and slow clocks. */
+            /* Verify the frequencies of sys, bus and slow clocks. */
+            if ((srcfreq > (sysfreq_mul  * (g_vlpr_maxsysclks[(uint32_t)config->src][CORE_CLK_INDEX] >> 4))) ||
+                (srcfreq > (busfreq_mul  * (g_vlpr_maxsysclks[(uint32_t)config->src][BUS_CLK_INDEX]  >> 4))) ||
+                (srcfreq > (slowfreq_mul * (g_vlpr_maxsysclks[(uint32_t)config->src][SLOW_CLK_INDEX] >> 4)))) {
+                /* Configuration for the next system clock source is not
+                 * valid.
+                 */
 
-          if ((srcfreq > (sysfreq_mul *
-              (g_vlpr_maxsysclks[(uint32_t)config->src][CORE_CLK_INDEX] >>
-                4))) ||
-              (srcfreq > (busfreq_mul *
-              (g_vlpr_maxsysclks[(uint32_t)config->src][BUS_CLK_INDEX] >>
-                4))) ||
-              (srcfreq > (slowfreq_mul *
-              (g_vlpr_maxsysclks[(uint32_t)config->src][SLOW_CLK_INDEX] >>
-                4))))
-            {
-              /* Configuration for the next system clock source is not
-               * valid.
-               */
-
-              ret = -EINVAL;
+                ret = -EINVAL;
             }
-          else
-            {
-              regval = (((uint32_t)config->src << SCG_VCCR_SCS_SHIFT) |
-                        SCG_VCCR_DIVCORE(config->divcore) |
-                        SCG_VCCR_DIVBUS(config->divbus)  |
-                        SCG_VCCR_DIVSLOW(config->divslow));
-              putreg32(regval, S32K1XX_SCG_VCCR);
+            else {
+                regval = (((uint32_t)config->src << SCG_VCCR_SCS_SHIFT) |
+                          SCG_VCCR_DIVCORE(config->divcore) |
+                          SCG_VCCR_DIVBUS(config->divbus)   |
+                          SCG_VCCR_DIVSLOW(config->divslow));
+                putreg32(regval, S32K1XX_SCG_VCCR);
             }
-          break;
+            break;
 
-#ifdef CONFIG_S32K1XX_HAVE_HSRUN
-        case SCG_SYSTEM_CLOCK_MODE_HSRUN:     /* High Speed Run mode. */
-          DEBUGASSERT(SCG_SYSTEM_CLOCK_SRC_FIRC == config->src ||
-                      SCG_SYSTEM_CLOCK_SRC_SYS_PLL == config->src);
+        #ifdef CONFIG_S32K1XX_HAVE_HSRUN
+        case SCG_SYSTEM_CLOCK_MODE_HSRUN : /* High Speed Run mode. */
+            DEBUGASSERT(SCG_SYSTEM_CLOCK_SRC_FIRC == config->src || SCG_SYSTEM_CLOCK_SRC_SYS_PLL == config->src);
 
-          /* Verify the frequencies of sys, bus and slow clocks. */
-
-          if ((srcfreq > (sysfreq_mul *
-              (g_hsrun_maxsysclks[(uint32_t)config->src][CORE_CLK_INDEX] >>
-                4))) ||
-              (srcfreq > (busfreq_mul *
-              (g_hsrun_maxsysclks[(uint32_t)config->src][BUS_CLK_INDEX] >>
-                4))) ||
-              (srcfreq > (slowfreq_mul *
-              (g_hsrun_maxsysclks[(uint32_t)config->src][SLOW_CLK_INDEX] >>
-                4))))
-            {
-              /* Configuration for the next system clock source is not
-               * valid.
-               */
-
-              ret = -EINVAL;
+            /* Verify the frequencies of sys, bus and slow clocks. */
+            if ((srcfreq > (sysfreq_mul  * (g_hsrun_maxsysclks[(uint32_t)config->src][CORE_CLK_INDEX] >> 4))) ||
+                (srcfreq > (busfreq_mul  * (g_hsrun_maxsysclks[(uint32_t)config->src][BUS_CLK_INDEX]  >> 4))) ||
+                (srcfreq > (slowfreq_mul * (g_hsrun_maxsysclks[(uint32_t)config->src][SLOW_CLK_INDEX] >> 4)))) {
+                /* Configuration for the next system clock source is not
+                 * valid.
+                 */
+                ret = -EINVAL;
             }
-          else
-            {
-              regval = (((uint32_t)config->src << SCG_HCCR_SCS_SHIFT) |
-                        SCG_HCCR_DIVCORE(config->divcore) |
-                        SCG_HCCR_DIVBUS(config->divbus)  |
-                        SCG_HCCR_DIVSLOW(config->divslow));
-              putreg32(regval, S32K1XX_SCG_HCCR);
+            else {
+                regval = (((uint32_t)config->src << SCG_HCCR_SCS_SHIFT) |
+                          SCG_HCCR_DIVCORE(config->divcore) |
+                          SCG_HCCR_DIVBUS(config->divbus)   |
+                          SCG_HCCR_DIVSLOW(config->divslow));
+                putreg32(regval, S32K1XX_SCG_HCCR);
             }
-          break;
-#endif
-        default:
+            break;
+        #endif
 
-          /* Invalid mode */
-
-          DEBUGPANIC();
-          break;
+        default :
+            /* Invalid mode */
+            DEBUGPANIC();
+            break;
     }
 
-  return ret;
+    return ret;
 }
 
 /****************************************************************************
@@ -583,56 +499,45 @@ s32k1xx_set_sysclk_cfg(enum scg_system_clock_mode_e mode,
  *   any failure.
  *
  ****************************************************************************/
+static int s32k1xx_transition_systemclock(const struct scg_system_clock_config_s* cfg) {
+    enum scg_system_clock_mode_e run_mode;
+    uint32_t timeout;
+    int      ret = OK;
 
-static int
-s32k1xx_transition_systemclock(const struct scg_system_clock_config_s *cfg)
-{
-  enum scg_system_clock_mode_e run_mode;
-  uint32_t timeout;
-  int ret = OK;
+    DEBUGASSERT(cfg != NULL && cfg->src != SCG_SYSTEM_CLOCK_SRC_NONE);
 
-  DEBUGASSERT(cfg != NULL && cfg->src != SCG_SYSTEM_CLOCK_SRC_NONE);
+    /* Get and convert Run mode from SMC to SCG defines */
+    run_mode = s32k1xx_get_runmode();
 
-  /* Get and convert Run mode from SMC to SCG defines */
+    /* Check the current mode */
+    DEBUGASSERT(run_mode != SCG_SYSTEM_CLOCK_MODE_NONE);
 
-  run_mode = s32k1xx_get_runmode();
+    /* Update run mode configuration */
+    ret = s32k1xx_set_sysclk_cfg(run_mode, cfg);
+    if (ret == OK) {
+        /* Wait for system clock to transition.
+         *
+         * e10777: The SCG_RCCR[SCS] and SCG_HCCR[SCS] may have a corrupted
+         * status during the interval when the system clock is switching.
+         * Workaround: The SCS field should be read twice by the software to
+         * ensure the system clock switch has completed.
+         */
+        #if 1 /* Errata E10777 */
+        timeout = 10;
+        #else
+        timeout = 1;
+        #endif
 
-  /* Check the current mode */
+        do {
+            timeout--;
+        } while (s32k1xx_get_scgclk_source() != cfg->src && timeout > 0);
 
-  DEBUGASSERT(run_mode != SCG_SYSTEM_CLOCK_MODE_NONE);
-
-  /* Update run mode configuration */
-
-  ret = s32k1xx_set_sysclk_cfg(run_mode, cfg);
-  if (ret == OK)
-    {
-      /* Wait for system clock to transition.
-       *
-       * e10777: The SCG_RCCR[SCS] and SCG_HCCR[SCS] may have a corrupted
-       * status during the interval when the system clock is switching.
-       * Workaround: The SCS field should be read twice by the software to
-       * ensure the system clock switch has completed.
-       */
-
-#if 1 /* Errata E10777 */
-      timeout = 10;
-#else
-      timeout = 1;
-#endif
-
-      do
-        {
-          timeout--;
-        }
-      while (s32k1xx_get_scgclk_source() != cfg->src && timeout > 0);
-
-      if (timeout == 0)
-        {
-          ret = -ETIMEDOUT;
+        if (timeout == 0) {
+            ret = -ETIMEDOUT;
         }
     }
 
-  return ret;
+    return ret;
 }
 
 /****************************************************************************
@@ -649,94 +554,69 @@ s32k1xx_transition_systemclock(const struct scg_system_clock_config_s *cfg)
  *   any failure.
  *
  ****************************************************************************/
+static int s32k1xx_firc_config(bool enable, const struct scg_firc_config_s* firccfg) {
+    uint32_t regval;
+    int32_t  timeout;
+    int      ret = OK;
 
-static int s32k1xx_firc_config(bool enable,
-                               const struct scg_firc_config_s *firccfg)
-{
-  uint32_t regval;
-  int32_t timeout;
-  int ret = OK;
+    DEBUGASSERT(firccfg != NULL);
 
-  DEBUGASSERT(firccfg != NULL);
+    /* If clock is used by system, return error. */
+    regval = getreg32(S32K1XX_SCG_FIRCCSR);
+    if ((regval & SCG_FIRCCSR_FIRCSEL) != 0) {
+        ret = -EBUSY;
+    }
+    /* Disable the FIRC */
+    else {
+        /* Clear LK bit field */
+        regval &= ~SCG_FIRCCSR_LK;
+        putreg32(regval, S32K1XX_SCG_FIRCCSR);
 
-  /* If clock is used by system, return error. */
-
-  regval = getreg32(S32K1XX_SCG_FIRCCSR);
-  if ((regval & SCG_FIRCCSR_FIRCSEL) != 0)
-    {
-      ret = -EBUSY;
+        /* Disable monitor, disable clock and clear error. */
+        putreg32(SCG_FIRCCSR_FIRCERR, S32K1XX_SCG_FIRCCSR);
     }
 
-  /* Disable the FIRC */
+    /* Configure FIRC. */
+    if (enable && (ret == OK)) {
+        /* Now start to set up FIRC clock. */
 
-  else
-    {
-      /* Clear LK bit field */
+        /* Step 1. Setup dividers. */
+        regval = SCG_FIRCDIV_FIRCDIV1(firccfg->div1) | SCG_FIRCDIV_FIRCDIV2(firccfg->div2);
+        putreg32(regval, S32K1XX_SCG_FIRCDIV);
 
-      regval &= ~SCG_FIRCCSR_LK;
-      putreg32(regval, S32K1XX_SCG_FIRCCSR);
-
-      /* Disable monitor, disable clock and clear error. */
-
-      putreg32(SCG_FIRCCSR_FIRCERR, S32K1XX_SCG_FIRCCSR);
-    }
-
-  /* Configure FIRC. */
-
-  if (enable && (ret == OK))
-    {
-      /* Now start to set up FIRC clock. */
-
-      /* Step 1. Setup dividers. */
-
-      regval = SCG_FIRCDIV_FIRCDIV1(firccfg->div1) |
-               SCG_FIRCDIV_FIRCDIV2(firccfg->div2);
-      putreg32(regval, S32K1XX_SCG_FIRCDIV);
-
-      /* Step 2. Set FIRC configuration. */
-
-      if (firccfg->range == 0)
-        {
-          regval = 0;
+        /* Step 2. Set FIRC configuration. */
+        if (firccfg->range == 0) {
+            regval = 0;
         }
-      else
-        {
-          regval = SCG_FIRCCFG_48MHZ; /* REVISIT: Also zero */
+        else {
+            regval = SCG_FIRCCFG_48MHZ; /* REVISIT: Also zero */
         }
 
-      putreg32(regval, S32K1XX_SCG_FIRCCFG);
+        putreg32(regval, S32K1XX_SCG_FIRCCFG);
 
-      /* Step 3. Enable clock, config regulator and locking feature. */
+        /* Step 3. Enable clock, config regulator and locking feature. */
+        regval = SCG_FIRCCSR_FIRCEN;
 
-      regval = SCG_FIRCCSR_FIRCEN;
-
-      if (!firccfg->regulator)
-        {
-          regval |= SCG_FIRCCSR_FIRCREGOFF;
+        if (!firccfg->regulator) {
+            regval |= SCG_FIRCCSR_FIRCREGOFF;
         }
 
-      if (firccfg->locked)
-        {
-          regval |= SCG_FIRCCSR_LK;
+        if (firccfg->locked) {
+            regval |= SCG_FIRCCSR_LK;
         }
 
-      putreg32(regval, S32K1XX_SCG_FIRCCSR);
+        putreg32(regval, S32K1XX_SCG_FIRCCSR);
 
-      /* Wait for FIRC to initialize */
-
-      for (timeout = FIRC_STABILIZATION_TIMEOUT;
-           s32k1xx_get_fircfreq() == 0 && timeout > 0;
-           timeout--)
-        {
+        /* Wait for FIRC to initialize */
+        for (timeout = FIRC_STABILIZATION_TIMEOUT; s32k1xx_get_fircfreq() == 0 && timeout > 0; timeout--) {
         }
 
-      if (timeout <= 0)
-        {
-          ret = -ETIMEDOUT;
+        if (timeout <= 0) {
+            ret = -ETIMEDOUT;
         }
     }
 
-  return ret;
+    return ret;
 }
 
 /****************************************************************************
@@ -753,41 +633,33 @@ static int s32k1xx_firc_config(bool enable,
  *   any failure.
  *
  ****************************************************************************/
+static int s32k1xx_firc_clocksource(void) {
+    struct scg_system_clock_config_s firccfg;
+    int ret = OK;
 
-static int s32k1xx_firc_clocksource(void)
-{
-  struct scg_system_clock_config_s firccfg;
-  int ret = OK;
-
-  /* If the current system clock source is not FIRC:
-   * 1. Enable FIRC (if it's not enabled)
-   * 2. Switch to FIRC.
- */
-
-  if (s32k1xx_get_scgclk_source() != SCG_SYSTEM_CLOCK_SRC_FIRC)
-    {
-      /* If FIRC is not on, then FIRC is configured with the default
-       * configuration
-       */
-
-      if (s32k1xx_get_fircfreq() == 0)
-        {
-          ret = s32k1xx_firc_config(true, NULL);
+    /* If the current system clock source is not FIRC:
+     * 1. Enable FIRC (if it's not enabled)
+     * 2. Switch to FIRC.
+     */
+    if (s32k1xx_get_scgclk_source() != SCG_SYSTEM_CLOCK_SRC_FIRC) {
+        /* If FIRC is not on, then FIRC is configured with the default
+         * configuration
+         */
+        if (s32k1xx_get_fircfreq() == 0) {
+            ret = s32k1xx_firc_config(true, NULL);
         }
 
-      /* FIRC is enabled, transition the system clock source to FIRC. */
-
-      if (ret == OK)
-        {
-          firccfg.src     = SCG_SYSTEM_CLOCK_SRC_FIRC;
-          firccfg.divcore = g_tmp_sysclk[TMP_FIRC_CLK][TMP_SYS_DIV];
-          firccfg.divbus  = g_tmp_sysclk[TMP_FIRC_CLK][TMP_BUS_DIV];
-          firccfg.divslow = g_tmp_sysclk[TMP_FIRC_CLK][TMP_SLOW_DIV];
-          ret             = s32k1xx_transition_systemclock(&firccfg);
+        /* FIRC is enabled, transition the system clock source to FIRC. */
+        if (ret == OK) {
+            firccfg.src     = SCG_SYSTEM_CLOCK_SRC_FIRC;
+            firccfg.divcore = g_tmp_sysclk[TMP_FIRC_CLK][TMP_SYS_DIV];
+            firccfg.divbus  = g_tmp_sysclk[TMP_FIRC_CLK][TMP_BUS_DIV];
+            firccfg.divslow = g_tmp_sysclk[TMP_FIRC_CLK][TMP_SLOW_DIV];
+            ret             = s32k1xx_transition_systemclock(&firccfg);
         }
     }
 
-  return ret;
+    return ret;
 }
 
 /****************************************************************************
@@ -804,101 +676,79 @@ static int s32k1xx_firc_clocksource(void)
  *   any failure.
  *
  ****************************************************************************/
+static int s32k1xx_sirc_config(bool enable, const struct scg_sirc_config_s* sirccfg) {
+    uint32_t regval;
+    uint32_t timeout;
+    int      ret = OK;
 
-static int s32k1xx_sirc_config(bool enable,
-                               const struct scg_sirc_config_s *sirccfg)
-{
-  uint32_t regval;
-  uint32_t timeout;
-  int ret = OK;
+    DEBUGASSERT(sirccfg != NULL);
 
-  DEBUGASSERT(sirccfg != NULL);
+    /* If clock is used by system, return error. */
+    regval = getreg32(S32K1XX_SCG_SIRCCSR);
+    if ((regval & SCG_SIRCCSR_SIRCSEL) != 0) {
+        ret = -EBUSY;
+    }
+    /* Disable SIRC */
+    else {
+        /* Clear LK bit field */
+        regval &= ~SCG_SIRCCSR_LK;
+        putreg32(regval, S32K1XX_SCG_SIRCCSR);
 
-  /* If clock is used by system, return error. */
-
-  regval = getreg32(S32K1XX_SCG_SIRCCSR);
-  if ((regval & SCG_SIRCCSR_SIRCSEL) != 0)
-    {
-      ret = -EBUSY;
+        /* Disable monitor, disable clock and clear error. */
+        putreg32(0, S32K1XX_SCG_SIRCCSR);
     }
 
-  /* Disable SIRC */
+    /* Configure SIRC. */
+    if (enable && (ret == OK)) {
+        /* Now start to set up SIRC clock. */
 
-  else
-    {
-      /* Clear LK bit field */
+        /* Step 1. Setup dividers. */
 
-      regval &= ~SCG_SIRCCSR_LK;
-      putreg32(regval, S32K1XX_SCG_SIRCCSR);
+        regval = SCG_SIRCDIV_SIRCDIV1(sirccfg->div1) | SCG_SIRCDIV_SIRCDIV2(sirccfg->div2);
+        putreg32(regval, S32K1XX_SCG_SIRCDIV);
 
-      /* Disable monitor, disable clock and clear error. */
+        /* Step 2. Set SIRC configuration: frequency range. */
 
-      putreg32(0, S32K1XX_SCG_SIRCCSR);
-    }
-
-  /* Configure SIRC. */
-
-  if (enable  && (ret == OK))
-    {
-      /* Now start to set up SIRC clock. */
-
-      /* Step 1. Setup dividers. */
-
-      regval = SCG_SIRCDIV_SIRCDIV1(sirccfg->div1) |
-               SCG_SIRCDIV_SIRCDIV2(sirccfg->div2);
-      putreg32(regval, S32K1XX_SCG_SIRCDIV);
-
-      /* Step 2. Set SIRC configuration: frequency range. */
-
-      if (sirccfg->range == SCG_SIRC_RANGE_HIGH)
-        {
-          regval = SCG_SIRCCFG_HIGHRANGE;
+        if (sirccfg->range == SCG_SIRC_RANGE_HIGH) {
+            regval = SCG_SIRCCFG_HIGHRANGE;
         }
-      else
-        {
-          regval = SCG_SIRCCFG_LOWRANGE;
+        else {
+            regval = SCG_SIRCCFG_LOWRANGE;
         }
 
-      putreg32(regval, S32K1XX_SCG_SIRCCFG);
+        putreg32(regval, S32K1XX_SCG_SIRCCFG);
 
-      /* Step 3. Set SIRC control: enable clock, configure source in STOP
-       * and VLP modes, configure lock feature.
-       */
+        /* Step 3. Set SIRC control: enable clock, configure source in STOP
+         * and VLP modes, configure lock feature.
+         */
 
-      regval = SCG_SIRCCSR_SIRCEN;
+        regval = SCG_SIRCCSR_SIRCEN;
 
-      if (sirccfg->stopmode)
-        {
-          regval |= SCG_SIRCCSR_SIRCSTEN;
+        if (sirccfg->stopmode) {
+            regval |= SCG_SIRCCSR_SIRCSTEN;
         }
 
-      if (sirccfg->lowpower)
-        {
-          regval |= SCG_SIRCCSR_SIRCLPEN;
+        if (sirccfg->lowpower) {
+            regval |= SCG_SIRCCSR_SIRCLPEN;
         }
 
-      if (sirccfg->locked)
-        {
-          regval |= SCG_SIRCCSR_LK;
+        if (sirccfg->locked) {
+            regval |= SCG_SIRCCSR_LK;
         }
 
-      putreg32(regval, S32K1XX_SCG_SIRCCSR);
+        putreg32(regval, S32K1XX_SCG_SIRCCSR);
 
-      /* Wait for SIRC to initialize */
+        /* Wait for SIRC to initialize */
 
-      for (timeout = SIRC_STABILIZATION_TIMEOUT;
-           s32k1xx_get_sircfreq() == 0 && timeout > 0;
-           timeout--)
-        {
+        for (timeout = SIRC_STABILIZATION_TIMEOUT; s32k1xx_get_sircfreq() == 0 && timeout > 0; timeout--) {
         }
 
-      if (timeout <= 0)
-        {
-          ret = -ETIMEDOUT;
+        if (timeout <= 0) {
+            ret = -ETIMEDOUT;
         }
     }
 
-  return ret;
+    return ret;
 }
 
 #if defined(CONFIG_VLPR_STANDBY) || defined(CONFIG_VLPR_SLEEP)
@@ -917,41 +767,36 @@ static int s32k1xx_sirc_config(bool enable,
  *   any failure.
  *
  ****************************************************************************/
+static int s32k1xx_sirc_clocksource(void) {
+    struct scg_system_clock_config_s sirccfg;
+    int ret = OK;
 
-static int s32k1xx_sirc_clocksource(void)
-{
-  struct scg_system_clock_config_s sirccfg;
-  int ret = OK;
+    /* If the current system clock source is not SIRC:
+     * 1. Enable SIRC (if it's not enabled)
+     * 2. Switch to SIRC.
+     */
 
-  /* If the current system clock source is not SIRC:
-   * 1. Enable SIRC (if it's not enabled)
-   * 2. Switch to SIRC.
-   */
+    if (s32k1xx_get_scgclk_source() != SCG_SYSTEM_CLOCK_SRC_SIRC) {
+        /* If SIRC is not on, then SIRC is configured with the default
+         * configuration
+         */
 
-  if (s32k1xx_get_scgclk_source() != SCG_SYSTEM_CLOCK_SRC_SIRC)
-    {
-      /* If SIRC is not on, then SIRC is configured with the default
-       * configuration
-       */
-
-      if (s32k1xx_get_sircfreq() == 0)
-        {
-          ret = s32k1xx_sirc_config(true, NULL);
+        if (s32k1xx_get_sircfreq() == 0) {
+            ret = s32k1xx_sirc_config(true, NULL);
         }
 
-      /* SIRC is enabled, transition the system clock source to SIRC. */
+        /* SIRC is enabled, transition the system clock source to SIRC. */
 
-      if (ret == OK)
-        {
-          sirccfg.src     = SCG_SYSTEM_CLOCK_SRC_SIRC;
-          sirccfg.divcore = g_tmp_sysclk[TMP_SIRC_CLK][TMP_SYS_DIV];
-          sirccfg.divbus  = g_tmp_sysclk[TMP_SIRC_CLK][TMP_BUS_DIV];
-          sirccfg.divslow = g_tmp_sysclk[TMP_SIRC_CLK][TMP_SLOW_DIV];
-          ret             = s32k1xx_transition_systemclock(&sirccfg);
+        if (ret == OK) {
+            sirccfg.src     = SCG_SYSTEM_CLOCK_SRC_SIRC;
+            sirccfg.divcore = g_tmp_sysclk[TMP_SIRC_CLK][TMP_SYS_DIV];
+            sirccfg.divbus  = g_tmp_sysclk[TMP_SIRC_CLK][TMP_BUS_DIV];
+            sirccfg.divslow = g_tmp_sysclk[TMP_SIRC_CLK][TMP_SLOW_DIV];
+            ret             = s32k1xx_transition_systemclock(&sirccfg);
         }
     }
 
-  return ret;
+    return ret;
 }
 
 #endif
@@ -970,120 +815,89 @@ static int s32k1xx_sirc_clocksource(void)
  *   any failure.
  *
  ****************************************************************************/
+static int s32k1xx_sosc_config(bool enable, const struct scg_sosc_config_s* sosccfg) {
+    uint32_t regval;
+    uint32_t timeout;
+    int      ret = OK;
 
-static int s32k1xx_sosc_config(bool enable,
-                               const struct scg_sosc_config_s *sosccfg)
-{
-  uint32_t regval;
-  uint32_t timeout;
-  int ret = OK;
+    DEBUGASSERT(sosccfg != NULL);
 
-  DEBUGASSERT(sosccfg != NULL);
+    /* If clock is used by system, return error. */
 
-  /* If clock is used by system, return error. */
+    regval = getreg32(S32K1XX_SCG_SOSCCSR);
+    if ((regval & SCG_SOSCCSR_SOSCSEL) != 0) {
+        ret = -EBUSY;
+    }
+    /* Disable SOSC */
+    else {
+        /* Clear LK bit field */
+        regval &= ~SCG_SOSCCSR_LK;
+        putreg32(regval, S32K1XX_SCG_SOSCCSR);
 
-  regval = getreg32(S32K1XX_SCG_SOSCCSR);
-  if ((regval & SCG_SOSCCSR_SOSCSEL) != 0)
-    {
-      ret = -EBUSY;
+        /* Disable monitor, disable clock and clear error. */
+        putreg32(SCG_SOSCCSR_SOSCERR, S32K1XX_SCG_SOSCCSR);
     }
 
-  /* Disable SOSC */
+    /* Configure the SOSC */
+    if (enable && (ret == OK)) {
+        /* Now start to set up OSC clock */
 
-  else
-    {
-      /* Clear LK bit field */
+        /* Step 1. Setup dividers. */
+        regval = SCG_SOSCDIV_SOSCDIV1(sosccfg->div1) | SCG_SOSCDIV_SOSCDIV2(sosccfg->div2);
+        putreg32(regval, S32K1XX_SCG_SOSCDIV);
 
-      regval &= ~SCG_SOSCCSR_LK;
-      putreg32(regval, S32K1XX_SCG_SOSCCSR);
+        /* Step 2. Set OSC configuration. */
+        regval = SCG_SOSCCFG_RANGE(sosccfg->range);
 
-      /* Disable monitor, disable clock and clear error. */
-
-      putreg32(SCG_SOSCCSR_SOSCERR, S32K1XX_SCG_SOSCCSR);
-    }
-
-  /* Configure the SOSC */
-
-  if (enable && (ret == OK))
-    {
-      /* Now start to set up OSC clock */
-
-      /* Step 1. Setup dividers. */
-
-      regval = SCG_SOSCDIV_SOSCDIV1(sosccfg->div1) |
-               SCG_SOSCDIV_SOSCDIV2(sosccfg->div2);
-      putreg32(regval, S32K1XX_SCG_SOSCDIV);
-
-      /* Step 2. Set OSC configuration. */
-
-      regval = SCG_SOSCCFG_RANGE(sosccfg->range);
-
-      if (sosccfg->gain == SCG_SOSC_GAIN_HIGH)
-        {
-          regval |= SCG_SOSCCFG_HGO;
+        if (sosccfg->gain == SCG_SOSC_GAIN_HIGH) {
+            regval |= SCG_SOSCCFG_HGO;
         }
 
-      if (sosccfg->extref == SCG_SOSC_REF_OSC)
-        {
-          regval |= SCG_SOSCCFG_EREFS;
+        if (sosccfg->extref == SCG_SOSC_REF_OSC) {
+            regval |= SCG_SOSCCFG_EREFS;
         }
 
-      putreg32(regval, S32K1XX_SCG_SOSCCFG);
+        putreg32(regval, S32K1XX_SCG_SOSCCFG);
 
-      /* Step 3. Enable clock, configure monitor, lock register. */
-
-      regval = SCG_SOSCCSR_SOSCEN;
-
-      if (sosccfg->locked)
-        {
-          regval |= SCG_SOSCCSR_LK;
+        /* Step 3. Enable clock, configure monitor, lock register. */
+        regval = SCG_SOSCCSR_SOSCEN;
+        if (sosccfg->locked) {
+            regval |= SCG_SOSCCSR_LK;
         }
 
-      switch (sosccfg->mode)
-        {
-          case SCG_SOSC_MONITOR_DISABLE:
-            {
-              putreg32(regval, S32K1XX_SCG_SOSCCSR);
-            }
-            break;
+        switch (sosccfg->mode) {
+            case SCG_SOSC_MONITOR_DISABLE : {
+                putreg32(regval, S32K1XX_SCG_SOSCCSR);
+            } break;
 
-          case SCG_SOSC_MONITOR_INT:
-            {
-              regval |= SCG_SOSCCSR_SOSCCM;
-              putreg32(regval, S32K1XX_SCG_SOSCCSR);
-            }
-            break;
+            case SCG_SOSC_MONITOR_INT : {
+                regval |= SCG_SOSCCSR_SOSCCM;
+                putreg32(regval, S32K1XX_SCG_SOSCCSR);
+            } break;
 
-          case SCG_SOSC_MONITOR_RESET:
-            {
-              regval |= SCG_SOSCCSR_SOSCCM | SCG_SOSCCSR_SOSCCMRE;
-              putreg32(regval, S32K1XX_SCG_SOSCCSR);
-            }
-            break;
+            case SCG_SOSC_MONITOR_RESET : {
+                regval |= SCG_SOSCCSR_SOSCCM | SCG_SOSCCSR_SOSCCMRE;
+                putreg32(regval, S32K1XX_SCG_SOSCCSR);
+            } break;
 
-          default:
+            default :
 
-            /* Invalid monitor mode */
+                /* Invalid monitor mode */
 
-            DEBUGPANIC();
-            break;
+                DEBUGPANIC();
+                break;
         }
 
-      /* Wait for System OSC to initialize */
-
-      for (timeout = SOSC_STABILIZATION_TIMEOUT;
-           s32k1xx_get_soscfreq() == 0 && timeout > 0;
-           timeout--)
-        {
+        /* Wait for System OSC to initialize */
+        for (timeout = SOSC_STABILIZATION_TIMEOUT; s32k1xx_get_soscfreq() == 0 && timeout > 0; timeout--) {
         }
 
-      if (timeout <= 0)
-        {
-          ret = -ETIMEDOUT;
+        if (timeout <= 0) {
+            ret = -ETIMEDOUT;
         }
     }
 
-  return ret;
+    return ret;
 }
 
 /****************************************************************************
@@ -1100,123 +914,102 @@ static int s32k1xx_sosc_config(bool enable,
  *   any failure.
  *
  ****************************************************************************/
-
 #ifdef CONFIG_S32K1XX_HAVE_SPLL
-static int s32k1xx_spll_config(bool enable,
-                               const struct scg_spll_config_s *spllcfg)
-{
-  uint32_t regval;
-  uint32_t srcfreq;
-  uint32_t timeout;
-  int ret = OK;
+static int s32k1xx_spll_config(bool enable, const struct scg_spll_config_s* spllcfg) {
+    uint32_t regval;
+    uint32_t srcfreq;
+    uint32_t timeout;
+    int      ret = OK;
 
-  DEBUGASSERT(spllcfg != NULL);
+    DEBUGASSERT(spllcfg != NULL);
 
-  /* If clock is used by system, return error. */
+    /* If clock is used by system, return error. */
 
-  regval = getreg32(S32K1XX_SCG_SPLLCSR);
-  if ((regval & SCG_SPLLCSR_SPLLSEL) != 0)
-    {
-      ret = -EBUSY;
+    regval = getreg32(S32K1XX_SCG_SPLLCSR);
+    if ((regval & SCG_SPLLCSR_SPLLSEL) != 0) {
+        ret = -EBUSY;
     }
 
-  /* Disable the SPLL. */
+    /* Disable the SPLL. */
 
-  else
-    {
-      /* Clear LK bit field */
+    else {
+        /* Clear LK bit field */
 
-      regval &= ~SCG_SPLLCSR_LK;
-      putreg32(regval, S32K1XX_SCG_SPLLCSR);
+        regval &= ~SCG_SPLLCSR_LK;
+        putreg32(regval, S32K1XX_SCG_SPLLCSR);
 
-      /* Disable monitor, disable clock and clear error. */
+        /* Disable monitor, disable clock and clear error. */
 
-      putreg32(SCG_SPLLCSR_SPLLERR, S32K1XX_SCG_SPLLCSR);
+        putreg32(SCG_SPLLCSR_SPLLERR, S32K1XX_SCG_SPLLCSR);
     }
 
-  /* Configure SPLL */
+    /* Configure SPLL */
 
-  if (enable && (ret == OK))
-    {
-      /* Get clock source frequency. */
+    if (enable && (ret == OK)) {
+        /* Get clock source frequency. */
 
-      srcfreq = s32k1xx_get_soscfreq();
-      DEBUGASSERT(srcfreq != 0);
+        srcfreq = s32k1xx_get_soscfreq();
+        DEBUGASSERT(srcfreq != 0);
 
-      /* Pre-divider checking. */
+        /* Pre-divider checking. */
 
-      srcfreq /= spllcfg->prediv;
-      DEBUGASSERT(srcfreq >= SCG_SPLL_REF_MIN &&
-                  srcfreq <= SCG_SPLL_REF_MAX);
+        srcfreq /= spllcfg->prediv;
+        DEBUGASSERT(srcfreq >= SCG_SPLL_REF_MIN && srcfreq <= SCG_SPLL_REF_MAX);
 
-      /* Now start to set up PLL clock. */
+        /* Now start to set up PLL clock. */
 
-      regval = SCG_SPLLDIV_SPLLDIV1(spllcfg->div1) |
-               SCG_SPLLDIV_SPLLDIV2(spllcfg->div2);
-      putreg32(regval, S32K1XX_SCG_SPLLDIV);
+        regval = SCG_SPLLDIV_SPLLDIV1(spllcfg->div1) | SCG_SPLLDIV_SPLLDIV2(spllcfg->div2);
+        putreg32(regval, S32K1XX_SCG_SPLLDIV);
 
-      /* Step 2. Set PLL configuration. */
+        /* Step 2. Set PLL configuration. */
 
-      regval = SCG_SPLLCFG_PREDIV(spllcfg->prediv)  |
-               SCG_SPLLCFG_MULT(spllcfg->mult);
-      putreg32(regval, S32K1XX_SCG_SPLLCFG);
+        regval = SCG_SPLLCFG_PREDIV(spllcfg->prediv) | SCG_SPLLCFG_MULT(spllcfg->mult);
+        putreg32(regval, S32K1XX_SCG_SPLLCFG);
 
-      /* Step 3.
-       * Enable clock, configure monitor, lock register.
-       */
+        /* Step 3.
+         * Enable clock, configure monitor, lock register.
+         */
 
-      regval = SCG_SPLLCSR_SPLLEN;
+        regval = SCG_SPLLCSR_SPLLEN;
 
-      if (spllcfg->locked)
-        {
-          regval |= SCG_SPLLCSR_LK;
+        if (spllcfg->locked) {
+            regval |= SCG_SPLLCSR_LK;
         }
 
-      switch (spllcfg->mode)
-        {
-          case SCG_SPLL_MONITOR_DISABLE:
-            {
-              putreg32(regval, S32K1XX_SCG_SPLLCSR);
-            }
-            break;
+        switch (spllcfg->mode) {
+            case SCG_SPLL_MONITOR_DISABLE : {
+                putreg32(regval, S32K1XX_SCG_SPLLCSR);
+            } break;
 
-          case SCG_SPLL_MONITOR_INT:
-            {
-              regval |= SCG_SPLLCSR_SPLLCM;
-              putreg32(regval, S32K1XX_SCG_SPLLCSR);
-            }
-            break;
+            case SCG_SPLL_MONITOR_INT : {
+                regval |= SCG_SPLLCSR_SPLLCM;
+                putreg32(regval, S32K1XX_SCG_SPLLCSR);
+            } break;
 
-          case SCG_SPLL_MONITOR_RESET:
-            {
-              regval |= (SCG_SPLLCSR_SPLLCM | SCG_SPLLCSR_SPLLCMRE);
-              putreg32(regval, S32K1XX_SCG_SPLLCSR);
-            }
-            break;
+            case SCG_SPLL_MONITOR_RESET : {
+                regval |= (SCG_SPLLCSR_SPLLCM | SCG_SPLLCSR_SPLLCMRE);
+                putreg32(regval, S32K1XX_SCG_SPLLCSR);
+            } break;
 
-          default:
+            default :
 
-            /* Invalid monitor mode */
+                /* Invalid monitor mode */
 
-            DEBUGPANIC();
-            break;
+                DEBUGPANIC();
+                break;
         }
 
-      /* Wait for System PLL to initialize */
+        /* Wait for System PLL to initialize */
 
-      for (timeout = SPLL_STABILIZATION_TIMEOUT;
-           s32k1xx_get_spllfreq() == 0 && timeout > 0;
-           timeout--)
-        {
+        for (timeout = SPLL_STABILIZATION_TIMEOUT; s32k1xx_get_spllfreq() == 0 && timeout > 0; timeout--) {
         }
 
-      if (timeout <= 0)
-        {
-          ret = -ETIMEDOUT;
+        if (timeout <= 0) {
+            ret = -ETIMEDOUT;
         }
     }
 
-  return ret;
+    return ret;
 }
 #endif
 
@@ -1234,154 +1027,123 @@ static int s32k1xx_spll_config(bool enable,
  *   any failure.
  *
  ****************************************************************************/
+static int s32k1xx_configure_scgmodules(const struct scg_config_s* scgcfg) {
+    struct scg_system_clock_config_s        sysclkcfg;
+    const struct scg_system_clock_config_s* next;
+    int ret = OK;
 
-static int s32k1xx_configure_scgmodules(const struct scg_config_s *scgcfg)
-{
-  struct scg_system_clock_config_s sysclkcfg;
-  const struct scg_system_clock_config_s *next;
-  int ret = OK;
-
-  /* Configure all clock sources that are different from the current system
-   * clock source FIRC (SIRC, SOSC, SPLL).
-   */
-
-  ret = s32k1xx_sirc_config(scgcfg->sirc.initialize, &scgcfg->sirc);
-  if (ret == OK)
-    {
-      ret = s32k1xx_sosc_config(scgcfg->sosc.initialize, &scgcfg->sosc);
-#ifdef CONFIG_S32K1XX_HAVE_SPLL
-      if (ret == OK)
-        {
-          ret = s32k1xx_spll_config(scgcfg->spll.initialize, &scgcfg->spll);
+    /* Configure all clock sources that are different from the current system
+     * clock source FIRC (SIRC, SOSC, SPLL).
+     */
+    ret = s32k1xx_sirc_config(scgcfg->sirc.initialize, &scgcfg->sirc);
+    if (ret == OK) {
+        ret = s32k1xx_sosc_config(scgcfg->sosc.initialize, &scgcfg->sosc);
+        #ifdef CONFIG_S32K1XX_HAVE_SPLL
+        if (ret == OK) {
+            ret = s32k1xx_spll_config(scgcfg->spll.initialize, &scgcfg->spll);
         }
-#endif
+        #endif
     }
 
-  /* Get the next system clock source */
+    /* Get the next system clock source */
+    switch (s32k1xx_get_runmode()) {
+        case SCG_SYSTEM_CLOCK_MODE_RUN : {
+            next = &scgcfg->clockmode.rccr;
+        } break;
 
-  switch (s32k1xx_get_runmode())
-    {
-      case SCG_SYSTEM_CLOCK_MODE_RUN:
-        {
-          next = &scgcfg->clockmode.rccr;
-        }
-        break;
+        case SCG_SYSTEM_CLOCK_MODE_VLPR : {
+            next = &scgcfg->clockmode.vccr;
+        } break;
 
-      case SCG_SYSTEM_CLOCK_MODE_VLPR:
-        {
-          next = &scgcfg->clockmode.vccr;
-        }
-        break;
+        #ifdef CONFIG_S32K1XX_HAVE_HSRUN
+        case SCG_SYSTEM_CLOCK_MODE_HSRUN : {
+            next = &scgcfg->clockmode.hccr;
+        } break;
+        #endif
 
-#ifdef CONFIG_S32K1XX_HAVE_HSRUN
-      case SCG_SYSTEM_CLOCK_MODE_HSRUN:
-        {
-          next = &scgcfg->clockmode.hccr;
-        }
-        break;
-#endif
-
-      default:
-        DEBUGPANIC();
-        next = NULL;
-        break;
+        default :
+            DEBUGPANIC();
+            next = NULL;
+            break;
     }
 
-  if (ret == OK)
-    {
-      /* The current system clock source is FIRC.  Verify whether the next
-       * system clock source is FIRC.
-       */
+    if (ret == OK) {
+        /* The current system clock source is FIRC.  Verify whether the next
+         * system clock source is FIRC.
+         */
 
-      if (next->src == SCG_SYSTEM_CLOCK_SRC_FIRC)
-        {
-          /* If they are the same, search for a temporary system clock source
-          * (use one of the following sources: SPLL, SOSC, SIRC).  Assume
-          * that a temporary clock is not found ret = -ENOENT.
-          */
+        if (next->src == SCG_SYSTEM_CLOCK_SRC_FIRC) {
+            /* If they are the same, search for a temporary system clock source
+             * (use one of the following sources: SPLL, SOSC, SIRC).  Assume
+             * that a temporary clock is not found ret = -ENOENT.
+             */
 
-          ret = -ENOENT;
+            ret = -ENOENT;
 
-#ifdef CONFIG_S32K1XX_HAVE_SPLL
-          /* SPLL is enabled */
-
-          if (scgcfg->spll.initialize && (ret == -ENOENT))
-            {
-              sysclkcfg.src     = SCG_SYSTEM_CLOCK_SRC_SYS_PLL;
-              sysclkcfg.divcore = g_tmp_sysclk[TMP_SPLL_CLK][TMP_SYS_DIV];
-              sysclkcfg.divbus  = g_tmp_sysclk[TMP_SPLL_CLK][TMP_BUS_DIV];
-              sysclkcfg.divslow = g_tmp_sysclk[TMP_SPLL_CLK][TMP_SLOW_DIV];
-              ret               = s32k1xx_transition_systemclock(&sysclkcfg);
+            #ifdef CONFIG_S32K1XX_HAVE_SPLL
+            /* SPLL is enabled */
+            if (scgcfg->spll.initialize && (ret == -ENOENT)) {
+                sysclkcfg.src     = SCG_SYSTEM_CLOCK_SRC_SYS_PLL;
+                sysclkcfg.divcore = g_tmp_sysclk[TMP_SPLL_CLK][TMP_SYS_DIV];
+                sysclkcfg.divbus  = g_tmp_sysclk[TMP_SPLL_CLK][TMP_BUS_DIV];
+                sysclkcfg.divslow = g_tmp_sysclk[TMP_SPLL_CLK][TMP_SLOW_DIV];
+                ret               = s32k1xx_transition_systemclock(&sysclkcfg);
             }
-#endif
+            #endif
 
-          /* SOSC is enabled and SPLL configuration for system clock source
-           * is not valid
-           */
-
-          if (scgcfg->sosc.initialize && (ret == -ENOENT))
-            {
-              sysclkcfg.src     = SCG_SYSTEM_CLOCK_SRC_SYS_OSC;
-              sysclkcfg.divcore = g_tmp_sysclk[TMP_SOSC_CLK][TMP_SYS_DIV];
-              sysclkcfg.divbus  = g_tmp_sysclk[TMP_SOSC_CLK][TMP_BUS_DIV];
-              sysclkcfg.divslow = g_tmp_sysclk[TMP_SOSC_CLK][TMP_SLOW_DIV];
-              ret               = s32k1xx_transition_systemclock(&sysclkcfg);
+            /* SOSC is enabled and SPLL configuration for system clock source
+             * is not valid
+             */
+            if (scgcfg->sosc.initialize && (ret == -ENOENT)) {
+                sysclkcfg.src     = SCG_SYSTEM_CLOCK_SRC_SYS_OSC;
+                sysclkcfg.divcore = g_tmp_sysclk[TMP_SOSC_CLK][TMP_SYS_DIV];
+                sysclkcfg.divbus  = g_tmp_sysclk[TMP_SOSC_CLK][TMP_BUS_DIV];
+                sysclkcfg.divslow = g_tmp_sysclk[TMP_SOSC_CLK][TMP_SLOW_DIV];
+                ret               = s32k1xx_transition_systemclock(&sysclkcfg);
             }
 
             /* SIRC is enabled and SOSC configuration for system clock
              * source is not valid
              */
-
-          if (scgcfg->sirc.initialize && (ret == -ENOENT))
-            {
-              sysclkcfg.src     = SCG_SYSTEM_CLOCK_SRC_SIRC;
-              sysclkcfg.divcore = g_tmp_sysclk[TMP_SIRC_CLK][TMP_SYS_DIV];
-              sysclkcfg.divbus  = g_tmp_sysclk[TMP_SIRC_CLK][TMP_BUS_DIV];
-              sysclkcfg.divslow = g_tmp_sysclk[TMP_SIRC_CLK][TMP_SLOW_DIV];
-              ret               = s32k1xx_transition_systemclock(&sysclkcfg);
+            if (scgcfg->sirc.initialize && (ret == -ENOENT)) {
+                sysclkcfg.src     = SCG_SYSTEM_CLOCK_SRC_SIRC;
+                sysclkcfg.divcore = g_tmp_sysclk[TMP_SIRC_CLK][TMP_SYS_DIV];
+                sysclkcfg.divbus  = g_tmp_sysclk[TMP_SIRC_CLK][TMP_BUS_DIV];
+                sysclkcfg.divslow = g_tmp_sysclk[TMP_SIRC_CLK][TMP_SLOW_DIV];
+                ret               = s32k1xx_transition_systemclock(&sysclkcfg);
             }
 
-          /* Transitioned to a temporary system clock source. */
-
-          if (ret == OK)
-            {
-              /* Configure the remaining clock source (FIRC). */
-
-              ret = s32k1xx_firc_config(scgcfg->firc.initialize,
-                                        &scgcfg->firc);
-              if (ret == OK)
-                {
-                  /* Transition to the next system clock source. */
-
-                  sysclkcfg.src     = next->src;
-                  sysclkcfg.divcore = next->divcore;
-                  sysclkcfg.divbus  = next->divbus;
-                  sysclkcfg.divslow = next->divslow;
-                  ret = s32k1xx_transition_systemclock(&sysclkcfg);
+            /* Transitioned to a temporary system clock source. */
+            if (ret == OK) {
+                /* Configure the remaining clock source (FIRC). */
+                ret = s32k1xx_firc_config(scgcfg->firc.initialize, &scgcfg->firc);
+                if (ret == OK) {
+                    /* Transition to the next system clock source. */
+                    sysclkcfg.src     = next->src;
+                    sysclkcfg.divcore = next->divcore;
+                    sysclkcfg.divbus  = next->divbus;
+                    sysclkcfg.divslow = next->divslow;
+                    ret               = s32k1xx_transition_systemclock(&sysclkcfg);
                 }
             }
         }
-      else
-        {
-          /* Transition to the next system clock source. */
+        else {
+            /* Transition to the next system clock source. */
+            sysclkcfg.src     = next->src;
+            sysclkcfg.divcore = next->divcore;
+            sysclkcfg.divbus  = next->divbus;
+            sysclkcfg.divslow = next->divslow;
+            ret               = s32k1xx_transition_systemclock(&sysclkcfg);
 
-          sysclkcfg.src     = next->src;
-          sysclkcfg.divcore = next->divcore;
-          sysclkcfg.divbus  = next->divbus;
-          sysclkcfg.divslow = next->divslow;
-          ret = s32k1xx_transition_systemclock(&sysclkcfg);
+            if (ret == OK) {
+                /* Configure the remaining clock source (FIRC) */
 
-          if (ret == OK)
-            {
-              /* Configure the remaining clock source (FIRC) */
-
-              ret = s32k1xx_firc_config(scgcfg->firc.initialize,
-                                        &scgcfg->firc);
+                ret = s32k1xx_firc_config(scgcfg->firc.initialize, &scgcfg->firc);
             }
         }
     }
 
-  return ret;
+    return ret;
 }
 
 /****************************************************************************
@@ -1398,75 +1160,54 @@ static int s32k1xx_configure_scgmodules(const struct scg_config_s *scgcfg)
  *   any failure.
  *
  ****************************************************************************/
+static int s32k1xx_scg_config(const struct scg_config_s* scgcfg) {
+    uint32_t regval;
+    int      ret = OK;
 
-static int s32k1xx_scg_config(const struct scg_config_s *scgcfg)
-{
-  uint32_t regval;
-  int ret = OK;
+    DEBUGASSERT(scgcfg != NULL);
 
-  DEBUGASSERT(scgcfg != NULL);
-
-  /* Configure a temporary system clock source: FIRC if enabled */
-
-  ret = s32k1xx_firc_clocksource();
-
-  if (ret == OK)
-    {
-      /* Configure clock sources from SCG */
-
-      ret = s32k1xx_configure_scgmodules(scgcfg);
+    /* Configure a temporary system clock source: FIRC if enabled */
+    ret = s32k1xx_firc_clocksource();
+    if (ret == OK) {
+        /* Configure clock sources from SCG */
+        ret = s32k1xx_configure_scgmodules(scgcfg);
     }
 
-  if (ret == OK)
-    {
-      /* Configure RTC. */
-
-#if 0 /* Not used */
-      if (scgcfg->rtc.initialize)
-        {
-          /* RTC Clock settings. */
-
-          g_rtc_clkin = scgcfg->rtc.clkin;
+    if (ret == OK) {
+        /* Configure RTC. */
+        #if 0 /* Not used */
+        if (scgcfg->rtc.initialize) {
+            /* RTC Clock settings. */
+            g_rtc_clkin = scgcfg->rtc.clkin;
         }
-#endif
+        #endif
 
-      /* Configure SCG ClockOut. */
-
-      if (scgcfg->clockout.initialize)
-        {
-          /* ClockOut settings. */
-
-          regval  = getreg32(S32K1XX_SCG_CLKOUTCNFG);
-          regval &= ~SCG_CLKOUTCNFG_CLKOUTSEL_MASK;
-          regval |= SCG_CLKOUTCNFG_CLKOUTSEL(scgcfg->clockout.source);
-          putreg32(regval, S32K1XX_SCG_CLKOUTCNFG);
+        /* Configure SCG ClockOut. */
+        if (scgcfg->clockout.initialize) {
+            /* ClockOut settings. */
+            regval  = getreg32(S32K1XX_SCG_CLKOUTCNFG);
+            regval &= ~SCG_CLKOUTCNFG_CLKOUTSEL_MASK;
+            regval |= SCG_CLKOUTCNFG_CLKOUTSEL(scgcfg->clockout.source);
+            putreg32(regval, S32K1XX_SCG_CLKOUTCNFG);
         }
 
-      /* Configure SCG clock modes. */
-
-      if (scgcfg->clockmode.initialize)
-        {
-          /* Configure SCG clock modes */
-
-          ret = s32k1xx_set_sysclk_cfg(SCG_SYSTEM_CLOCK_MODE_RUN,
-                                       &scgcfg->clockmode.rccr);
-          if (ret == OK)
-            {
-              ret = s32k1xx_set_sysclk_cfg(SCG_SYSTEM_CLOCK_MODE_VLPR,
-                                           &scgcfg->clockmode.vccr);
+        /* Configure SCG clock modes. */
+        if (scgcfg->clockmode.initialize) {
+            /* Configure SCG clock modes */
+            ret = s32k1xx_set_sysclk_cfg(SCG_SYSTEM_CLOCK_MODE_RUN, &scgcfg->clockmode.rccr);
+            if (ret == OK) {
+                ret = s32k1xx_set_sysclk_cfg(SCG_SYSTEM_CLOCK_MODE_VLPR, &scgcfg->clockmode.vccr);
             }
 
-#ifdef CONFIG_S32K1XX_HAVE_HSRUN
-          if (ret == OK)
-            {
-              ret = s32k1xx_set_sysclk_cfg(SCG_SYSTEM_CLOCK_MODE_HSRUN,
-                                           &scgcfg->clockmode.hccr);
+            #ifdef CONFIG_S32K1XX_HAVE_HSRUN
+            if (ret == OK) {
+                ret = s32k1xx_set_sysclk_cfg(SCG_SYSTEM_CLOCK_MODE_HSRUN, &scgcfg->clockmode.hccr);
             }
-#endif
+            #endif
         }
     }
 
-  return ret;
+    return ret;
 }
 
 /****************************************************************************
@@ -1482,150 +1223,119 @@ static int s32k1xx_scg_config(const struct scg_config_s *scgcfg)
  *   None.
  *
  ****************************************************************************/
+static void s32k1xx_sim_config(const struct sim_clock_config_s* simcfg) {
+    uint32_t regval;
+    #ifdef CONFIG_S32K1XX_HAVE_QSPI
+    int i;
+    #endif
 
-static void s32k1xx_sim_config(const struct sim_clock_config_s *simcfg)
-{
-  uint32_t regval;
-#ifdef CONFIG_S32K1XX_HAVE_QSPI
-  int i;
-#endif
+    DEBUGASSERT(simcfg != NULL);
 
-  DEBUGASSERT(simcfg != NULL);
+    /* ClockOut settings. */
+    if (simcfg->clockout.initialize) {
+        regval  = getreg32(S32K1XX_SIM_CHIPCTL);
+        regval &= ~(SIM_CHIPCTL_CLKOUTEN | SIM_CHIPCTL_CLKOUTDIV_MASK | SIM_CHIPCTL_CLKOUTSEL_MASK);
 
-  /* ClockOut settings. */
-
-  if (simcfg->clockout.initialize)
-    {
-      regval  = getreg32(S32K1XX_SIM_CHIPCTL);
-      regval &= ~(SIM_CHIPCTL_CLKOUTEN | SIM_CHIPCTL_CLKOUTDIV_MASK |
-                  SIM_CHIPCTL_CLKOUTSEL_MASK);
-
-      if (simcfg->clockout.enable)
-        {
-          regval |= SIM_CHIPCTL_CLKOUTEN;
+        if (simcfg->clockout.enable) {
+            regval |= SIM_CHIPCTL_CLKOUTEN;
         }
 
-      regval |= SIM_CHIPCTL_CLKOUTSEL(simcfg->clockout.source);
-      regval |= SIM_CHIPCTL_CLKOUTDIV(simcfg->clockout.divider);
-      putreg32(regval, S32K1XX_SIM_CHIPCTL);
+        regval |= SIM_CHIPCTL_CLKOUTSEL(simcfg->clockout.source);
+        regval |= SIM_CHIPCTL_CLKOUTDIV(simcfg->clockout.divider);
+        putreg32(regval, S32K1XX_SIM_CHIPCTL);
     }
 
-  /* Low Power Clock settings from SIM. */
+    /* Low Power Clock settings from SIM. */
+    if (simcfg->lpoclk.initialize) {
+        regval  = getreg32(S32K1XX_SIM_LPOCLKS);
+        regval &= ~(SIM_LPOCLKS_LPO1KCLKEN | SIM_LPOCLKS_LPO32KCLKEN | SIM_LPOCLKS_LPOCLKSEL_MASK |
+                    SIM_LPOCLKS_RTCCLKSEL_MASK);
 
-  if (simcfg->lpoclk.initialize)
-    {
-      regval  = getreg32(S32K1XX_SIM_LPOCLKS);
-      regval &= ~(SIM_LPOCLKS_LPO1KCLKEN | SIM_LPOCLKS_LPO32KCLKEN |
-                  SIM_LPOCLKS_LPOCLKSEL_MASK | SIM_LPOCLKS_RTCCLKSEL_MASK);
-
-      if (simcfg->lpoclk.lpo1k)
-        {
-          regval |= SIM_LPOCLKS_LPO1KCLKEN;
+        if (simcfg->lpoclk.lpo1k) {
+            regval |= SIM_LPOCLKS_LPO1KCLKEN;
         }
 
-      if (simcfg->lpoclk.lpo32k)
-        {
-          regval |= SIM_LPOCLKS_LPO32KCLKEN;
+        if (simcfg->lpoclk.lpo32k) {
+            regval |= SIM_LPOCLKS_LPO32KCLKEN;
         }
 
-      regval |= SIM_LPOCLKS_LPOCLKSEL(simcfg->lpoclk.lpo_source);
-      regval |= SIM_LPOCLKS_RTCCLKSEL(simcfg->lpoclk.rtc_source);
+        regval |= SIM_LPOCLKS_LPOCLKSEL(simcfg->lpoclk.lpo_source);
+        regval |= SIM_LPOCLKS_RTCCLKSEL(simcfg->lpoclk.rtc_source);
 
-      putreg32(regval, S32K1XX_SIM_LPOCLKS);
+        putreg32(regval, S32K1XX_SIM_LPOCLKS);
     }
 
-  /* Platform Gate Clock settings. */
+    /* Platform Gate Clock settings. */
+    if (simcfg->platgate.initialize) {
+        regval  = getreg32(S32K1XX_SIM_PLATCGC);
+        regval &= ~(SIM_PLATCGC_CGCMSCM | SIM_PLATCGC_CGCMPU | SIM_PLATCGC_CGCDMA | SIM_PLATCGC_CGCERM | SIM_PLATCGC_CGCEIM);
 
-  if (simcfg->platgate.initialize)
-    {
-      regval  = getreg32(S32K1XX_SIM_PLATCGC);
-      regval &= ~(SIM_PLATCGC_CGCMSCM | SIM_PLATCGC_CGCMPU |
-                  SIM_PLATCGC_CGCDMA | SIM_PLATCGC_CGCERM |
-                  SIM_PLATCGC_CGCEIM);
-
-      if (simcfg->platgate.mscm)
-        {
-          regval |= SIM_PLATCGC_CGCMSCM;
+        if (simcfg->platgate.mscm) {
+            regval |= SIM_PLATCGC_CGCMSCM;
         }
 
-      if (simcfg->platgate.mpu)
-        {
-          regval |= SIM_PLATCGC_CGCMPU;
+        if (simcfg->platgate.mpu) {
+            regval |= SIM_PLATCGC_CGCMPU;
         }
 
-      if (simcfg->platgate.dma)
-        {
-          regval |= SIM_PLATCGC_CGCDMA;
+        if (simcfg->platgate.dma) {
+            regval |= SIM_PLATCGC_CGCDMA;
         }
 
-      if (simcfg->platgate.erm)
-        {
-          regval |= SIM_PLATCGC_CGCERM;
+        if (simcfg->platgate.erm) {
+            regval |= SIM_PLATCGC_CGCERM;
         }
 
-      if (simcfg->platgate.eim)
-        {
-          regval |= SIM_PLATCGC_CGCEIM;
+        if (simcfg->platgate.eim) {
+            regval |= SIM_PLATCGC_CGCEIM;
         }
 
-      putreg32(regval, S32K1XX_SIM_PLATCGC);
+        putreg32(regval, S32K1XX_SIM_PLATCGC);
 
-#ifdef CONFIG_S32K1XX_HAVE_QSPI
-      regval  = getreg32(S32K1XX_SIM_MISCTRL0);
-      regval &= ~SIM_MISCTRL0_QSPI_CLK_SEL;
+        #ifdef CONFIG_S32K1XX_HAVE_QSPI
+        regval = getreg32(S32K1XX_SIM_MISCTRL0);
+        regval &= ~SIM_MISCTRL0_QSPI_CLK_SEL;
 
-      if (simcfg->qspirefclk.refclk)
-        {
-          regval |= SIM_MISCTRL0_QSPI_CLK_SEL;
+        if (simcfg->qspirefclk.refclk) {
+            regval |= SIM_MISCTRL0_QSPI_CLK_SEL;
         }
 
-      putreg32(regval, S32K1XX_SIM_MISCTRL0);
-#endif
+        putreg32(regval, S32K1XX_SIM_MISCTRL0);
+        #endif
     }
 
-#if 0 /* REVISIT:  Not currently used */
-  /* TCLK Clock settings. */
-
-  if (simcfg->tclk.initialize)
-    {
-      for (i = 0; i < NUMBER_OF_TCLK_INPUTS; i++)
-        {
-          g_tclkfreq[i] = simcfg->tclk.tclkfreq[i];
+    #if 0 /* REVISIT:  Not currently used */
+    /* TCLK Clock settings. */
+    if (simcfg->tclk.initialize) {
+        for (i = 0; i < NUMBER_OF_TCLK_INPUTS; i++) {
+            g_tclkfreq[i] = simcfg->tclk.tclkfreq[i];
         }
     }
-#endif
+    #endif
 
-  /* Debug trace Clock settings. */
+    /* Debug trace Clock settings. */
+    if (simcfg->traceclk.initialize) {
+        /* Disable divider. */
+        putreg32(0, S32K1XX_SIM_CLKDIV4);
 
-  if (simcfg->traceclk.initialize)
-    {
-      /* Disable divider. */
+        /* Configure trace source. */
+        regval  = getreg32(S32K1XX_SIM_CHIPCTL);
+        regval &= ~SIM_CHIPCTL_TRACECLK_SEL;
 
-      putreg32(0, S32K1XX_SIM_CLKDIV4);
-
-      /* Configure trace source. */
-
-      regval  = getreg32(S32K1XX_SIM_CHIPCTL);
-      regval &= ~SIM_CHIPCTL_TRACECLK_SEL;
-
-      if (simcfg->traceclk.source)
-        {
-          regval |= SIM_CHIPCTL_TRACECLK_SEL;
+        if (simcfg->traceclk.source) {
+            regval |= SIM_CHIPCTL_TRACECLK_SEL;
         }
 
-      putreg32(regval, S32K1XX_SIM_CHIPCTL);
+        putreg32(regval, S32K1XX_SIM_CHIPCTL);
 
-      if (simcfg->traceclk.enable)
-        {
-          regval = SIM_CLKDIV4_TRACEDIVEN |
-                   SIM_CLKDIV4_TRACEDIV(simcfg->traceclk.divider);
+        if (simcfg->traceclk.enable) {
+            regval = SIM_CLKDIV4_TRACEDIVEN | SIM_CLKDIV4_TRACEDIV(simcfg->traceclk.divider);
 
-          if (simcfg->traceclk.fraction)
-            {
-              regval |= SIM_CLKDIV4_TRACEFRAC;
+            if (simcfg->traceclk.fraction) {
+                regval |= SIM_CLKDIV4_TRACEFRAC;
             }
 
-          putreg32(regval, S32K1XX_SIM_CLKDIV4);
+            putreg32(regval, S32K1XX_SIM_CLKDIV4);
         }
     }
 }
@@ -1643,39 +1353,29 @@ static void s32k1xx_sim_config(const struct sim_clock_config_s *simcfg)
  *   None.
  *
  ****************************************************************************/
+static void s32k1xx_pmc_config(const struct pmc_config_s* pmccfg) {
+    uint8_t regval;
 
-static void s32k1xx_pmc_config(const struct pmc_config_s *pmccfg)
-{
-  uint8_t regval;
+    DEBUGASSERT(pmccfg != NULL);
 
-  DEBUGASSERT(pmccfg != NULL);
-
-  /* Low Power Clock settings from PMC. */
-
-  if (pmccfg->lpoclk.initialize)
-    {
-      /* Enable/disable the low power oscillator. */
-
-      regval = getreg8(S32K1XX_PMC_REGSC);
-
-      if (pmccfg->lpoclk.enable)
-        {
-          regval &= ~PMC_REGSC_LPODIS;
+    /* Low Power Clock settings from PMC. */
+    if (pmccfg->lpoclk.initialize) {
+        /* Enable/disable the low power oscillator. */
+        regval = getreg8(S32K1XX_PMC_REGSC);
+        if (pmccfg->lpoclk.enable) {
+            regval &= ~PMC_REGSC_LPODIS;
         }
-      else
-        {
-          regval |= PMC_REGSC_LPODIS;
+        else {
+            regval |= PMC_REGSC_LPODIS;
         }
 
-      /* Enable Biasing (needed for VLPR mode, no effect in RUN mode) */
+        /* Enable Biasing (needed for VLPR mode, no effect in RUN mode) */
+        regval |= PMC_REGSC_BIASEN;
 
-      regval |= PMC_REGSC_BIASEN;
+        putreg8(regval, S32K1XX_PMC_REGSC);
 
-      putreg8(regval, S32K1XX_PMC_REGSC);
-
-      /* Write trimming value. */
-
-      putreg8(pmccfg->lpoclk.trim & PMC_LPOTRIM_MASK, S32K1XX_PMC_LPOTRIM);
+        /* Write trimming value. */
+        putreg8(pmccfg->lpoclk.trim & PMC_LPOTRIM_MASK, S32K1XX_PMC_LPOTRIM);
     }
 }
 
@@ -1692,26 +1392,24 @@ static void s32k1xx_pmc_config(const struct pmc_config_s *pmccfg)
  *   none.
  *
  ****************************************************************************/
+void s32k1xx_allow_vlprmode(bool allow) {
+    uint32_t regval;
 
-void s32k1xx_allow_vlprmode(bool allow)
-{
-  uint32_t regval;
+    /* get the SMC_PMPROT register */
 
-  /* get the SMC_PMPROT register */
+    regval = getreg32(S32K1XX_SMC_PMPROT);
 
-  regval  =  getreg32(S32K1XX_SMC_PMPROT);
+    /* mask the AVLP bit */
 
-  /* mask the AVLP bit */
+    regval &= ~SMC_PMPROT_AVLP;
 
-  regval &= ~SMC_PMPROT_AVLP;
+    /* set the new bit */
 
-  /* set the new bit */
+    regval |= (allow << SMC_PMPROT_AVLP_SHIFT);
 
-  regval |= (allow << SMC_PMPROT_AVLP_SHIFT);
+    /* set the registervalue */
 
-  /* set the registervalue */
-
-  putreg32(regval, S32K1XX_SMC_PMPROT);
+    putreg32(regval, S32K1XX_SMC_PMPROT);
 }
 
 /****************************************************************************
@@ -1736,567 +1434,482 @@ void s32k1xx_allow_vlprmode(bool allow)
  ****************************************************************************/
 
 #ifdef CONFIG_PM
-static void up_pm_notify(struct pm_callback_s *cb, int domain,
-                         enum pm_state_e pmstate)
-{
-  int return_value;
+static void up_pm_notify(struct pm_callback_s* cb, int domain, enum pm_state_e pmstate) {
+    int return_value;
 
-  /* check if the transition is from the IDLE domain to the NORMAL domain */
+    /* check if the transition is from the IDLE domain to the NORMAL domain */
 
-  if (pm_querystate(PM_IDLE_DOMAIN) == PM_IDLE &&
-    pmstate == PM_NORMAL)
-    {
-      /* return */
+    if (pm_querystate(PM_IDLE_DOMAIN) == PM_IDLE && pmstate == PM_NORMAL) {
+        /* return */
 
-      return;
+        return;
     }
 
-  /* check what the new power state is */
+    /* check what the new power state is */
 
-  switch (pmstate)
-    {
-      /* if it needs to be set to RUN mode */
+    switch (pmstate) {
+            /* if it needs to be set to RUN mode */
 
-      case(PM_NORMAL):
-        {
-          /* Logic for PM_NORMAL goes here */
+        case (PM_NORMAL) : {
+            /* Logic for PM_NORMAL goes here */
 
-          /* change the microcontroller to RUN mode  */
+            /* change the microcontroller to RUN mode  */
 
-          /* and wait until in RUN mode */
+            /* and wait until in RUN mode */
 
-          return_value = (int)s32k1xx_set_runmode(SCG_SYSTEM_CLOCK_MODE_RUN);
+            return_value = (int)s32k1xx_set_runmode(SCG_SYSTEM_CLOCK_MODE_RUN);
 
-          /* check for debug assertion */
+            /* check for debug assertion */
 
-          DEBUGASSERT(return_value != (int)SCG_SYSTEM_CLOCK_MODE_NONE);
+            DEBUGASSERT(return_value != (int)SCG_SYSTEM_CLOCK_MODE_NONE);
 
-          /* enable all clock sources again if needed  */
+            /* enable all clock sources again if needed  */
 
-          /* these could be the FIRC, PPL, and SOSC */
+            /* these could be the FIRC, PPL, and SOSC */
 
-          /* check if the FIRC was enabled and
-           * it is not the system clock source
-           */
+            /* check if the FIRC was enabled and
+             * it is not the system clock source
+             */
 
-          if (g_initial_clkconfig.scg.firc.initialize &&
-            (s32k1xx_get_scgclk_source() != SCG_SYSTEM_CLOCK_SRC_SIRC))
-          {
-            /* enable FIRC */
+            if (g_initial_clkconfig.scg.firc.initialize && (s32k1xx_get_scgclk_source() != SCG_SYSTEM_CLOCK_SRC_SIRC)) {
+                /* enable FIRC */
 
-            return_value = s32k1xx_firc_config(true,
-              &g_initial_clkconfig.scg.firc);
-            DEBUGASSERT(!return_value);
-          }
-
-          /* check if the FIRC needs to be disabled and if it is enabled */
-
-          else if ((!(g_initial_clkconfig.scg.firc.initialize)) &&
-            (s32k1xx_get_srcfreq(SCG_SYSTEM_CLOCK_SRC_FIRC)))
-          {
-            /* disable FIRC */
-
-            return_value = s32k1xx_firc_config(false,
-              &g_initial_clkconfig.scg.firc);
-            DEBUGASSERT(!return_value);
-          }
-
-          /* check if the SOSC was enabled and
-           * it is not the system clock source
-           */
-
-          if (g_initial_clkconfig.scg.sosc.initialize &&
-            (s32k1xx_get_scgclk_source() != SCG_SYSTEM_CLOCK_SRC_SYS_OSC) &&
-            (s32k1xx_get_scgclk_source() != SCG_SYSTEM_CLOCK_SRC_SYS_PLL))
-          {
-            /* enable SOSC */
-
-            return_value =
-              s32k1xx_sosc_config(true, &g_initial_clkconfig.scg.sosc);
-            DEBUGASSERT(!return_value);
-          }
-
-          /* check if the SOSC needs to be disabled and if it is enabled */
-
-          else if ((!(g_initial_clkconfig.scg.sosc.initialize)) &&
-            (s32k1xx_get_srcfreq(SCG_SYSTEM_CLOCK_SRC_SYS_OSC)))
-          {
-            /* disable SOSC */
-
-            return_value =
-              s32k1xx_sosc_config(false, &g_initial_clkconfig.scg.sosc);
-            DEBUGASSERT(!return_value);
-          }
-
-          /* check if the SPLL was enabled and
-           * it is not the system clock source
-           */
-
-          if (g_initial_clkconfig.scg.spll.initialize &&
-            (s32k1xx_get_scgclk_source() != SCG_SYSTEM_CLOCK_SRC_SYS_OSC) &&
-            (s32k1xx_get_scgclk_source() != SCG_SYSTEM_CLOCK_SRC_SYS_PLL))
-          {
-            /* enable SPLL */
-
-            return_value = s32k1xx_spll_config(true,
-              &g_initial_clkconfig.scg.spll);
-            DEBUGASSERT(!return_value);
-          }
-
-          /* check if the SPLL needs to be disabled and if it is enabled */
-
-          else if ((!(g_initial_clkconfig.scg.spll.initialize)) &&
-            (s32k1xx_get_srcfreq(SCG_SYSTEM_CLOCK_SRC_SYS_PLL)))
-          {
-            /* disable SPLL */
-
-            return_value = s32k1xx_spll_config(false,
-              &g_initial_clkconfig.scg.spll);
-            DEBUGASSERT(!return_value);
-          }
-
-          /* check if the RCCR clock source is enabled */
-
-          if (s32k1xx_get_srcfreq(g_initial_clkconfig.scg.clockmode.rccr.src)
-            != 0)
-          {
-            /* change the system clock back to the configured clock */
-
-            /* and wait until clock changed */
-
-            if (s32k1xx_transition_systemclock(
-              &g_initial_clkconfig.scg.clockmode.rccr))
-            {
-              /* error */
-
-              DEBUGPANIC();
+                return_value = s32k1xx_firc_config(true, &g_initial_clkconfig.scg.firc);
+                DEBUGASSERT(!return_value);
             }
-          }
 
-          /* if it is 0 */
+            /* check if the FIRC needs to be disabled and if it is enabled */
 
-          else
-          {
-            /* error */
+            else if ((!(g_initial_clkconfig.scg.firc.initialize)) && (s32k1xx_get_srcfreq(SCG_SYSTEM_CLOCK_SRC_FIRC))) {
+                /* disable FIRC */
 
-            DEBUGPANIC();
-          }
+                return_value = s32k1xx_firc_config(false, &g_initial_clkconfig.scg.firc);
+                DEBUGASSERT(!return_value);
+            }
 
-          /* calculate the new clock ticks */
+            /* check if the SOSC was enabled and
+             * it is not the system clock source
+             */
 
-          up_timer_initialize();
-        }
-        break;
+            if (g_initial_clkconfig.scg.sosc.initialize &&
+                (s32k1xx_get_scgclk_source() != SCG_SYSTEM_CLOCK_SRC_SYS_OSC) &&
+                (s32k1xx_get_scgclk_source() != SCG_SYSTEM_CLOCK_SRC_SYS_PLL)) {
+                /* enable SOSC */
 
-      case(PM_IDLE):
-        {
-          /* Logic for PM_IDLE goes here */
-        }
-        break;
+                return_value = s32k1xx_sosc_config(true, &g_initial_clkconfig.scg.sosc);
+                DEBUGASSERT(!return_value);
+            }
 
-      /* if it needs to be set to VLPR mode */
+            /* check if the SOSC needs to be disabled and if it is enabled */
 
-      case(PM_STANDBY):
-        {
-          /* Logic for PM_STANDBY goes here */
+            else if ((!(g_initial_clkconfig.scg.sosc.initialize)) &&
+                     (s32k1xx_get_srcfreq(SCG_SYSTEM_CLOCK_SRC_SYS_OSC))) {
+                /* disable SOSC */
+
+                return_value = s32k1xx_sosc_config(false, &g_initial_clkconfig.scg.sosc);
+                DEBUGASSERT(!return_value);
+            }
+
+            /* check if the SPLL was enabled and
+             * it is not the system clock source
+             */
+
+            if (g_initial_clkconfig.scg.spll.initialize &&
+                (s32k1xx_get_scgclk_source() != SCG_SYSTEM_CLOCK_SRC_SYS_OSC) &&
+                (s32k1xx_get_scgclk_source() != SCG_SYSTEM_CLOCK_SRC_SYS_PLL)) {
+                /* enable SPLL */
+
+                return_value = s32k1xx_spll_config(true, &g_initial_clkconfig.scg.spll);
+                DEBUGASSERT(!return_value);
+            }
+
+            /* check if the SPLL needs to be disabled and if it is enabled */
+
+            else if ((!(g_initial_clkconfig.scg.spll.initialize)) &&
+                     (s32k1xx_get_srcfreq(SCG_SYSTEM_CLOCK_SRC_SYS_PLL))) {
+                /* disable SPLL */
+
+                return_value = s32k1xx_spll_config(false, &g_initial_clkconfig.scg.spll);
+                DEBUGASSERT(!return_value);
+            }
+
+            /* check if the RCCR clock source is enabled */
+
+            if (s32k1xx_get_srcfreq(g_initial_clkconfig.scg.clockmode.rccr.src) != 0) {
+                /* change the system clock back to the configured clock */
+
+                /* and wait until clock changed */
+
+                if (s32k1xx_transition_systemclock(&g_initial_clkconfig.scg.clockmode.rccr)) {
+                    /* error */
+
+                    DEBUGPANIC();
+                }
+            }
+
+            /* if it is 0 */
+
+            else {
+                /* error */
+
+                DEBUGPANIC();
+            }
+
+            /* calculate the new clock ticks */
+
+            up_timer_initialize();
+        } break;
+
+        case (PM_IDLE) : {
+            /* Logic for PM_IDLE goes here */
+        } break;
+
+            /* if it needs to be set to VLPR mode */
+
+        case (PM_STANDBY) : {
+            /* Logic for PM_STANDBY goes here */
 
 #ifdef CONFIG_RUN_STANDBY
 
-          /* change the microcontroller to RUN mode */
+            /* change the microcontroller to RUN mode */
 
-          /* and wait until in RUN mode */
+            /* and wait until in RUN mode */
 
-          return_value =
-            (int)s32k1xx_set_runmode(SCG_SYSTEM_CLOCK_MODE_RUN);
-          DEBUGASSERT(return_value != (int)SCG_SYSTEM_CLOCK_MODE_NONE);
+            return_value = (int)s32k1xx_set_runmode(SCG_SYSTEM_CLOCK_MODE_RUN);
+            DEBUGASSERT(return_value != (int)SCG_SYSTEM_CLOCK_MODE_NONE);
 
-          /* enable all clock sources again if needed  */
+            /* enable all clock sources again if needed  */
 
-          /* these could be the FIRC, PPL, and SOSC */
+            /* these could be the FIRC, PPL, and SOSC */
 
-          /* check if the FIRC was enabled and
-           * it is not the system clock source
-           */
+            /* check if the FIRC was enabled and
+             * it is not the system clock source
+             */
 
-          if (g_initial_clkconfig.scg.firc.initialize &&
-            (s32k1xx_get_scgclk_source() != SCG_SYSTEM_CLOCK_SRC_SIRC))
-          {
-            /* enable FIRC */
+            if (g_initial_clkconfig.scg.firc.initialize && (s32k1xx_get_scgclk_source() != SCG_SYSTEM_CLOCK_SRC_SIRC)) {
+                /* enable FIRC */
 
-            return_value = s32k1xx_firc_config(true,
-              &g_initial_clkconfig.scg.firc);
-            DEBUGASSERT(!return_value);
-          }
-
-          /* check if the FIRC needs to be disabled and if it is enabled */
-
-          else if ((!(g_initial_clkconfig.scg.firc.initialize)) &&
-            (s32k1xx_get_srcfreq(SCG_SYSTEM_CLOCK_SRC_FIRC)))
-          {
-            /* disable FIRC */
-
-            return_value = s32k1xx_firc_config(false,
-              &g_initial_clkconfig.scg.firc);
-            DEBUGASSERT(!return_value);
-          }
-
-          /* check if the SOSC was enabled and
-           * it is not the system clock source
-           */
-
-          if (g_initial_clkconfig.scg.sosc.initialize &&
-            (s32k1xx_get_scgclk_source() != SCG_SYSTEM_CLOCK_SRC_SYS_OSC) &&
-            (s32k1xx_get_scgclk_source() != SCG_SYSTEM_CLOCK_SRC_SYS_PLL))
-          {
-            /* enable SOSC */
-
-            return_value =
-              s32k1xx_sosc_config(true, &g_initial_clkconfig.scg.sosc);
-            DEBUGASSERT(!return_value);
-          }
-
-          /* check if the SOSC needs to be disabled and if it is enabled */
-
-          else if ((!(g_initial_clkconfig.scg.sosc.initialize)) &&
-            (s32k1xx_get_srcfreq(SCG_SYSTEM_CLOCK_SRC_SYS_OSC)))
-          {
-            /* disable SOSC */
-
-            return_value =
-              s32k1xx_sosc_config(false, &g_initial_clkconfig.scg.sosc);
-            DEBUGASSERT(!return_value);
-          }
-
-          /* check if the SPLL was enabled and
-           * it is not the system clock source
-           */
-
-          if (g_initial_clkconfig.scg.spll.initialize &&
-            (s32k1xx_get_scgclk_source() != SCG_SYSTEM_CLOCK_SRC_SYS_OSC) &&
-            (s32k1xx_get_scgclk_source() != SCG_SYSTEM_CLOCK_SRC_SYS_PLL))
-          {
-            /* enable SPLL */
-
-            return_value = s32k1xx_spll_config(true,
-              &g_initial_clkconfig.scg.spll);
-            DEBUGASSERT(!return_value);
-          }
-
-          /* check if the SPLL needs to be disabled and if it is enabled */
-
-          else if ((!(g_initial_clkconfig.scg.spll.initialize)) &&
-            (s32k1xx_get_srcfreq(SCG_SYSTEM_CLOCK_SRC_SYS_PLL)))
-          {
-            /* disable SPLL */
-
-            return_value = s32k1xx_spll_config(false,
-              &g_initial_clkconfig.scg.spll);
-            DEBUGASSERT(!return_value);
-          }
-
-          /* check if the RCCR clock source is enabled */
-
-          if (s32k1xx_get_srcfreq(g_initial_clkconfig.scg.clockmode.rccr.src)
-            != 0)
-          {
-            /* change the system clock back to the configured clock */
-
-            /* and wait until clock changed */
-
-            if (s32k1xx_transition_systemclock(
-              &g_initial_clkconfig.scg.clockmode.rccr))
-            {
-              /* error */
-
-              DEBUGPANIC();
+                return_value = s32k1xx_firc_config(true, &g_initial_clkconfig.scg.firc);
+                DEBUGASSERT(!return_value);
             }
-          }
 
-          /* if it is 0 */
+            /* check if the FIRC needs to be disabled and if it is enabled */
 
-          else
-          {
-            /* error */
+            else if ((!(g_initial_clkconfig.scg.firc.initialize)) && (s32k1xx_get_srcfreq(SCG_SYSTEM_CLOCK_SRC_FIRC))) {
+                /* disable FIRC */
 
-            DEBUGPANIC();
-          }
+                return_value = s32k1xx_firc_config(false, &g_initial_clkconfig.scg.firc);
+                DEBUGASSERT(!return_value);
+            }
+
+            /* check if the SOSC was enabled and
+             * it is not the system clock source
+             */
+
+            if (g_initial_clkconfig.scg.sosc.initialize &&
+                (s32k1xx_get_scgclk_source() != SCG_SYSTEM_CLOCK_SRC_SYS_OSC) &&
+                (s32k1xx_get_scgclk_source() != SCG_SYSTEM_CLOCK_SRC_SYS_PLL)) {
+                /* enable SOSC */
+
+                return_value = s32k1xx_sosc_config(true, &g_initial_clkconfig.scg.sosc);
+                DEBUGASSERT(!return_value);
+            }
+
+            /* check if the SOSC needs to be disabled and if it is enabled */
+
+            else if ((!(g_initial_clkconfig.scg.sosc.initialize)) &&
+                     (s32k1xx_get_srcfreq(SCG_SYSTEM_CLOCK_SRC_SYS_OSC))) {
+                /* disable SOSC */
+
+                return_value = s32k1xx_sosc_config(false, &g_initial_clkconfig.scg.sosc);
+                DEBUGASSERT(!return_value);
+            }
+
+            /* check if the SPLL was enabled and
+             * it is not the system clock source
+             */
+
+            if (g_initial_clkconfig.scg.spll.initialize &&
+                (s32k1xx_get_scgclk_source() != SCG_SYSTEM_CLOCK_SRC_SYS_OSC) &&
+                (s32k1xx_get_scgclk_source() != SCG_SYSTEM_CLOCK_SRC_SYS_PLL)) {
+                /* enable SPLL */
+
+                return_value = s32k1xx_spll_config(true, &g_initial_clkconfig.scg.spll);
+                DEBUGASSERT(!return_value);
+            }
+
+            /* check if the SPLL needs to be disabled and if it is enabled */
+
+            else if ((!(g_initial_clkconfig.scg.spll.initialize)) &&
+                     (s32k1xx_get_srcfreq(SCG_SYSTEM_CLOCK_SRC_SYS_PLL))) {
+                /* disable SPLL */
+
+                return_value = s32k1xx_spll_config(false, &g_initial_clkconfig.scg.spll);
+                DEBUGASSERT(!return_value);
+            }
+
+            /* check if the RCCR clock source is enabled */
+
+            if (s32k1xx_get_srcfreq(g_initial_clkconfig.scg.clockmode.rccr.src) != 0) {
+                /* change the system clock back to the configured clock */
+
+                /* and wait until clock changed */
+
+                if (s32k1xx_transition_systemclock(&g_initial_clkconfig.scg.clockmode.rccr)) {
+                    /* error */
+
+                    DEBUGPANIC();
+                }
+            }
+
+            /* if it is 0 */
+
+            else {
+                /* error */
+
+                DEBUGPANIC();
+            }
 
 #endif /* CONFIG_RUN_STANDBY */
 
 #ifdef CONFIG_VLPR_STANDBY
 
-          /* set the system clock to the SIRC 8MHz freq */
+            /* set the system clock to the SIRC 8MHz freq */
 
-          /* this freq will change to the predefined vccr settings
-           * when the mode change occures
-           */
+            /* this freq will change to the predefined vccr settings
+             * when the mode change occures
+             */
 
-          /* and wait until system clock changed */
+            /* and wait until system clock changed */
 
-          return_value = s32k1xx_sirc_clocksource();
-          DEBUGASSERT(!return_value);
-
-          /* disable the other clock sources if not already disabled */
-
-          /* these are the FIRC, PPL, and SOSC */
-
-          /* check if the SPLL is enabled */
-
-          if (s32k1xx_get_spllfreq() != 0)
-          {
-            /* disable SPLL */
-
-            return_value = s32k1xx_spll_config(false,
-              &g_initial_clkconfig.scg.spll);
+            return_value = s32k1xx_sirc_clocksource();
             DEBUGASSERT(!return_value);
-          }
 
-          /* check if the SOSC is enabled */
+            /* disable the other clock sources if not already disabled */
 
-          if (s32k1xx_get_soscfreq() != 0)
-          {
-            /* disable SOSC */
+            /* these are the FIRC, PPL, and SOSC */
 
-            return_value =
-              s32k1xx_sosc_config(false, &g_initial_clkconfig.scg.sosc);
-            DEBUGASSERT(!return_value);
-          }
+            /* check if the SPLL is enabled */
 
-          /* check if the FIRC is enabled */
+            if (s32k1xx_get_spllfreq() != 0) {
+                /* disable SPLL */
 
-          if (s32k1xx_get_fircfreq() != 0)
-          {
-            /* disable FIRC */
+                return_value = s32k1xx_spll_config(false, &g_initial_clkconfig.scg.spll);
+                DEBUGASSERT(!return_value);
+            }
 
-            return_value = s32k1xx_firc_config(false,
-              &g_initial_clkconfig.scg.firc);
-            DEBUGASSERT(!return_value);
-          }
+            /* check if the SOSC is enabled */
 
-  #ifdef CONFIG_ARCH_CHIP_S32K11X
+            if (s32k1xx_get_soscfreq() != 0) {
+                /* disable SOSC */
+
+                return_value = s32k1xx_sosc_config(false, &g_initial_clkconfig.scg.sosc);
+                DEBUGASSERT(!return_value);
+            }
+
+            /* check if the FIRC is enabled */
+
+            if (s32k1xx_get_fircfreq() != 0) {
+                /* disable FIRC */
+
+                return_value = s32k1xx_firc_config(false, &g_initial_clkconfig.scg.firc);
+                DEBUGASSERT(!return_value);
+            }
+
+#ifdef CONFIG_ARCH_CHIP_S32K11X
             /* TODO make sure CMU is gated? (only for S32k11x) */
 
-            #error Make sure CMU is gated
-  #endif
+#error Make sure CMU is gated
+#endif
 
-          /* change the microcontroller to VLPR mode */
+            /* change the microcontroller to VLPR mode */
 
-          /* and wait until it is in that runmode */
+            /* and wait until it is in that runmode */
 
-          return_value =
-            (int)s32k1xx_set_runmode(SCG_SYSTEM_CLOCK_MODE_VLPR);
-          DEBUGASSERT(return_value != (int)SCG_SYSTEM_CLOCK_MODE_NONE);
+            return_value = (int)s32k1xx_set_runmode(SCG_SYSTEM_CLOCK_MODE_VLPR);
+            DEBUGASSERT(return_value != (int)SCG_SYSTEM_CLOCK_MODE_NONE);
 
 #endif /* CONFIG_VLPR_STANDBY */
 
-          /* calculate the new clock ticks */
+            /* calculate the new clock ticks */
 
-          up_timer_initialize();
-        }
-        break;
+            up_timer_initialize();
+        } break;
 
-      case(PM_SLEEP):
-        {
-          /* Logic for PM_SLEEP goes here */
+        case (PM_SLEEP) : {
+            /* Logic for PM_SLEEP goes here */
 
 #ifdef CONFIG_RUN_SLEEP
 
-          /* change the microcontroller to RUN mode */
+            /* change the microcontroller to RUN mode */
 
-          /* and wait until in RUN mode */
+            /* and wait until in RUN mode */
 
-          return_value = (int)s32k1xx_set_runmode(SCG_SYSTEM_CLOCK_MODE_RUN);
-          DEBUGASSERT(return_value != (int)SCG_SYSTEM_CLOCK_MODE_NONE);
+            return_value = (int)s32k1xx_set_runmode(SCG_SYSTEM_CLOCK_MODE_RUN);
+            DEBUGASSERT(return_value != (int)SCG_SYSTEM_CLOCK_MODE_NONE);
 
-          /* enable all clock sources again if needed */
+            /* enable all clock sources again if needed */
 
-          /* these could be the FIRC, PPL, and SOSC */
+            /* these could be the FIRC, PPL, and SOSC */
 
-          /* check if the FIRC was enabled
-           * and it is not the system clock source
-           */
+            /* check if the FIRC was enabled
+             * and it is not the system clock source
+             */
 
-          if (g_initial_clkconfig.scg.firc.initialize &&
-            (s32k1xx_get_scgclk_source() != SCG_SYSTEM_CLOCK_SRC_SIRC))
-          {
-            /* enable FIRC */
+            if (g_initial_clkconfig.scg.firc.initialize && (s32k1xx_get_scgclk_source() != SCG_SYSTEM_CLOCK_SRC_SIRC)) {
+                /* enable FIRC */
 
-            return_value = s32k1xx_firc_config(true,
-              &g_initial_clkconfig.scg.firc);
-            DEBUGASSERT(!return_value);
-          }
-
-          /* check if the FIRC needs to be disabled and if it is enabled */
-
-          else if ((!(g_initial_clkconfig.scg.firc.initialize)) &&
-            (s32k1xx_get_srcfreq(SCG_SYSTEM_CLOCK_SRC_FIRC)))
-          {
-            /* disable FIRC */
-
-            return_value = s32k1xx_firc_config(false,
-              &g_initial_clkconfig.scg.firc);
-            DEBUGASSERT(!return_value);
-          }
-
-          /* check if the SOSC was enabled
-           * and it is not the system clock source
-           */
-
-          if (g_initial_clkconfig.scg.sosc.initialize &&
-            (s32k1xx_get_scgclk_source() != SCG_SYSTEM_CLOCK_SRC_SYS_OSC) &&
-            (s32k1xx_get_scgclk_source() != SCG_SYSTEM_CLOCK_SRC_SYS_PLL))
-          {
-            /* enable SOSC */
-
-            return_value =
-              s32k1xx_sosc_config(true, &g_initial_clkconfig.scg.sosc);
-            DEBUGASSERT(!return_value);
-          }
-
-          /* check if the SOSC needs to be disabled and if it is enabled */
-
-          else if ((!(g_initial_clkconfig.scg.sosc.initialize)) &&
-            (s32k1xx_get_srcfreq(SCG_SYSTEM_CLOCK_SRC_SYS_OSC)))
-          {
-            /* disable SOSC */
-
-            return_value =
-              s32k1xx_sosc_config(false, &g_initial_clkconfig.scg.sosc);
-            DEBUGASSERT(!return_value);
-          }
-
-          /* check if the SPLL was enabled
-           * and it is not the system clock source
-           */
-
-          if (g_initial_clkconfig.scg.spll.initialize &&
-            (s32k1xx_get_scgclk_source() != SCG_SYSTEM_CLOCK_SRC_SYS_OSC) &&
-            (s32k1xx_get_scgclk_source() != SCG_SYSTEM_CLOCK_SRC_SYS_PLL))
-          {
-            /* enable SPLL */
-
-            return_value = s32k1xx_spll_config(true,
-              &g_initial_clkconfig.scg.spll);
-            DEBUGASSERT(!return_value);
-          }
-
-          /* check if the SPLL needs to be disabled and if it is enabled */
-
-          else if ((!(g_initial_clkconfig.scg.spll.initialize)) &&
-            (s32k1xx_get_srcfreq(SCG_SYSTEM_CLOCK_SRC_SYS_PLL)))
-          {
-            /* disable SPLL */
-
-            return_value = s32k1xx_spll_config(false,
-              &g_initial_clkconfig.scg.spll);
-            DEBUGASSERT(!return_value);
-          }
-
-          /* check if the RCCR clock source is enabled */
-
-          if (s32k1xx_get_srcfreq(g_initial_clkconfig.scg.clockmode.rccr.src)
-            != 0)
-          {
-            /* change the system clock back to the configured clock */
-
-            /* and wait until clock changed */
-
-            if (s32k1xx_transition_systemclock(
-              &g_initial_clkconfig.scg.clockmode.rccr))
-            {
-              /* error */
-
-              DEBUGPANIC();
+                return_value = s32k1xx_firc_config(true, &g_initial_clkconfig.scg.firc);
+                DEBUGASSERT(!return_value);
             }
-          }
 
-          /* if it is 0 */
+            /* check if the FIRC needs to be disabled and if it is enabled */
 
-          else
-          {
-            /* error */
+            else if ((!(g_initial_clkconfig.scg.firc.initialize)) && (s32k1xx_get_srcfreq(SCG_SYSTEM_CLOCK_SRC_FIRC))) {
+                /* disable FIRC */
 
-            DEBUGPANIC();
-          }
+                return_value = s32k1xx_firc_config(false, &g_initial_clkconfig.scg.firc);
+                DEBUGASSERT(!return_value);
+            }
+
+            /* check if the SOSC was enabled
+             * and it is not the system clock source
+             */
+
+            if (g_initial_clkconfig.scg.sosc.initialize &&
+                (s32k1xx_get_scgclk_source() != SCG_SYSTEM_CLOCK_SRC_SYS_OSC) &&
+                (s32k1xx_get_scgclk_source() != SCG_SYSTEM_CLOCK_SRC_SYS_PLL)) {
+                /* enable SOSC */
+
+                return_value = s32k1xx_sosc_config(true, &g_initial_clkconfig.scg.sosc);
+                DEBUGASSERT(!return_value);
+            }
+
+            /* check if the SOSC needs to be disabled and if it is enabled */
+
+            else if ((!(g_initial_clkconfig.scg.sosc.initialize)) &&
+                     (s32k1xx_get_srcfreq(SCG_SYSTEM_CLOCK_SRC_SYS_OSC))) {
+                /* disable SOSC */
+
+                return_value = s32k1xx_sosc_config(false, &g_initial_clkconfig.scg.sosc);
+                DEBUGASSERT(!return_value);
+            }
+
+            /* check if the SPLL was enabled
+             * and it is not the system clock source
+             */
+
+            if (g_initial_clkconfig.scg.spll.initialize &&
+                (s32k1xx_get_scgclk_source() != SCG_SYSTEM_CLOCK_SRC_SYS_OSC) &&
+                (s32k1xx_get_scgclk_source() != SCG_SYSTEM_CLOCK_SRC_SYS_PLL)) {
+                /* enable SPLL */
+
+                return_value = s32k1xx_spll_config(true, &g_initial_clkconfig.scg.spll);
+                DEBUGASSERT(!return_value);
+            }
+
+            /* check if the SPLL needs to be disabled and if it is enabled */
+
+            else if ((!(g_initial_clkconfig.scg.spll.initialize)) &&
+                     (s32k1xx_get_srcfreq(SCG_SYSTEM_CLOCK_SRC_SYS_PLL))) {
+                /* disable SPLL */
+
+                return_value = s32k1xx_spll_config(false, &g_initial_clkconfig.scg.spll);
+                DEBUGASSERT(!return_value);
+            }
+
+            /* check if the RCCR clock source is enabled */
+
+            if (s32k1xx_get_srcfreq(g_initial_clkconfig.scg.clockmode.rccr.src) != 0) {
+                /* change the system clock back to the configured clock */
+
+                /* and wait until clock changed */
+
+                if (s32k1xx_transition_systemclock(&g_initial_clkconfig.scg.clockmode.rccr)) {
+                    /* error */
+
+                    DEBUGPANIC();
+                }
+            }
+
+            /* if it is 0 */
+
+            else {
+                /* error */
+
+                DEBUGPANIC();
+            }
 
 #endif /* CONFIG_RUN_SLEEP */
 
 #ifdef CONFIG_VLPR_SLEEP
 
-          /* set the system clock to the SIRC 8MHz freq */
+            /* set the system clock to the SIRC 8MHz freq */
 
-          /* this freq will change to the predefined vccr settings
-           * when the mode change occures
-           */
+            /* this freq will change to the predefined vccr settings
+             * when the mode change occures
+             */
 
-          /* and wait until system clock changed */
+            /* and wait until system clock changed */
 
-          return_value = s32k1xx_sirc_clocksource();
-          DEBUGASSERT(!return_value);
-
-          /* disable the other clock sources if not already disabled */
-
-          /* these are the FIRC, PPL, and SOSC */
-
-          /* check if the SPLL is enabled */
-
-          if (s32k1xx_get_spllfreq() != 0)
-          {
-            /* disable SPLL */
-
-            return_value =
-            s32k1xx_spll_config(false, &g_initial_clkconfig.scg.spll);
+            return_value = s32k1xx_sirc_clocksource();
             DEBUGASSERT(!return_value);
-          }
 
-          /* check if the SOSC is enabled */
+            /* disable the other clock sources if not already disabled */
 
-          if (s32k1xx_get_soscfreq() != 0)
-          {
-            /* disable SOSC */
+            /* these are the FIRC, PPL, and SOSC */
 
-            return_value =
-              s32k1xx_sosc_config(false, &g_initial_clkconfig.scg.sosc);
-            DEBUGASSERT(!return_value);
-          }
+            /* check if the SPLL is enabled */
 
-          /* check if the FIRC is enabled */
+            if (s32k1xx_get_spllfreq() != 0) {
+                /* disable SPLL */
 
-          if (s32k1xx_get_fircfreq() != 0)
-          {
-            /* disable FIRC */
+                return_value = s32k1xx_spll_config(false, &g_initial_clkconfig.scg.spll);
+                DEBUGASSERT(!return_value);
+            }
 
-            return_value =
-            s32k1xx_firc_config(false, &g_initial_clkconfig.scg.firc);
-            DEBUGASSERT(!return_value);
-          }
+            /* check if the SOSC is enabled */
 
-  #ifdef CONFIG_ARCH_CHIP_S32K11X
+            if (s32k1xx_get_soscfreq() != 0) {
+                /* disable SOSC */
+
+                return_value = s32k1xx_sosc_config(false, &g_initial_clkconfig.scg.sosc);
+                DEBUGASSERT(!return_value);
+            }
+
+            /* check if the FIRC is enabled */
+
+            if (s32k1xx_get_fircfreq() != 0) {
+                /* disable FIRC */
+
+                return_value = s32k1xx_firc_config(false, &g_initial_clkconfig.scg.firc);
+                DEBUGASSERT(!return_value);
+            }
+
+#ifdef CONFIG_ARCH_CHIP_S32K11X
             /* TODO make sure CMU is gated? (only for S32k11x) */
 
-            #error Make sure CMU is gated
-  #endif
-          /* change the microcontroller to VLPR mode */
+#error Make sure CMU is gated
+#endif
+            /* change the microcontroller to VLPR mode */
 
-          /* and wait until it is in that runmode */
+            /* and wait until it is in that runmode */
 
-          return_value =
-          (int)s32k1xx_set_runmode(SCG_SYSTEM_CLOCK_MODE_VLPR);
-          DEBUGASSERT(return_value != (int)SCG_SYSTEM_CLOCK_MODE_NONE);
+            return_value = (int)s32k1xx_set_runmode(SCG_SYSTEM_CLOCK_MODE_VLPR);
+            DEBUGASSERT(return_value != (int)SCG_SYSTEM_CLOCK_MODE_NONE);
 
 #endif /* CONFIG_VLPR_SLEEP */
 
-          /* calculate the new clock ticks */
+            /* calculate the new clock ticks */
 
-          up_timer_initialize();
-        }
-        break;
+            up_timer_initialize();
+        } break;
 
-      default:
+        default :
 
-        /* Should not get here */
+            /* Should not get here */
 
-        break;
+            break;
     }
 }
 #endif
@@ -2336,12 +1949,10 @@ static void up_pm_notify(struct pm_callback_s *cb, int domain,
  ****************************************************************************/
 
 #ifdef CONFIG_PM
-static int up_pm_prepare(struct pm_callback_s *cb, int domain,
-                         enum pm_state_e pmstate)
-{
-  /* Logic to prepare for a reduced power state goes here. */
+static int up_pm_prepare(struct pm_callback_s* cb, int domain, enum pm_state_e pmstate) {
+    /* Logic to prepare for a reduced power state goes here. */
 
-  return OK;
+    return OK;
 }
 #endif
 
@@ -2362,41 +1973,33 @@ static int up_pm_prepare(struct pm_callback_s *cb, int domain,
  *   The current running mode.
  *
  ****************************************************************************/
+enum scg_system_clock_mode_e s32k1xx_get_runmode(void) {
+    enum scg_system_clock_mode_e mode;
 
-enum scg_system_clock_mode_e s32k1xx_get_runmode(void)
-{
-  enum scg_system_clock_mode_e mode;
+    /* Get the current running mode */
+    switch (getreg32(S32K1XX_SMC_PMSTAT) & SMC_PMSTAT_PMSTAT_MASK) {
+            /* Run mode */
+        case SMC_PMSTAT_PMSTAT_RUN :
+            mode = SCG_SYSTEM_CLOCK_MODE_RUN;
+            break;
 
-  /* Get the current running mode */
+            /* Very low power run mode */
+        case SMC_PMSTAT_PMSTAT_VLPR :
+            mode = SCG_SYSTEM_CLOCK_MODE_VLPR;
+            break;
 
-  switch (getreg32(S32K1XX_SMC_PMSTAT) & SMC_PMSTAT_PMSTAT_MASK)
-    {
-      /* Run mode */
+            /* High speed run mode */
+        case SMC_PMSTAT_PMSTAT_HSRUN :
+            mode = SCG_SYSTEM_CLOCK_MODE_HSRUN;
+            break;
 
-      case SMC_PMSTAT_PMSTAT_RUN:
-        mode = SCG_SYSTEM_CLOCK_MODE_RUN;
-        break;
-
-      /* Very low power run mode */
-
-      case SMC_PMSTAT_PMSTAT_VLPR:
-        mode = SCG_SYSTEM_CLOCK_MODE_VLPR;
-        break;
-
-      /* High speed run mode */
-
-      case SMC_PMSTAT_PMSTAT_HSRUN:
-        mode = SCG_SYSTEM_CLOCK_MODE_HSRUN;
-        break;
-
-      /* This should never happen - core has to be in some run mode to
-       * execute code
-       */
-
-      case SMC_PMSTAT_PMSTAT_VLPS:
-      default:
-        mode = SCG_SYSTEM_CLOCK_MODE_NONE;
-        break;
+            /* This should never happen - core has to be in some run mode to
+             * execute code
+             */
+        case SMC_PMSTAT_PMSTAT_VLPS :
+        default :
+            mode = SCG_SYSTEM_CLOCK_MODE_NONE;
+            break;
     }
 
     return mode;
@@ -2415,105 +2018,75 @@ enum scg_system_clock_mode_e s32k1xx_get_runmode(void)
  *   The current running mode.
  *
  ****************************************************************************/
+enum scg_system_clock_mode_e s32k1xx_set_runmode(enum scg_system_clock_mode_e next_run_mode) {
+    enum scg_system_clock_mode_e mode;
 
-enum scg_system_clock_mode_e s32k1xx_set_runmode(enum scg_system_clock_mode_e
-  next_run_mode)
-{
-  enum scg_system_clock_mode_e mode;
+    /* get the current run mode */
+    mode = s32k1xx_get_runmode();
+    uint32_t regval;
 
-  /* get the current run mode */
+    /* check if the current runmode is not the same as the next runmode */
+    if (mode != next_run_mode) {
+        /* check what the next mode is */
+        switch (next_run_mode) {
+                /* in case of the RUN mode */
+                /* it will use the clock configuration from S32K1XX_SCG_RCCR */
+            case SCG_SYSTEM_CLOCK_MODE_RUN :
 
-  mode = s32k1xx_get_runmode();
-  uint32_t regval;
+                /* check if in VLPR mode */
+                if (mode == SCG_SYSTEM_CLOCK_MODE_VLPR) {
+                    /* get the SMC_PMCTRL register */
+                    regval = getreg32(S32K1XX_SMC_PMCTRL);
 
-  /* check if the current runmode is not the same as the next runmode */
+                    /* mask the RUNM bits */
+                    regval &= ~SMC_PMCTRL_RUNM_MASK;
 
-  if (mode != next_run_mode)
-    {
-      /* check what the next mode is */
+                    /* change the mode to RUN mode */
+                    regval |= SMC_PMCTRL_RUNM_RUN;
 
-      switch (next_run_mode)
-      {
-        /* in case of the RUN mode */
+                    /* write the register */
+                    putreg32(regval, S32K1XX_SMC_PMCTRL);
 
-        /* it will use the clock configuration from S32K1XX_SCG_RCCR */
+                    /* wait until it is in RUN mode */
+                    while (s32k1xx_get_runmode() != SCG_SYSTEM_CLOCK_MODE_RUN)
+                        ;
+                }
+                break;
 
-        case SCG_SYSTEM_CLOCK_MODE_RUN:
+                /* in case of the VLPR mode */
+                /* it will use the clock configuration from S32K1XX_SCG_VCCR */
+            case SCG_SYSTEM_CLOCK_MODE_VLPR :
+                /* check if in RUN mode and VLPR mode is allowed */
+                if ((mode == SCG_SYSTEM_CLOCK_MODE_RUN) && (getreg32(S32K1XX_SMC_PMPROT) & SMC_PMPROT_AVLP)) {
+                    /* get the SMC_PMCTRL register */
+                    regval = getreg32(S32K1XX_SMC_PMCTRL);
 
-          /* check if in VLPR mode */
+                    /* mask the RUNM bits */
+                    regval &= ~SMC_PMCTRL_RUNM_MASK;
 
-          if (mode == SCG_SYSTEM_CLOCK_MODE_VLPR)
-          {
-            /* get the SMC_PMCTRL register */
+                    /* change the mode to VLPR mode */
+                    regval |= SMC_PMCTRL_RUNM_VLPR;
 
-            regval = getreg32(S32K1XX_SMC_PMCTRL);
+                    /* write the register */
+                    putreg32(regval, S32K1XX_SMC_PMCTRL);
 
-            /* mask the RUNM bits */
+                    /* wait until it is in VLPR mode */
+                    while (s32k1xx_get_runmode() != SCG_SYSTEM_CLOCK_MODE_VLPR)
+                        ;
+                }
+                break;
 
-            regval &= ~SMC_PMCTRL_RUNM_MASK;
+                /* others are not implemented */
+            default :
+                break;
+        }
 
-            /* change the mode to RUN mode */
-
-            regval |= SMC_PMCTRL_RUNM_RUN;
-
-            /* write the register */
-
-            putreg32(regval, S32K1XX_SMC_PMCTRL);
-
-            /* wait until it is in RUN mode */
-
-            while (s32k1xx_get_runmode() != SCG_SYSTEM_CLOCK_MODE_RUN);
-          }
-
-        break;
-
-        /* in case of the VLPR mode */
-
-        /* it will use the clock configuration from S32K1XX_SCG_VCCR */
-
-        case SCG_SYSTEM_CLOCK_MODE_VLPR:
-
-          /* check if in RUN mode and VLPR mode is allowed */
-
-          if ((mode == SCG_SYSTEM_CLOCK_MODE_RUN) &&
-            (getreg32(S32K1XX_SMC_PMPROT) & SMC_PMPROT_AVLP))
-          {
-            /* get the SMC_PMCTRL register */
-
-            regval = getreg32(S32K1XX_SMC_PMCTRL);
-
-            /* mask the RUNM bits */
-
-            regval &= ~SMC_PMCTRL_RUNM_MASK;
-
-            /* change the mode to VLPR mode */
-
-            regval |= SMC_PMCTRL_RUNM_VLPR;
-
-            /* write the register */
-
-            putreg32(regval, S32K1XX_SMC_PMCTRL);
-
-            /* wait until it is in VLPR mode */
-
-            while (s32k1xx_get_runmode() != SCG_SYSTEM_CLOCK_MODE_VLPR);
-          }
-        break;
-
-        /* others are not implemented */
-
-        default:
-        break;
-      }
-
-      /* get the current run mode */
-
-      mode = s32k1xx_get_runmode();
+        /* get the current run mode */
+        mode = s32k1xx_get_runmode();
     }
 
-  /* return the mode */
-
-  return mode;
+    /* return the mode */
+    return mode;
 }
 
 /****************************************************************************
@@ -2533,36 +2106,28 @@ enum scg_system_clock_mode_e s32k1xx_set_runmode(enum scg_system_clock_mode_e
  *   any failure.
  *
  ****************************************************************************/
+int /**/s32k1xx_clockconfig(const struct clock_configuration_s* clkcfg) {
+    int ret;
 
-int s32k1xx_clockconfig(const struct clock_configuration_s *clkcfg)
-{
-  int ret;
+    DEBUGASSERT(clkcfg != NULL);
 
-  DEBUGASSERT(clkcfg != NULL);
+    /* Set SCG configuration */
+    ret = s32k1xx_scg_config(&clkcfg->scg);
+    if (ret >= 0) {
+        /* Allow the VLPR mode */
+        s32k1xx_allow_vlprmode(true);
 
-  /* Set SCG configuration */
+        /* Set PCC configuration */
+        s32k1xx_periphclocks(num_of_peripheral_clocks_0, clkcfg->pcc.pclks);
 
-  ret = s32k1xx_scg_config(&clkcfg->scg);
-  if (ret >= 0)
-    {
-      /* Allow the VLPR mode */
+        /* Set SIM configuration */
+        s32k1xx_sim_config(&clkcfg->sim);
 
-      s32k1xx_allow_vlprmode(true);
-
-      /* Set PCC configuration */
-
-      s32k1xx_periphclocks(num_of_peripheral_clocks_0, clkcfg->pcc.pclks);
-
-      /* Set SIM configuration */
-
-      s32k1xx_sim_config(&clkcfg->sim);
-
-      /* Set PMC configuration */
-
-      s32k1xx_pmc_config(&clkcfg->pmc);
+        /* Set PMC configuration */
+        s32k1xx_pmc_config(&clkcfg->pmc);
     }
 
-  return ret;
+    return (ret);
 }
 
 /****************************************************************************
@@ -2580,11 +2145,10 @@ int s32k1xx_clockconfig(const struct clock_configuration_s *clkcfg)
  *
  ****************************************************************************/
 #ifdef CONFIG_PM
-void s32k1xx_clock_pm_register(void)
-{
-  /* Register to receive power management callbacks */
+void s32k1xx_clock_pm_register(void) {
+    /* Register to receive power management callbacks */
 
-  pm_register(&g_clock_pmcb);
+    pm_register(&g_clock_pmcb);
 }
 #endif
 
@@ -2602,77 +2166,66 @@ void s32k1xx_clock_pm_register(void)
  *   failure.
  *
  ****************************************************************************/
+uint32_t s32k1xx_get_coreclk(void) {
+    uint32_t coreclk = 0;
+    uint32_t regval;
+    uint32_t divider;
+    #ifdef CONFIG_S32K1XX_HAVE_SPLL
+    uint32_t prediv;
+    uint32_t mult;
+    #endif
 
-uint32_t s32k1xx_get_coreclk(void)
-{
-  uint32_t coreclk = 0;
-  uint32_t regval;
-  uint32_t divider;
-#ifdef CONFIG_S32K1XX_HAVE_SPLL
-  uint32_t prediv;
-  uint32_t mult;
-#endif
+    /* Get the core clock divider */
 
-  /* Get the core clock divider */
+    regval  = getreg32(S32K1XX_SCG_CSR);
+    divider = ((regval & SCG_CSR_DIVCORE_MASK) >> SCG_CSR_DIVCORE_SHIFT) + 1;
 
-  regval  = getreg32(S32K1XX_SCG_CSR);
-  divider = ((regval & SCG_CSR_DIVCORE_MASK) >> SCG_CSR_DIVCORE_SHIFT) + 1;
+    /* Handle according to the selection clock source */
 
-  /* Handle according to the selection clock source */
+    switch (regval & SCG_CSR_SCS_MASK) {
+        case SCG_CSR_SCS_SOSC : /* System OSC */
+            coreclk = BOARD_XTAL_FREQUENCY;
+            break;
 
-  switch (regval & SCG_CSR_SCS_MASK)
-    {
-      case SCG_CSR_SCS_SOSC:  /* System OSC */
+        case SCG_CSR_SCS_SIRC : /* Slow IRC */
+            regval = getreg32(S32K1XX_SCG_SIRCCFG) & SCG_SIRCCFG_RANGE;
+            if (regval == SCG_SIRCCFG_LOWRANGE) {
+                /* Slow IRC low range clock (2 MHz) */
+                return 0;
+            }
 
-        coreclk = BOARD_XTAL_FREQUENCY;
-        break;
+            /* Slow IRC high range clock (8 MHz ) */
+            coreclk = SCG_SIRC_HIGHRANGE_FREQUENCY;
+            break;
 
-      case SCG_CSR_SCS_SIRC:  /* Slow IRC */
-        regval = getreg32(S32K1XX_SCG_SIRCCFG) & SCG_SIRCCFG_RANGE;
-        if (regval == SCG_SIRCCFG_LOWRANGE)
-          {
-            /* Slow IRC low range clock (2 MHz) */
+        case SCG_CSR_SCS_FIRC : /* Fast IRC */
+            regval = getreg32(S32K1XX_SCG_FIRCCFG) & SCG_FIRCCFG_RANGE;
+            if (regval != SCG_FIRCCFG_48MHZ) {
+                return 0;
+            }
 
+            /* Fast IRC is trimmed to 48 MHz */
+            coreclk = SCG_FIRC_FREQUENCY0;
+            break;
+
+        #ifdef CONFIG_S32K1XX_HAVE_SPLL
+        case SCG_CSR_SPLL_FIRC : /* System PLL */
+
+            /* Coreclock = Fxtal * mult / (2 * prediv) */
+
+            regval = getreg32(S32K1XX_SCG_SPLLCFG);
+            prediv = ((regval & SCG_SPLLCFG_PREDIV_MASK) >> SCG_SPLLCFG_PREDIV_SHIFT) + 1;
+            mult   = ((regval & SCG_SPLLCFG_MULT_MASK) >> SCG_SPLLCFG_MULT_SHIFT) + 16;
+
+            coreclk = ((BOARD_XTAL_FREQUENCY / 2) * mult) / prediv;
+            break;
+        #endif
+
+        default :
             return 0;
-          }
-
-        /* Slow IRC high range clock (8 MHz ) */
-
-        coreclk = SCG_SIRC_HIGHRANGE_FREQUENCY;
-        break;
-
-      case SCG_CSR_SCS_FIRC:  /* Fast IRC */
-        regval = getreg32(S32K1XX_SCG_FIRCCFG) & SCG_FIRCCFG_RANGE;
-        if (regval != SCG_FIRCCFG_48MHZ)
-          {
-            return 0;
-          }
-
-        /* Fast IRC is trimmed to 48 MHz */
-
-        coreclk = SCG_FIRC_FREQUENCY0;
-        break;
-
-#ifdef CONFIG_S32K1XX_HAVE_SPLL
-      case SCG_CSR_SPLL_FIRC:  /* System PLL */
-
-        /* Coreclock = Fxtal * mult / (2 * prediv) */
-
-        regval  = getreg32(S32K1XX_SCG_SPLLCFG);
-        prediv  = ((regval & SCG_SPLLCFG_PREDIV_MASK) >>
-                    SCG_SPLLCFG_PREDIV_SHIFT) + 1;
-        mult    = ((regval & SCG_SPLLCFG_MULT_MASK) >>
-                    SCG_SPLLCFG_MULT_SHIFT) + 16;
-
-        coreclk = ((BOARD_XTAL_FREQUENCY / 2) * mult) / prediv;
-        break;
-#endif
-
-      default:
-        return 0;
     }
 
-  return coreclk / divider;
+    return (coreclk / divider);
 }
 
 /****************************************************************************
@@ -2690,50 +2243,42 @@ uint32_t s32k1xx_get_coreclk(void)
  *   any failure.
  *
  ****************************************************************************/
+uint32_t s32k1xx_get_sysclk(enum scg_system_clock_type_e type) {
+    enum scg_system_clock_src_e clksrc;
+    uint32_t regval;
+    uint32_t divider;
+    uint32_t freq;
 
-uint32_t s32k1xx_get_sysclk(enum scg_system_clock_type_e type)
-{
-  enum scg_system_clock_src_e clksrc;
-  uint32_t regval;
-  uint32_t divider;
-  uint32_t freq;
+    /* Get the SCG current system clock source */
+    clksrc = (enum scg_system_clock_src_e)s32k1xx_get_scgclk_source();
+    freq   = s32k1xx_get_srcfreq(clksrc);
 
-  /* Get the SCG current system clock source */
+    /* Adjust to count for the code divider */
+    regval  = getreg32(S32K1XX_SCG_CSR);
+    divider = ((regval & SCG_CSR_DIVCORE_MASK) >> SCG_CSR_DIVCORE_SHIFT) + 1;
+    freq   /= divider;
 
-  clksrc  = (enum scg_system_clock_src_e)s32k1xx_get_scgclk_source();
-  freq    = s32k1xx_get_srcfreq(clksrc);
+    /* Handle additional dividers for the clock type */
+    switch (type) {
+        case SCG_SYSTEM_CLOCK_CORE :
+            break;
 
-  /* Adjust to count for the code divider */
+        case SCG_SYSTEM_CLOCK_BUS :
+            divider = ((regval & SCG_CSR_DIVBUS_MASK) >> SCG_CSR_DIVBUS_SHIFT) + 1;
+            freq /= divider;
+            break;
 
-  regval  = getreg32(S32K1XX_SCG_CSR);
-  divider = ((regval & SCG_CSR_DIVCORE_MASK) >> SCG_CSR_DIVCORE_SHIFT) + 1;
-  freq   /= divider;
+        case SCG_SYSTEM_CLOCK_SLOW :
+            divider = ((regval & SCG_CSR_DIVSLOW_MASK) >> SCG_CSR_DIVSLOW_SHIFT) + 1;
+            freq /= divider;
+            break;
 
-  /* Handle additional dividers for the clock type */
-
-  switch (type)
-    {
-      case SCG_SYSTEM_CLOCK_CORE:
-        break;
-
-      case SCG_SYSTEM_CLOCK_BUS:
-        divider = ((regval & SCG_CSR_DIVBUS_MASK) >>
-                    SCG_CSR_DIVBUS_SHIFT) + 1;
-        freq   /= divider;
-        break;
-
-      case SCG_SYSTEM_CLOCK_SLOW:
-        divider = ((regval & SCG_CSR_DIVSLOW_MASK) >>
-                    SCG_CSR_DIVSLOW_SHIFT) + 1;
-        freq   /= divider;
-        break;
-
-      default:
-        freq = 0;
-        break;
+        default :
+            freq = 0;
+            break;
     }
 
-  return freq;
+    return (freq);
 }
 
 /****************************************************************************
@@ -2750,138 +2295,97 @@ uint32_t s32k1xx_get_sysclk(enum scg_system_clock_type_e type)
  *   The frequency of the requested asynchronous clock source.
  *
  ****************************************************************************/
+uint32_t s32k1xx_get_asnchfreq(enum clock_names_e clksrc, enum scg_async_clock_type_e type) {
+    uint32_t regval;
+    uint32_t freq = 0;
+    uint32_t div  = 0;
 
-uint32_t s32k1xx_get_asnchfreq(enum clock_names_e clksrc,
-                               enum scg_async_clock_type_e type)
-{
-  uint32_t regval;
-  uint32_t freq = 0;
-  uint32_t div  = 0;
+    switch (type) {
+        case SCG_ASYNC_CLOCK_DIV1 : {
+            switch (clksrc) {
+                case FIRC_CLK : {
+                    freq   = s32k1xx_get_fircfreq();
+                    regval = getreg32(S32K1XX_SCG_FIRCDIV);
+                    div    = (regval & SCG_FIRCDIV_FIRCDIV1_MASK) >> SCG_FIRCDIV_FIRCDIV1_SHIFT;
+                } break;
 
-  switch (type)
-    {
-      case SCG_ASYNC_CLOCK_DIV1:
-        {
-          switch (clksrc)
-            {
-              case FIRC_CLK:
-                {
-                  freq   = s32k1xx_get_fircfreq();
-                  regval = getreg32(S32K1XX_SCG_FIRCDIV);
-                  div    = (regval & SCG_FIRCDIV_FIRCDIV1_MASK) >>
-                            SCG_FIRCDIV_FIRCDIV1_SHIFT;
-                }
-                break;
+                case SIRC_CLK : {
+                    freq   = s32k1xx_get_sircfreq();
+                    regval = getreg32(S32K1XX_SCG_SIRCDIV);
+                    div    = (regval & SCG_SIRCDIV_SIRCDIV1_MASK) >> SCG_SIRCDIV_SIRCDIV1_SHIFT;
+                } break;
 
-              case SIRC_CLK:
-                {
-                  freq   = s32k1xx_get_sircfreq();
-                  regval = getreg32(S32K1XX_SCG_SIRCDIV);
-                  div    = (regval & SCG_SIRCDIV_SIRCDIV1_MASK) >>
-                            SCG_SIRCDIV_SIRCDIV1_SHIFT;
-                }
-                break;
+                case SOSC_CLK : {
+                    freq   = s32k1xx_get_soscfreq();
+                    regval = getreg32(S32K1XX_SCG_SOSCDIV);
+                    div    = (regval & SCG_SOSCDIV_SOSCDIV1_MASK) >> SCG_SOSCDIV_SOSCDIV1_SHIFT;
+                } break;
 
-              case SOSC_CLK:
-                {
-                  freq   = s32k1xx_get_soscfreq();
-                  regval = getreg32(S32K1XX_SCG_SOSCDIV);
-                  div    = (regval & SCG_SOSCDIV_SOSCDIV1_MASK) >>
-                            SCG_SOSCDIV_SOSCDIV1_SHIFT;
-                }
-                break;
+                #ifdef CONFIG_S32K1XX_HAVE_SPLL
+                case SPLL_CLK : {
+                    freq   = s32k1xx_get_spllfreq();
+                    regval = getreg32(S32K1XX_SCG_SPLLDIV);
+                    div    = (regval & SCG_SPLLDIV_SPLLDIV1_MASK) >> SCG_SPLLDIV_SPLLDIV1_SHIFT;
+                } break;
+                #endif
 
-#ifdef CONFIG_S32K1XX_HAVE_SPLL
-              case SPLL_CLK:
-                {
-                  freq   = s32k1xx_get_spllfreq();
-                  regval = getreg32(S32K1XX_SCG_SPLLDIV);
-                  div    = (regval & SCG_SPLLDIV_SPLLDIV1_MASK) >>
-                            SCG_SPLLDIV_SPLLDIV1_SHIFT;
-                }
-                break;
-#endif
+                default : {
+                    /* Invalid clock source type */
 
-              default:
-                {
-                  /* Invalid clock source type */
-
-                  freq = 0;
-                  DEBUGPANIC();
-                }
-                break;
+                    freq = 0;
+                    DEBUGPANIC();
+                } break;
             }
-        }
-        break;
+        } break;
 
-      case SCG_ASYNC_CLOCK_DIV2:
-        {
-          switch (clksrc)
-            {
-              case FIRC_CLK:
-                {
-                  freq   = s32k1xx_get_fircfreq();
-                  regval = getreg32(S32K1XX_SCG_FIRCDIV);
-                  div    = (regval & SCG_FIRCDIV_FIRCDIV2_MASK) >>
-                            SCG_FIRCDIV_FIRCDIV2_SHIFT;
-                }
-                break;
+        case SCG_ASYNC_CLOCK_DIV2 : {
+            switch (clksrc) {
+                case FIRC_CLK : {
+                    freq   = s32k1xx_get_fircfreq();
+                    regval = getreg32(S32K1XX_SCG_FIRCDIV);
+                    div    = (regval & SCG_FIRCDIV_FIRCDIV2_MASK) >> SCG_FIRCDIV_FIRCDIV2_SHIFT;
+                } break;
 
-              case SIRC_CLK:
-                {
-                  freq   = s32k1xx_get_sircfreq();
-                  regval = getreg32(S32K1XX_SCG_SIRCDIV);
-                  div    = (regval & SCG_SIRCDIV_SIRCDIV2_MASK) >>
-                            SCG_SIRCDIV_SIRCDIV2_SHIFT;
-                }
-                break;
-              case SOSC_CLK:
-                {
-                  freq   = s32k1xx_get_soscfreq();
-                  regval = getreg32(S32K1XX_SCG_SOSCDIV);
-                  div    = (regval & SCG_SOSCDIV_SOSCDIV2_MASK) >>
-                            SCG_SOSCDIV_SOSCDIV2_SHIFT;
-                }
-                break;
-#ifdef CONFIG_S32K1XX_HAVE_SPLL
-              case SPLL_CLK:
-                {
-                  freq = s32k1xx_get_spllfreq();
-                  regval = getreg32(S32K1XX_SCG_SPLLDIV);
-                  div    = (regval & SCG_SPLLDIV_SPLLDIV2_MASK) >>
-                            SCG_SPLLDIV_SPLLDIV2_SHIFT;
-                }
-                break;
-#endif
-              default:
-                {
-                  /* Invalid clock source type */
+                case SIRC_CLK : {
+                    freq   = s32k1xx_get_sircfreq();
+                    regval = getreg32(S32K1XX_SCG_SIRCDIV);
+                    div    = (regval & SCG_SIRCDIV_SIRCDIV2_MASK) >> SCG_SIRCDIV_SIRCDIV2_SHIFT;
+                } break;
+                case SOSC_CLK : {
+                    freq   = s32k1xx_get_soscfreq();
+                    regval = getreg32(S32K1XX_SCG_SOSCDIV);
+                    div    = (regval & SCG_SOSCDIV_SOSCDIV2_MASK) >> SCG_SOSCDIV_SOSCDIV2_SHIFT;
+                } break;
 
-                  freq = 0;
-                  DEBUGPANIC();
-                }
-                break;
+                #ifdef CONFIG_S32K1XX_HAVE_SPLL
+                case SPLL_CLK : {
+                    freq   = s32k1xx_get_spllfreq();
+                    regval = getreg32(S32K1XX_SCG_SPLLDIV);
+                    div    = (regval & SCG_SPLLDIV_SPLLDIV2_MASK) >> SCG_SPLLDIV_SPLLDIV2_SHIFT;
+                } break;
+                #endif
+
+                default : {
+                    /* Invalid clock source type */
+                    freq = 0;
+                    DEBUGPANIC();
+                } break;
             }
-        }
-        break;
+        } break;
 
-      default:
-
-          /* Invalid async clock source */
-
-          freq = 0;
-          DEBUGPANIC();
-          break;
+        default :
+            /* Invalid async clock source */
+            freq = 0;
+            DEBUGPANIC();
+            break;
     }
 
-  if (div != 0)
-    {
-      freq = (freq >> (div - 1));
+    if (div != 0) {
+        freq = (freq >> (div - 1));
     }
-  else  /* Output disabled. */
-    {
-      freq = 0;
+    else { /* Output disabled. */
+        freq = 0;
     }
 
-  return freq;
+    return (freq);
 }

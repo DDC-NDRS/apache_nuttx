@@ -60,21 +60,18 @@
  *   power management operations might be performed.
  *
  ****************************************************************************/
-
-void up_idle(void)
-{
-#if defined(CONFIG_SUPPRESS_INTERRUPTS) || defined(CONFIG_SUPPRESS_TIMER_INTS)
+void /**/up_idle(void) {
+  #if defined(CONFIG_SUPPRESS_INTERRUPTS) || defined(CONFIG_SUPPRESS_TIMER_INTS)
   /* If the system is idle and there are no timer interrupts, then process
    * "fake" timer interrupts. Hopefully, something will wake up.
    */
-
   nxsched_process_timer();
-#else
+  #else
 
   /* Sleep until an interrupt occurs to save power */
 
   BEGIN_IDLE();
   asm("WFI");
   END_IDLE();
-#endif
+  #endif
 }

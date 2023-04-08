@@ -21,7 +21,6 @@
 /****************************************************************************
  * Included Files
  ****************************************************************************/
-
 #include <arch/board/board.h>
 #include <nuttx/config.h>
 
@@ -49,21 +48,18 @@
  * a minimum, the NuttX port supports enabling interrupts on a per-port
  * basis.
  */
-
-#if defined (CONFIG_S32K1XX_PORTAINTS) || defined (CONFIG_S32K1XX_PORTBINTS) || \
-    defined (CONFIG_S32K1XX_PORTCINTS) || defined (CONFIG_S32K1XX_PORTDINTS) || \
-    defined (CONFIG_S32K1XX_PORTEINTS)
-#  define HAVE_PORTINTS 1
+#if defined(CONFIG_S32K1XX_PORTAINTS) || defined(CONFIG_S32K1XX_PORTBINTS) || \
+    defined(CONFIG_S32K1XX_PORTCINTS) || defined(CONFIG_S32K1XX_PORTDINTS) || \
+    defined(CONFIG_S32K1XX_PORTEINTS)
+#define HAVE_PORTINTS 1
 #endif
 
 /****************************************************************************
  * Private Types
  ****************************************************************************/
-
-struct s32k1xx_pinirq_s
-{
-  xcpt_t handler;
-  void *arg;
+struct s32k1xx_pinirq_s {
+    xcpt_t handler;
+    void*  arg;
 };
 
 /****************************************************************************
@@ -76,7 +72,6 @@ struct s32k1xx_pinirq_s
  * a GPIO. Hence, we need to support all 32 pins for each port.  To keep the
  * memory usage at a minimum, the logic may be configure per port.
  */
-
 #ifdef CONFIG_S32K1XX_PORTAINTS
 static struct s32k1xx_pinirq_s g_portaisrs[32];
 #endif
@@ -104,57 +99,49 @@ static struct s32k1xx_pinirq_s g_porteisrs[32];
  *   Common port interrupt handling.
  *
  ****************************************************************************/
-
 #ifdef HAVE_PORTINTS
-static int s32k1xx_portinterrupt(int irq, void *context,
-                                 uintptr_t addr,
-                                 struct s32k1xx_pinirq_s *isrtab)
-{
-  uint32_t isfr = getreg32(addr);
-  int i;
+static int s32k1xx_portinterrupt(int irq, void* context, uintptr_t addr, struct s32k1xx_pinirq_s* isrtab) {
+    uint32_t isfr = getreg32(addr);
+    int      i;
 
-  /* Examine each pin in the port */
+    /* Examine each pin in the port */
 
-  for (i = 0; i < 32 && isfr != 0; i++)
-    {
-      /* A bit set in the ISR means that an interrupt is pending for this
-       * pin.  If the pin is programmed for level sensitive inputs, then
-       * the interrupt handling logic MUST disable the interrupt (or cause
-       * the level to change) to prevent infinite interrupts.
-       */
+    for (i = 0; i < 32 && isfr != 0; i++) {
+        /* A bit set in the ISR means that an interrupt is pending for this
+         * pin.  If the pin is programmed for level sensitive inputs, then
+         * the interrupt handling logic MUST disable the interrupt (or cause
+         * the level to change) to prevent infinite interrupts.
+         */
 
-      uint32_t bit = (1 << i);
-      if ((isfr & bit) != 0)
-        {
-          /* I think that bits may be set in the ISFR for DMA activities
-           * well.  So, no error is declared if there is no registered
-           * interrupt handler for the pin.
-           */
+        uint32_t bit = (1 << i);
+        if ((isfr & bit) != 0) {
+            /* I think that bits may be set in the ISFR for DMA activities
+             * well.  So, no error is declared if there is no registered
+             * interrupt handler for the pin.
+             */
 
-          if (isrtab[i].handler != NULL)
-            {
-              xcpt_t handler = isrtab[i].handler;
-              void  *arg     = isrtab[i].arg;
+            if (isrtab[i].handler != NULL) {
+                xcpt_t handler = isrtab[i].handler;
+                void*  arg     = isrtab[i].arg;
 
-              /* There is a registered interrupt handler... invoke it */
-
-              handler(irq, context, arg);
+                /* There is a registered interrupt handler... invoke it */
+                handler(irq, context, arg);
             }
 
-          /* Writing a one to the ISFR register will clear the pending
-           * interrupt.  If pin is configured to generate a DMA request
-           * then the ISFR bit will be cleared automatically at the
-           * completion of the requested DMA transfer. If configured for
-           * a level sensitive interrupt and the pin remains asserted and
-           * the bit will set again immediately after it is cleared.
-           */
+            /* Writing a one to the ISFR register will clear the pending
+             * interrupt.  If pin is configured to generate a DMA request
+             * then the ISFR bit will be cleared automatically at the
+             * completion of the requested DMA transfer. If configured for
+             * a level sensitive interrupt and the pin remains asserted and
+             * the bit will set again immediately after it is cleared.
+             */
 
-          isfr &= ~bit;
-          putreg32(bit, addr);
+            isfr &= ~bit;
+            putreg32(bit, addr);
         }
     }
 
-  return OK;
+    return OK;
 }
 #endif
 
@@ -165,44 +152,33 @@ static int s32k1xx_portinterrupt(int irq, void *context,
  *   Handle interrupts arriving on individual ports
  *
  ****************************************************************************/
-
 #ifdef CONFIG_S32K1XX_PORTAINTS
-static int s32k1xx_portainterrupt(int irq, void *context, void *arg)
-{
-  return s32k1xx_portinterrupt(irq, context, S32K1XX_PORTA_ISFR,
-                               g_portaisrs);
+static int s32k1xx_portainterrupt(int irq, void* context, void* arg) {
+    return s32k1xx_portinterrupt(irq, context, S32K1XX_PORTA_ISFR, g_portaisrs);
 }
 #endif
 
 #ifdef CONFIG_S32K1XX_PORTBINTS
-static int s32k1xx_portbinterrupt(int irq, void *context, void *arg)
-{
-  return s32k1xx_portinterrupt(irq, context, S32K1XX_PORTB_ISFR,
-                               g_portbisrs);
+static int s32k1xx_portbinterrupt(int irq, void* context, void* arg) {
+    return s32k1xx_portinterrupt(irq, context, S32K1XX_PORTB_ISFR, g_portbisrs);
 }
 #endif
 
 #ifdef CONFIG_S32K1XX_PORTCINTS
-static int s32k1xx_portcinterrupt(int irq, void *context, void *arg)
-{
-  return s32k1xx_portinterrupt(irq, context, S32K1XX_PORTC_ISFR,
-                               g_portcisrs);
+static int s32k1xx_portcinterrupt(int irq, void* context, void* arg) {
+    return s32k1xx_portinterrupt(irq, context, S32K1XX_PORTC_ISFR, g_portcisrs);
 }
 #endif
 
 #ifdef CONFIG_S32K1XX_PORTDINTS
-static int s32k1xx_portdinterrupt(int irq, void *context, void *arg)
-{
-  return s32k1xx_portinterrupt(irq, context, S32K1XX_PORTD_ISFR,
-                               g_portdisrs);
+static int s32k1xx_portdinterrupt(int irq, void* context, void* arg) {
+    return s32k1xx_portinterrupt(irq, context, S32K1XX_PORTD_ISFR, g_portdisrs);
 }
 #endif
 
 #ifdef CONFIG_S32K1XX_PORTEINTS
-static int s32k1xx_porteinterrupt(int irq, void *context, void *arg)
-{
-  return s32k1xx_portinterrupt(irq, context, S32K1XX_PORTE_ISFR,
-                               g_porteisrs);
+static int s32k1xx_porteinterrupt(int irq, void* context, void* arg) {
+    return s32k1xx_portinterrupt(irq, context, S32K1XX_PORTE_ISFR, g_porteisrs);
 }
 #endif
 
@@ -218,34 +194,36 @@ static int s32k1xx_porteinterrupt(int irq, void *context, void *arg)
  *   GPIO pins.
  *
  ****************************************************************************/
+void s32k1xx_pinirq_initialize(void) {
+    #ifdef CONFIG_S32K1XX_PORTAINTS
+    irq_attach(S32K1XX_IRQ_PORTA, s32k1xx_portainterrupt, NULL);
+    putreg32(0xffffffff, S32K1XX_PORTA_ISFR);
+    up_enable_irq(S32K1XX_IRQ_PORTA);
+    #endif
 
-void s32k1xx_pinirq_initialize(void)
-{
-#ifdef CONFIG_S32K1XX_PORTAINTS
-  irq_attach(S32K1XX_IRQ_PORTA, s32k1xx_portainterrupt, NULL);
-  putreg32(0xffffffff, S32K1XX_PORTA_ISFR);
-  up_enable_irq(S32K1XX_IRQ_PORTA);
-#endif
-#ifdef CONFIG_S32K1XX_PORTBINTS
-  irq_attach(S32K1XX_IRQ_PORTB, s32k1xx_portbinterrupt, NULL);
-  putreg32(0xffffffff, S32K1XX_PORTB_ISFR);
-  up_enable_irq(S32K1XX_IRQ_PORTB);
-#endif
-#ifdef CONFIG_S32K1XX_PORTCINTS
-  irq_attach(S32K1XX_IRQ_PORTC, s32k1xx_portcinterrupt, NULL);
-  putreg32(0xffffffff, S32K1XX_PORTC_ISFR);
-  up_enable_irq(S32K1XX_IRQ_PORTC);
-#endif
-#ifdef CONFIG_S32K1XX_PORTDINTS
-  irq_attach(S32K1XX_IRQ_PORTD, s32k1xx_portdinterrupt, NULL);
-  putreg32(0xffffffff, S32K1XX_PORTD_ISFR);
-  up_enable_irq(S32K1XX_IRQ_PORTD);
-#endif
-#ifdef CONFIG_S32K1XX_PORTEINTS
-  irq_attach(S32K1XX_IRQ_PORTE, s32k1xx_porteinterrupt, NULL);
-  putreg32(0xffffffff, S32K1XX_PORTE_ISFR);
-  up_enable_irq(S32K1XX_IRQ_PORTE);
-#endif
+    #ifdef CONFIG_S32K1XX_PORTBINTS
+    irq_attach(S32K1XX_IRQ_PORTB, s32k1xx_portbinterrupt, NULL);
+    putreg32(0xffffffff, S32K1XX_PORTB_ISFR);
+    up_enable_irq(S32K1XX_IRQ_PORTB);
+    #endif
+
+    #ifdef CONFIG_S32K1XX_PORTCINTS
+    irq_attach(S32K1XX_IRQ_PORTC, s32k1xx_portcinterrupt, NULL);
+    putreg32(0xffffffff, S32K1XX_PORTC_ISFR);
+    up_enable_irq(S32K1XX_IRQ_PORTC);
+    #endif
+
+    #ifdef CONFIG_S32K1XX_PORTDINTS
+    irq_attach(S32K1XX_IRQ_PORTD, s32k1xx_portdinterrupt, NULL);
+    putreg32(0xffffffff, S32K1XX_PORTD_ISFR);
+    up_enable_irq(S32K1XX_IRQ_PORTD);
+    #endif
+
+    #ifdef CONFIG_S32K1XX_PORTEINTS
+    irq_attach(S32K1XX_IRQ_PORTE, s32k1xx_porteinterrupt, NULL);
+    putreg32(0xffffffff, S32K1XX_PORTE_ISFR);
+    up_enable_irq(S32K1XX_IRQ_PORTE);
+    #endif
 }
 
 /****************************************************************************
@@ -271,74 +249,73 @@ void s32k1xx_pinirq_initialize(void)
  *   any failure to indicate the nature of the failure.
  *
  ****************************************************************************/
-
-int s32k1xx_pinirqattach(uint32_t pinset, xcpt_t pinisr, void *arg)
-{
+int /**/s32k1xx_pinirqattach(uint32_t pinset, xcpt_t pinisr, void* arg) {
 #ifdef HAVE_PORTINTS
-  struct s32k1xx_pinirq_s *isrtab;
-  irqstate_t flags;
-  unsigned int port;
-  unsigned int pin;
+    struct s32k1xx_pinirq_s* isrtab;
+    irqstate_t   flags;
+    unsigned int port;
+    unsigned int pin;
 
-  /* It only makes sense to call this function for input pins that are
-   * configured as interrupts.
-   */
+    /* It only makes sense to call this function for input pins that are
+     * configured as interrupts.
+     */
 
-  DEBUGASSERT((pinset & _PIN_INTDMA_MASK) == _PIN_INTERRUPT);
-  DEBUGASSERT((pinset & _PIN_IO_MASK) == _PIN_INPUT);
+    DEBUGASSERT((pinset & _PIN_INTDMA_MASK) == _PIN_INTERRUPT);
+    DEBUGASSERT((pinset & _PIN_IO_MASK) == _PIN_INPUT);
 
-  /* Get the port number and pin number */
+    /* Get the port number and pin number */
+    port = (pinset & _PIN_PORT_MASK) >> _PIN_PORT_SHIFT;
+    pin  = (pinset & _PIN_MASK) >> _PIN_SHIFT;
 
-  port = (pinset & _PIN_PORT_MASK) >> _PIN_PORT_SHIFT;
-  pin  = (pinset & _PIN_MASK)      >> _PIN_SHIFT;
+    /* Get the table associated with this port */
+    DEBUGASSERT(port < S32K1XX_NPORTS);
+    flags = enter_critical_section();
+    switch (port) {
+        #ifdef CONFIG_S32K1XX_PORTAINTS
+        case S32K1XX_PORTA :
+            isrtab = g_portaisrs;
+            break;
+        #endif
 
-  /* Get the table associated with this port */
+        #ifdef CONFIG_S32K1XX_PORTBINTS
+        case S32K1XX_PORTB :
+            isrtab = g_portbisrs;
+            break;
+        #endif
 
-  DEBUGASSERT(port < S32K1XX_NPORTS);
-  flags = enter_critical_section();
-  switch (port)
-    {
-#ifdef CONFIG_S32K1XX_PORTAINTS
-      case S32K1XX_PORTA :
-        isrtab = g_portaisrs;
-        break;
-#endif
-#ifdef CONFIG_S32K1XX_PORTBINTS
-      case S32K1XX_PORTB :
-        isrtab = g_portbisrs;
-        break;
-#endif
-#ifdef CONFIG_S32K1XX_PORTCINTS
-      case S32K1XX_PORTC :
-        isrtab = g_portcisrs;
-        break;
-#endif
-#ifdef CONFIG_S32K1XX_PORTDINTS
-      case S32K1XX_PORTD :
-        isrtab = g_portdisrs;
-        break;
-#endif
-#ifdef CONFIG_S32K1XX_PORTEINTS
-      case S32K1XX_PORTE :
-        isrtab = g_porteisrs;
-        break;
-#endif
-      default:
-        leave_critical_section(flags);
-        return -EINVAL;
+        #ifdef CONFIG_S32K1XX_PORTCINTS
+        case S32K1XX_PORTC :
+            isrtab = g_portcisrs;
+            break;
+        #endif
+
+        #ifdef CONFIG_S32K1XX_PORTDINTS
+        case S32K1XX_PORTD :
+            isrtab = g_portdisrs;
+            break;
+        #endif
+
+        #ifdef CONFIG_S32K1XX_PORTEINTS
+        case S32K1XX_PORTE :
+            isrtab = g_porteisrs;
+            break;
+        #endif
+
+        default :
+            leave_critical_section(flags);
+            return -EINVAL;
     }
 
-  /* Get the old PIN ISR and set the new PIN ISR */
+    /* Get the old PIN ISR and set the new PIN ISR */
+    isrtab[pin].handler = pinisr;
+    isrtab[pin].arg     = arg;
 
-  isrtab[pin].handler = pinisr;
-  isrtab[pin].arg     = arg;
+    /* And return the old PIN isr address */
 
-  /* And return the old PIN isr address */
-
-  leave_critical_section(flags);
-  return OK;
+    leave_critical_section(flags);
+    return OK;
 #else
-  return -ENOSYS;
+    return -ENOSYS;
 #endif /* HAVE_PORTINTS */
 }
 
@@ -349,73 +326,66 @@ int s32k1xx_pinirqattach(uint32_t pinset, xcpt_t pinisr, void *arg)
  *   Enable the interrupt for specified pin IRQ
  *
  ****************************************************************************/
-
-void s32k1xx_pinirqenable(uint32_t pinset)
-{
+void /**/s32k1xx_pinirqenable(uint32_t pinset) {
 #ifdef HAVE_PORTINTS
-  uintptr_t    base;
-  uint32_t     regval;
-  unsigned int port;
-  unsigned int pin;
+    uintptr_t    base;
+    uint32_t     regval;
+    unsigned int port;
+    unsigned int pin;
 
-  /* Get the port number and pin number */
+    /* Get the port number and pin number */
+    port = (pinset & _PIN_PORT_MASK) >> _PIN_PORT_SHIFT;
+    pin  = (pinset & _PIN_MASK) >> _PIN_SHIFT;
 
-  port = (pinset & _PIN_PORT_MASK) >> _PIN_PORT_SHIFT;
-  pin  = (pinset & _PIN_MASK)      >> _PIN_SHIFT;
+    DEBUGASSERT(port < S32K1XX_NPORTS);
+    if (port < S32K1XX_NPORTS) {
+        /* Get the base address of PORT block for this port */
+        base = S32K1XX_PORT_BASE(port);
 
-  DEBUGASSERT(port < S32K1XX_NPORTS);
-  if (port < S32K1XX_NPORTS)
-    {
-      /* Get the base address of PORT block for this port */
+        /* Modify the IRQC field of the port PCR register in order to enable
+         * the interrupt.
+         */
+        regval = getreg32(base + S32K1XX_PORT_PCR_OFFSET(pin));
+        regval &= ~PORT_PCR_IRQC_MASK;
 
-      base =  S32K1XX_PORT_BASE(port);
+        switch (pinset & _PIN_INT_MASK) {
+            case PIN_INT_ZERO : /* Interrupt when logic zero */
+                regval |= PORT_PCR_IRQC_ZERO;
+                break;
 
-      /* Modify the IRQC field of the port PCR register in order to enable
-       * the interrupt.
-       */
+            case PIN_INT_RISING : /* Interrupt on rising edge */
+                regval |= PORT_PCR_IRQC_RISING;
+                break;
 
-      regval = getreg32(base + S32K1XX_PORT_PCR_OFFSET(pin));
-      regval &= ~PORT_PCR_IRQC_MASK;
+            case PIN_INT_FALLING : /* Interrupt on falling edge */
+                regval |= PORT_PCR_IRQC_FALLING;
+                break;
 
-      switch (pinset & _PIN_INT_MASK)
-        {
-          case PIN_INT_ZERO : /* Interrupt when logic zero */
-            regval |= PORT_PCR_IRQC_ZERO;
-            break;
+            case PIN_INT_BOTH : /* Interrupt on either edge */
+                regval |= PORT_PCR_IRQC_BOTH;
+                break;
 
-          case PIN_INT_RISING : /* Interrupt on rising edge */
-            regval |= PORT_PCR_IRQC_RISING;
-            break;
+            case PIN_INT_ONE : /* Interrupt when logic one */
+                regval |= PORT_PCR_IRQC_ONE;
+                break;
 
-          case PIN_INT_FALLING : /* Interrupt on falling edge */
-            regval |= PORT_PCR_IRQC_FALLING;
-            break;
+            case PIN_DMA_RISING : /* DMA on rising edge */
+                regval |= PORT_PCR_IRQC_DMARISING;
+                break;
 
-          case PIN_INT_BOTH : /* Interrupt on either edge */
-            regval |= PORT_PCR_IRQC_BOTH;
-            break;
+            case PIN_DMA_FALLING : /* DMA on falling edge */
+                regval |= PORT_PCR_IRQC_DMAFALLING;
+                break;
 
-          case PIN_INT_ONE : /* Interrupt when logic one */
-            regval |= PORT_PCR_IRQC_ONE;
-            break;
+            case PIN_DMA_BOTH : /* DMA on either edge */
+                regval |= PORT_PCR_IRQC_DMABOTH;
+                break;
 
-          case PIN_DMA_RISING : /* DMA on rising edge */
-            regval |= PORT_PCR_IRQC_DMARISING;
-            break;
-
-          case PIN_DMA_FALLING : /* DMA on falling edge */
-            regval |= PORT_PCR_IRQC_DMAFALLING;
-            break;
-
-          case PIN_DMA_BOTH : /* DMA on either edge */
-            regval |= PORT_PCR_IRQC_DMABOTH;
-            break;
-
-          default:
-            return;
+            default :
+                return;
         }
 
-      putreg32(regval, base + S32K1XX_PORT_PCR_OFFSET(pin));
+        putreg32(regval, base + S32K1XX_PORT_PCR_OFFSET(pin));
     }
 #endif /* HAVE_PORTINTS */
 }
@@ -427,34 +397,31 @@ void s32k1xx_pinirqenable(uint32_t pinset)
  *   Disable the interrupt for specified pin
  *
  ****************************************************************************/
-
-void s32k1xx_pinirqdisable(uint32_t pinset)
-{
+void /**/s32k1xx_pinirqdisable(uint32_t pinset) {
 #ifdef HAVE_PORTINTS
-  uintptr_t    base;
-  uint32_t     regval;
-  unsigned int port;
-  unsigned int pin;
+    uintptr_t    base;
+    uint32_t     regval;
+    unsigned int port;
+    unsigned int pin;
 
-  /* Get the port number and pin number */
+    /* Get the port number and pin number */
 
-  port = (pinset & _PIN_PORT_MASK) >> _PIN_PORT_SHIFT;
-  pin  = (pinset & _PIN_MASK)      >> _PIN_SHIFT;
+    port = (pinset & _PIN_PORT_MASK) >> _PIN_PORT_SHIFT;
+    pin  = (pinset & _PIN_MASK) >> _PIN_SHIFT;
 
-  DEBUGASSERT(port < S32K1XX_NPORTS);
-  if (port < S32K1XX_NPORTS)
-    {
-      /* Get the base address of PORT block for this port */
+    DEBUGASSERT(port < S32K1XX_NPORTS);
+    if (port < S32K1XX_NPORTS) {
+        /* Get the base address of PORT block for this port */
 
-      base =  S32K1XX_PORT_BASE(port);
+        base = S32K1XX_PORT_BASE(port);
 
-      /* Clear the IRQC field of the port PCR register in order to disable
-       * the interrupt.
-       */
+        /* Clear the IRQC field of the port PCR register in order to disable
+         * the interrupt.
+         */
 
-      regval = getreg32(base + S32K1XX_PORT_PCR_OFFSET(pin));
-      regval &= ~PORT_PCR_IRQC_MASK;
-      putreg32(regval, base + S32K1XX_PORT_PCR_OFFSET(pin));
+        regval = getreg32(base + S32K1XX_PORT_PCR_OFFSET(pin));
+        regval &= ~PORT_PCR_IRQC_MASK;
+        putreg32(regval, base + S32K1XX_PORT_PCR_OFFSET(pin));
     }
 #endif /* HAVE_PORTINTS */
 }
