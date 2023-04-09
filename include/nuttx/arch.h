@@ -416,7 +416,6 @@ void up_switch_context(FAR struct tcb_s *tcb, FAR struct tcb_s *rtcb);
  *   disable interrupts before performing scheduling operations.
  *
  ****************************************************************************/
-
 void up_exit(int status) noreturn_function;
 
 /* Prototype is in unistd.h */

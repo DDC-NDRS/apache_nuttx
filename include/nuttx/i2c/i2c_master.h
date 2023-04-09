@@ -218,9 +218,7 @@ struct i2c_msg_s
  * structure visible to the I2C client.  The specific implementation may
  * add additional, device specific fields after the vtable.
  */
-
-struct i2c_master_s
-{
+struct i2c_master_s {
   FAR const struct i2c_ops_s *ops; /* I2C vtable */
 };
 

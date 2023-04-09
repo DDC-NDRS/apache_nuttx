@@ -533,7 +533,6 @@ int nxsem_set_protocol(FAR sem_t *sem, int protocol);
  * be handled gracefully
  *
  ****************************************************************************/
-
 int nxsem_wait_uninterruptible(FAR sem_t *sem);
 
 /****************************************************************************

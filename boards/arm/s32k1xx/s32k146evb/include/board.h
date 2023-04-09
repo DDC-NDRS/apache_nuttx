@@ -115,4 +115,56 @@
 #define PIN_CAN0_RX PIN_CAN0_RX_4           /* PTE4_CAN0_RX */
 #define PIN_CAN0_TX PIN_CAN0_TX_4           /* PTE5_CAN0_TX */
 
+/* LPUART0/LPUART2 configuration */
+#if defined(CONFIG_BOARD_BMU_A23C)
+#define PIN_LPUART0_RX  PIN_LPUART0_RX_1    /* PTB0_LPUART0_RX */
+#define PIN_LPUART0_TX  PIN_LPUART0_TX_1    /* PTB1_LPUART0_TX */
+
+#define PIN_LPUART2_RX  PIN_LPUART2_RX_2    /* PTD6_LPUART2_RX */
+#define PIN_LPUART2_TX  PIN_LPUART2_TX_2    /* PTD7_LPUART2_TX */
+#else /* S32K146EVB */
+#define PIN_LPUART0_RX  PIN_LPUART0_RX_2    /* PTA28 */
+#define PIN_LPUART0_TX  PIN_LPUART0_TX_2    /* PTA27 */
+
+#define PIN_LPUART2_RX  PIN_LPUART2_RX_1    /* PTA8 */
+#define PIN_LPUART2_TX  PIN_LPUART2_TX_1    /* PTA9 */
+#endif
+
+/* LPI2C0 configuration */
+#if defined(CONFIG_BOARD_BMU_A23C)
+#define PIN_LPI2C0_SCL  PIN_LPI2C0_SCL_2    /* PTA3_LPI2C0_SCL */
+#define PIN_LPI2C0_SDA  PIN_LPI2C0_SDA_2    /* PTA2_LPI2C0_SDA */
+#else
+#define PIN_LPI2C0_SCL  PIN_LPI2C0_SCL_2    /* PTA3(N/A) */
+#define PIN_LPI2C0_SDA  PIN_LPI2C0_SDA_2    /* PTA2(N/A) */
+#endif
+
+/* LPSPI0 configuration */
+#if defined(CONFIG_BOARD_BMU_A23C)
+#define PIN_LPSPI0_SCK  PIN_LPSPI0_SCK_4    /* PTD15_LPSPI0_SCK */
+#define PIN_LPSPI0_MISO PIN_LPSPI0_SIN_3    /* PTD16_LPSPI0_SIN */
+#define PIN_LPSPI0_MOSI PIN_LPSPI0_SOUT_3   /* PTB4_LPSPI0_SOUT */
+#define PIN_LPSPI0_PCS  PIN_LPSPI0_PCS0_3   /* PTB5_LPSPI0_PCS0 */
+#else
+#define PIN_LPSPI0_SCK  PIN_LPSPI0_SCK_3    /* PTB2 */
+#define PIN_LPSPI0_MISO PIN_LPSPI0_SIN_2    /* PTB3 */
+#define PIN_LPSPI0_MOSI PIN_LPSPI0_SOUT_3   /* PTB4 */
+#define PIN_LPSPI0_PCS  PIN_LPSPI0_PCS0_3   /* PTB5 */
+#endif
+
+/* CAN1/CAN2 configuration */
+#if defined(CONFIG_BOARD_BMU_A23C)
+#define PIN_CAN1_RX PIN_CAN1_RX_1           /* PTA12_CAN1_RX */
+#define PIN_CAN1_TX PIN_CAN1_TX_1           /* PTA13_CAN1_TX */
+
+#define PIN_CAN2_RX PIN_CAN2_RX_1           /* PTC16_CAN2_RX */
+#define PIN_CAN2_TX PIN_CAN2_TX_1           /* PTC17_CAN2_TX */
+#else
+#define PIN_CAN1_RX PIN_CAN1_RX_1           /* PTA12_CAN1_RX */
+#define PIN_CAN1_TX PIN_CAN1_TX_1           /* PTA13_CAN1_TX */
+
+#define PIN_CAN2_RX PIN_CAN2_RX_1           /* PTC16_CAN2_RX */
+#define PIN_CAN2_TX PIN_CAN2_TX_1           /* PTC17_CAN2_TX */
+#endif
+
 #endif /* __BOARDS_ARM_S32K1XX_S32K146EVB_INCLUDE_BOARD_H */
