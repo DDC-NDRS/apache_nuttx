@@ -307,7 +307,6 @@ int s32k1xx_gpio_initialize(void) {
         g_gpio[i].id = i;
 
         /* Find which pin type we are dealing with */
-
         pinset = g_gpiopins[i];
 
         if ((pinset & (_PIN_IO_MASK)) == _PIN_INPUT) {

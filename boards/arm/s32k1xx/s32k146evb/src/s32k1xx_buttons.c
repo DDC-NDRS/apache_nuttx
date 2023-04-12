@@ -99,7 +99,7 @@ uint32_t board_buttons(void) {
  *   value.
  *
  ****************************************************************************/
-int board_button_irq(int id, xcpt_t irqhandler, void* arg) {
+int /**/board_button_irq(int id, xcpt_t irqhandler, void* arg) {
     uint32_t pinset;
     int ret;
 

@@ -21,7 +21,6 @@
 /****************************************************************************
  * Included Files
  ****************************************************************************/
-
 #include <nuttx/config.h>
 #include <nuttx/compiler.h>
 
@@ -49,15 +48,12 @@
  *   Initialize I2C driver and register /dev/i2cN devices.
  *
  ****************************************************************************/
-
 int weak_function s32k1xx_i2cdev_initialize(void) {
     int ret = OK;
 
-#if defined(CONFIG_S32K1XX_LPI2C0) && defined(CONFIG_I2C_DRIVER)
+    #if defined(CONFIG_S32K1XX_LPI2C0) && defined(CONFIG_I2C_DRIVER)
     /* LPI2C0 *****************************************************************/
-
     /* Initialize the I2C driver for LPI2C0 */
-
     struct i2c_master_s* lpi2c0 = s32k1xx_i2cbus_initialize(0);
     if (lpi2c0 == NULL) {
         i2cerr("ERROR: FAILED to initialize LPI2C0\n");
@@ -70,9 +66,9 @@ int weak_function s32k1xx_i2cdev_initialize(void) {
         s32k1xx_i2cbus_uninitialize(lpi2c0);
         return ret;
     }
-#endif /* CONFIG_S32K1XX_LPI2C0 && CONFIG_I2C_DRIVER */
+    #endif /* CONFIG_S32K1XX_LPI2C0 && CONFIG_I2C_DRIVER */
 
-    return ret;
+    return (ret);
 }
 
 #endif /* CONFIG_S32K1XX_LPSPI */
