@@ -21,7 +21,6 @@
 /****************************************************************************
  * Included Files
  ****************************************************************************/
-
 #include <nuttx/config.h>
 
 #include <sys/types.h>
@@ -29,23 +28,23 @@
 #include <syslog.h>
 
 #ifdef CONFIG_INPUT_BUTTONS
-#  include <nuttx/input/buttons.h>
+#include <nuttx/input/buttons.h>
 #endif
 
 #ifdef CONFIG_USERLED
-#  include <nuttx/leds/userled.h>
+#include <nuttx/leds/userled.h>
 #endif
 
 #ifdef CONFIG_FS_PROCFS
-#  include <nuttx/fs/fs.h>
+#include <nuttx/fs/fs.h>
 #endif
 
 #ifdef CONFIG_S32K1XX_PROGMEM
-#  include <nuttx/mtd/mtd.h>
+#include <nuttx/mtd/mtd.h>
 #endif
 
 #ifdef CONFIG_S32K1XX_EEEPROM
-#  include "s32k1xx_eeeprom.h"
+#include "s32k1xx_eeeprom.h"
 #endif
 
 #include "s32k146evb.h"
@@ -53,7 +52,6 @@
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
-
 /****************************************************************************
  * Name: s32k1xx_bringup
  *
@@ -67,82 +65,73 @@
  *     Called from the NSH library
  *
  ****************************************************************************/
+int /**/s32k1xx_bringup(void) {
+    int ret = OK;
 
-int s32k1xx_bringup(void)
-{
-  int ret = OK;
-
-#ifdef CONFIG_INPUT_BUTTONS
-  /* Register the BUTTON driver */
-
-  ret = btn_lower_initialize("/dev/buttons");
-  if (ret < 0)
-    {
-      syslog(LOG_ERR, "ERROR: btn_lower_initialize() failed: %d\n", ret);
+    #ifdef CONFIG_INPUT_BUTTONS
+    /* Register the BUTTON driver */
+    ret = btn_lower_initialize("/dev/buttons");
+    if (ret < 0) {
+        syslog(LOG_ERR, "ERROR: btn_lower_initialize() failed: %d\n", ret);
     }
-#endif
+    #endif
 
-#ifdef CONFIG_USERLED
-  /* Register the LED driver */
-
-  ret = userled_lower_initialize("/dev/userleds");
-  if (ret < 0)
-    {
-      syslog(LOG_ERR, "ERROR: userled_lower_initialize() failed: %d\n", ret);
+    #ifdef CONFIG_USERLED
+    /* Register the LED driver */
+    ret = userled_lower_initialize("/dev/userleds");
+    if (ret < 0) {
+        syslog(LOG_ERR, "ERROR: userled_lower_initialize() failed: %d\n", ret);
     }
-#endif
+    #endif
 
-#ifdef CONFIG_FS_PROCFS
-  /* Mount the procfs file system */
-
-  ret = nx_mount(NULL, "/proc", "procfs", 0, NULL);
-  if (ret < 0)
-    {
-      syslog(LOG_ERR, "ERROR: Failed to mount procfs at /proc: %d\n", ret);
+    #ifdef CONFIG_FS_PROCFS
+    /* Mount the procfs file system */
+    ret = nx_mount(NULL, "/proc", "procfs", 0, NULL);
+    if (ret < 0) {
+        syslog(LOG_ERR, "ERROR: Failed to mount procfs at /proc: %d\n", ret);
     }
-#endif
+    #endif
 
-#ifdef CONFIG_S32K1XX_PROGMEM
-  struct mtd_dev_s *mtd;
-
-  mtd = progmem_initialize();
-  if (mtd == NULL)
-    {
-      syslog(LOG_ERR, "ERROR: progmem_initialize() failed\n");
+    #ifdef CONFIG_DEV_GPIO
+    /* Initialize and register the GPIO driver */
+    ret = s32k1xx_gpio_initialize();
+    if (ret < 0) {
+        syslog(LOG_ERR, "ERROR: Failed to initialize GPIO driver: %d\n", ret);
     }
-#endif
+    #endif /* CONFIG_DEV_GPIO */
 
-#ifdef CONFIG_S32K1XX_EEEPROM
-  /* Register EEEPROM block device */
+    #ifdef CONFIG_S32K1XX_PROGMEM
+    struct mtd_dev_s* mtd;
 
-  ret = s32k1xx_eeeprom_register(0, 4096);
-  if (ret < 0)
-    {
-      syslog(LOG_ERR, "ERROR: s32k1xx_eeeprom_register() failed\n");
+    mtd = progmem_initialize();
+    if (mtd == NULL) {
+        syslog(LOG_ERR, "ERROR: progmem_initialize() failed\n");
     }
-#endif
+    #endif
 
-#ifdef CONFIG_S32K1XX_LPI2C
-  /* Initialize I2C driver */
-
-  ret = s32k1xx_i2cdev_initialize();
-  if (ret < 0)
-    {
-      syslog(LOG_ERR, "ERROR: s32k1xx_i2cdev_initialize() failed: %d\n",
-             ret);
+    #ifdef CONFIG_S32K1XX_EEEPROM
+    /* Register EEEPROM block device */
+    ret = s32k1xx_eeeprom_register(0, 4096);
+    if (ret < 0) {
+        syslog(LOG_ERR, "ERROR: s32k1xx_eeeprom_register() failed\n");
     }
-#endif
+    #endif
 
-#ifdef CONFIG_S32K1XX_LPSPI
-  /* Initialize SPI driver */
-
-  ret = s32k1xx_spidev_initialize();
-  if (ret < 0)
-    {
-      syslog(LOG_ERR, "ERROR: s32k1xx_spidev_initialize() failed: %d\n",
-             ret);
+    #ifdef CONFIG_S32K1XX_LPI2C
+    /* Initialize I2C driver */
+    ret = s32k1xx_i2cdev_initialize();
+    if (ret < 0) {
+        syslog(LOG_ERR, "ERROR: s32k1xx_i2cdev_initialize() failed: %d\n", ret);
     }
-#endif
+    #endif
 
-  return ret;
+    #ifdef CONFIG_S32K1XX_LPSPI
+    /* Initialize SPI driver */
+    ret = s32k1xx_spidev_initialize();
+    if (ret < 0) {
+        syslog(LOG_ERR, "ERROR: s32k1xx_spidev_initialize() failed: %d\n", ret);
+    }
+    #endif
+
+    return ret;
 }

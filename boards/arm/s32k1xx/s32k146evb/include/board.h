@@ -25,6 +25,7 @@
  * Included Files
  ****************************************************************************/
 #include <nuttx/config.h>
+#include <hardware/s32k1xx_pinmux.h>
 
 /****************************************************************************
  * Pre-processor Definitions
@@ -166,5 +167,24 @@
 #define PIN_CAN2_RX PIN_CAN2_RX_1           /* PTC16_CAN2_RX */
 #define PIN_CAN2_TX PIN_CAN2_TX_1           /* PTC17_CAN2_TX */
 #endif
+
+/* GPIO pins to be registered to the GPIO driver.  These definitions need to
+ * be added to the g_gpiopins array in s32k1xx_gpio.c!
+ */
+#define DEV_GPIO0   (PIN_PTD15 | GPIO_OUTPUT)   /* RedLED    PTD15  (FTM0 CH0) */
+#define DEV_GPIO1   (PIN_PTD16 | GPIO_OUTPUT)   /* GreenLED  PTD16  (FTM0 CH1) */
+#define DEV_GPIO2   (PIN_PTD0  | GPIO_OUTPUT)   /* BlueLED   PTD0   (FTM0 CH2) */
+#define DEV_GPIO3   (PIN_PTC12 | PIN_INT_BOTH)  /* SW2  PTC12 */
+#define DEV_GPIO4   (PIN_PTC13 | PIN_INT_BOTH)  /* SW3  PTC13 */
+
+#define DEV_GPIO5   (PIN_PTE8  | GPIO_INPUT | PIN_INT_BOTH)
+#define DEV_GPIO6   (PIN_PTC3  | GPIO_INPUT | PIN_INT_BOTH)
+#define DEV_GPIO7   (PIN_PTC14 | GPIO_INPUT | PIN_INT_BOTH)
+#define DEV_GPIO8   (PIN_PTC8  | GPIO_INPUT | PIN_INT_BOTH)
+#define DEV_GPIO9   (PIN_PTA11 | GPIO_INPUT | PIN_INT_BOTH)
+#define DEV_GPIO10  (PIN_PTC9  | GPIO_INPUT | PIN_INT_BOTH)
+#define DEV_GPIO11  (PIN_PTA13 | GPIO_INPUT | PIN_INT_BOTH)
+
+#define DEV_NUM_OF_GPIO 5
 
 #endif /* __BOARDS_ARM_S32K1XX_S32K146EVB_INCLUDE_BOARD_H */

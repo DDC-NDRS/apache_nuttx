@@ -21,7 +21,6 @@
 /****************************************************************************
  * Included Files
  ****************************************************************************/
-
 #include <nuttx/config.h>
 
 #include <sys/types.h>
@@ -60,43 +59,32 @@
  *   end-of-file condition, or a negated errno value on any failure.
  *
  ****************************************************************************/
+ssize_t /**/file_read(FAR struct file* filep, FAR void* buf, size_t nbytes) {
+    FAR struct inode* inode;
+    int               ret = -EBADF;
 
-ssize_t file_read(FAR struct file *filep, FAR void *buf, size_t nbytes)
-{
-  FAR struct inode *inode;
-  int ret = -EBADF;
+    DEBUGASSERT(filep);
+    inode = filep->f_inode;
 
-  DEBUGASSERT(filep);
-  inode = filep->f_inode;
+    /* Was this file opened for read access? */
+    if ((filep->f_oflags & O_RDOK) == 0) {
+        /* No.. File is not read-able */
+        ret = -EACCES;
+    }
+    /* Is a driver or mountpoint registered? If so, does it support the read
+     * method?
+     */
+    else if (inode != NULL && inode->u.i_ops && inode->u.i_ops->read) {
+        /* Yes.. then let it perform the read.  NOTE that for the case of the
+         * mountpoint, we depend on the read methods being identical in
+         * signature and position in the operations vtable.
+         */
 
-  /* Was this file opened for read access? */
-
-  if ((filep->f_oflags & O_RDOK) == 0)
-    {
-      /* No.. File is not read-able */
-
-      ret = -EACCES;
+        ret = (int)inode->u.i_ops->read(filep, (FAR char*)buf, (size_t)nbytes);
     }
 
-  /* Is a driver or mountpoint registered? If so, does it support the read
-   * method?
-   */
-
-  else if (inode != NULL && inode->u.i_ops && inode->u.i_ops->read)
-    {
-      /* Yes.. then let it perform the read.  NOTE that for the case of the
-       * mountpoint, we depend on the read methods being identical in
-       * signature and position in the operations vtable.
-       */
-
-      ret = (int)inode->u.i_ops->read(filep,
-                                     (FAR char *)buf,
-                                     (size_t)nbytes);
-    }
-
-  /* Return the number of bytes read (or possibly an error code) */
-
-  return ret;
+    /* Return the number of bytes read (or possibly an error code) */
+    return (ret);
 }
 
 /****************************************************************************
@@ -119,25 +107,20 @@ ssize_t file_read(FAR struct file *filep, FAR void *buf, size_t nbytes)
  *   end-of-file condition, or a negated errno value on any failure.
  *
  ****************************************************************************/
+ssize_t /**/nx_read(int fd, FAR void* buf, size_t nbytes) {
+    FAR struct file* filep;
+    ssize_t          ret;
 
-ssize_t nx_read(int fd, FAR void *buf, size_t nbytes)
-{
-  FAR struct file *filep;
-  ssize_t ret;
-
-  /* First, get the file structure.  Note that on failure,
-   * fs_getfilep() will return the errno.
-   */
-
-  ret = (ssize_t)fs_getfilep(fd, &filep);
-  if (ret < 0)
-    {
-      return ret;
+    /* First, get the file structure.  Note that on failure,
+     * fs_getfilep() will return the errno.
+     */
+    ret = (ssize_t)fs_getfilep(fd, &filep);
+    if (ret < 0) {
+        return ret;
     }
 
-  /* Then let file_read do all of the work. */
-
-  return file_read(filep, buf, nbytes);
+    /* Then let file_read do all of the work. */
+    return file_read(filep, buf, nbytes);
 }
 
 /****************************************************************************
@@ -156,24 +139,19 @@ ssize_t nx_read(int fd, FAR void *buf, size_t nbytes)
  *   end-of-file condition, or -1 on failure with errno set appropriately.
  *
  ****************************************************************************/
+ssize_t /**/read(int fd, FAR void* buf, size_t nbytes) {
+    ssize_t ret;
 
-ssize_t read(int fd, FAR void *buf, size_t nbytes)
-{
-  ssize_t ret;
+    /* read() is a cancellation point */
+    enter_cancellation_point();
 
-  /* read() is a cancellation point */
-
-  enter_cancellation_point();
-
-  /* Let nx_read() do the real work */
-
-  ret = nx_read(fd, buf, nbytes);
-  if (ret < 0)
-    {
-      set_errno(-ret);
-      ret = ERROR;
+    /* Let nx_read() do the real work */
+    ret = nx_read(fd, buf, nbytes);
+    if (ret < 0) {
+        set_errno(-ret);
+        ret = ERROR;
     }
 
-  leave_cancellation_point();
-  return ret;
+    leave_cancellation_point();
+    return (ret);
 }

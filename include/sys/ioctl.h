@@ -110,7 +110,6 @@ extern "C"
  *      descriptor 'fd' references.
  *
  ****************************************************************************/
-
 int ioctl(int fd, int req, ...);
 
 #undef EXTERN
