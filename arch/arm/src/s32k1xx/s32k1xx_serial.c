@@ -65,14 +65,12 @@
 /****************************************************************************
  * Pre-processor Definitions
  ****************************************************************************/
-
 /* Which LPUART with be tty0/console and which tty1-7?  The console will
  * always be ttyS0.  If there is no console then will use the lowest
  * numbered LPUART.
  */
 
 /* First pick the console and ttys0.  This could be any of LPUART0-2 */
-
 #if defined(CONFIG_LPUART0_SERIAL_CONSOLE)
 #define CONSOLE_DEV             g_lpuart0priv       /* LPUART0 is console */
 #define TTYS0_DEV               g_lpuart0priv       /* LPUART0 is ttyS0 */
@@ -121,7 +119,6 @@
  * One of LPUART0-8 could be the console; one of UART0-2 has already been
  * assigned to ttys0.
  */
-
 #if defined(CONFIG_S32K1XX_LPUART0) && !defined(UART1_ASSIGNED)
 #define TTYS1_DEV               g_lpuart0priv       /* LPUART0 is ttyS1 */
 #define UART1_ASSIGNED          1
@@ -141,7 +138,6 @@
  * that was either assigned as ttyS0 or ttys1.  One of LPUART0-2 could be the
  * console.  One of UART1-2 has already been assigned to ttys0 or ttyS1.
  */
-
 #if defined(CONFIG_S32K1XX_LPUART1) && !defined(UART2_ASSIGNED)
 #define TTYS2_DEV               g_lpuart1priv       /* LPUART1 is ttyS2 */
 #define UART2_ASSIGNED          1
@@ -380,7 +376,6 @@ const struct uart_ops_s* g_o1 = &g_lpuart_txdma_ops;
 #endif
 
 /* I/O buffers */
-
 #ifdef CONFIG_LPUART0_RXDMA
 static char g_lpuart0rxfifo[RXDMA_BUFFER_SIZE];
 #endif
@@ -394,7 +389,6 @@ static char g_lpuart2rxfifo[RXDMA_BUFFER_SIZE];
 #endif
 
 /* I/O buffers */
-
 #ifdef CONFIG_S32K1XX_LPUART0
 static char g_lpuart0rxbuffer[CONFIG_LPUART0_RXBUFSIZE];
 static char g_lpuart0txbuffer[CONFIG_LPUART0_TXBUFSIZE];
@@ -472,7 +466,7 @@ static struct s32k1xx_uart_s g_lpuart0priv = {
     #endif
 
     /* Zephyr Extension */
-    .async_cb = NULL,
+    .async_cb     = NULL,
     .async_rx_buf = NULL,
     .async_rx_len = 0UL
 };
@@ -661,7 +655,6 @@ static inline void s32k1xx_disableuartint(struct s32k1xx_uart_s* priv, uint32_t*
     regval = s32k1xx_serialin(priv, S32K1XX_LPUART_CTRL_OFFSET);
 
     /* Return the current Rx and Tx interrupt state */
-
     if (ie != NULL) {
         *ie = regval & LPUART_ALL_INTS;
     }
@@ -681,9 +674,8 @@ static inline void s32k1xx_restoreuartint(struct s32k1xx_uart_s* priv, uint32_t 
     /* Enable/disable any interrupts that are currently disabled but should be
      * enabled/disabled.
      */
-
-    flags  = spin_lock_irqsave(NULL);
-    regval = s32k1xx_serialin(priv, S32K1XX_LPUART_CTRL_OFFSET);
+    flags   = spin_lock_irqsave(NULL);
+    regval  = s32k1xx_serialin(priv, S32K1XX_LPUART_CTRL_OFFSET);
     regval &= ~LPUART_ALL_INTS;
     regval |= ie;
     s32k1xx_serialout(priv, S32K1XX_LPUART_CTRL_OFFSET, regval);
@@ -798,7 +790,6 @@ static int s32k1xx_setup(struct uart_dev_s* dev) {
     struct s32k1xx_uart_s* priv = (struct s32k1xx_uart_s*)dev->priv;
     #ifndef CONFIG_SUPPRESS_LPUART_CONFIG
     struct uart_config_s config = {0};
-
     int ret;
 
     /* Configure the UART */
@@ -813,7 +804,6 @@ static int s32k1xx_setup(struct uart_dev_s* dev) {
 
     #ifdef CONFIG_SERIAL_IFLOWCONTROL
     /* Flow control on inbound side if not GPIO based */
-
     if ((priv->rts_gpio & _PIN_MODE_MASK) != _PIN_MODE_GPIO) {
         config.userts = priv->iflow;
     }
@@ -833,10 +823,8 @@ static int s32k1xx_setup(struct uart_dev_s* dev) {
     /* get the current interrupt bits and place them in ie */
 
     /* (used to use the interrupts)  */
-
     priv->ie = s32k1xx_serialin(priv, S32K1XX_LPUART_CTRL_OFFSET) & LPUART_ALL_INTS;
     return ret;
-
     #else
     priv->ie = s32k1xx_serialin(priv, S32K1XX_LPUART_CTRL_OFFSET) & LPUART_ALL_INTS;
     return OK;
@@ -896,7 +884,6 @@ static void s32k1xx_dma_shutdown(struct uart_dev_s* dev) {
         s32k1xx_dmach_stop(priv->txdma);
 
         /* Release the TX DMA channel */
-
         s32k1xx_dmach_free(priv->txdma);
         priv->txdma = NULL;
         nxsem_destroy(&priv->txdmasem);
@@ -930,11 +917,10 @@ static int s32k1xx_attach(struct uart_dev_s* dev) {
         /* Enable the interrupt (RX and TX interrupts are still disabled
          * in the UART
          */
-
         up_enable_irq(priv->irq);
     }
 
-    return ret;
+    return (ret);
 }
 
 /****************************************************************************
@@ -983,7 +969,6 @@ static int /**/s32k1xx_interrupt(int irq, void* context, void* arg) {
     /* Loop until there are no characters to be transferred or,
      * until we have been looping for a long time.
      */
-
     handled = true;
     for (passes = 0; passes < 256 && handled; passes++) {
         handled = false;
@@ -1038,7 +1023,7 @@ static int /**/s32k1xx_interrupt(int irq, void* context, void* arg) {
         }
     }
 
-    return OK;
+    return (OK);
 }
 
 /****************************************************************************
@@ -1048,17 +1033,16 @@ static int /**/s32k1xx_interrupt(int irq, void* context, void* arg) {
  *   All ioctl calls will be routed through this method
  *
  ****************************************************************************/
-
-static int s32k1xx_ioctl(struct file* filep, int cmd, unsigned long arg) {
-#if defined(CONFIG_SERIAL_TIOCSERGSTRUCT) || defined(CONFIG_SERIAL_TERMIOS)
+static int /**/s32k1xx_ioctl(struct file* filep, int cmd, unsigned long arg) {
+    #if defined(CONFIG_SERIAL_TIOCSERGSTRUCT) || defined(CONFIG_SERIAL_TERMIOS)
     struct inode*      inode = filep->f_inode;
     struct uart_dev_s* dev   = inode->i_private;
     irqstate_t         flags;
-#endif
+    #endif
     int ret = OK;
 
     switch (cmd) {
-#ifdef CONFIG_SERIAL_TIOCSERGSTRUCT
+        #ifdef CONFIG_SERIAL_TIOCSERGSTRUCT
         case TIOCSERGSTRUCT : {
             struct s32k1xx_uart_s* user = (struct s32k1xx_uart_s*)arg;
             if (!user) {
@@ -1068,9 +1052,9 @@ static int s32k1xx_ioctl(struct file* filep, int cmd, unsigned long arg) {
                 memcpy(user, dev, sizeof(struct s32k1xx_uart_s));
             }
         } break;
-#endif
+        #endif
 
-#ifdef CONFIG_SERIAL_TERMIOS
+        #ifdef CONFIG_SERIAL_TERMIOS
         case TCGETS : {
             struct termios*        termiosp = (struct termios*)arg;
             struct s32k1xx_uart_s* priv     = (struct s32k1xx_uart_s*)dev->priv;
@@ -1089,19 +1073,17 @@ static int s32k1xx_ioctl(struct file* filep, int cmd, unsigned long arg) {
             termiosp->c_cflag |= (priv->stopbits2) ? CSTOPB : 0;
 
             /* Return flow control */
-
-#ifdef CONFIG_SERIAL_OFLOWCONTROL
+            #ifdef CONFIG_SERIAL_OFLOWCONTROL
             termiosp->c_cflag |= ((priv->oflow) ? CCTS_OFLOW : 0);
-#endif
-#ifdef CONFIG_SERIAL_IFLOWCONTROL
+            #endif
+            #ifdef CONFIG_SERIAL_IFLOWCONTROL
             termiosp->c_cflag |= ((priv->iflow) ? CRTS_IFLOW : 0);
-#endif
+            #endif
             /* Return baud */
 
             cfsetispeed(termiosp, priv->baud);
 
             /* Return number of bits */
-
             switch (priv->bits) {
                 case 5 :
                     termiosp->c_cflag |= CS5;
@@ -1136,24 +1118,22 @@ static int s32k1xx_ioctl(struct file* filep, int cmd, unsigned long arg) {
             bool                   stop2;
 
             if ((!termiosp)
-#ifdef CONFIG_SERIAL_OFLOWCONTROL
+                #ifdef CONFIG_SERIAL_OFLOWCONTROL
                 || ((termiosp->c_cflag & CCTS_OFLOW) && (priv->cts_gpio == 0))
-#endif
-#ifdef CONFIG_SERIAL_IFLOWCONTROL
+                #endif
+                #ifdef CONFIG_SERIAL_IFLOWCONTROL
                 || ((termiosp->c_cflag & CRTS_IFLOW) && (priv->rts_gpio == 0))
-#endif
+                #endif
             ) {
                 ret = -EINVAL;
                 break;
             }
 
             /* Decode baud. */
-
             ret  = OK;
             baud = cfgetispeed(termiosp);
 
             /* Decode number of bits */
-
             switch (termiosp->c_cflag & CSIZE) {
                 case CS5 :
                     nbits = 5;
@@ -1170,11 +1150,13 @@ static int s32k1xx_ioctl(struct file* filep, int cmd, unsigned long arg) {
                 case CS8 :
                     nbits = 8;
                     break;
-#if 0
-          case CS9:
-            nbits = 9;
-            break;
-#endif
+
+                #if 0
+                case CS9:
+                    nbits = 9;
+                    break;
+                #endif
+
                 default :
                     ret = -EINVAL;
                     break;
@@ -1202,16 +1184,16 @@ static int s32k1xx_ioctl(struct file* filep, int cmd, unsigned long arg) {
                 priv->parity    = parity;
                 priv->bits      = nbits;
                 priv->stopbits2 = stop2;
-#ifdef CONFIG_SERIAL_OFLOWCONTROL
+                #ifdef CONFIG_SERIAL_OFLOWCONTROL
                 priv->oflow = (termiosp->c_cflag & CCTS_OFLOW) != 0;
-#endif
-#ifdef CONFIG_SERIAL_IFLOWCONTROL
+                #endif
+                #ifdef CONFIG_SERIAL_IFLOWCONTROL
                 priv->iflow = (termiosp->c_cflag & CRTS_IFLOW) != 0;
-#endif
+                #endif
+
                 /* effect the changes immediately - note that we do not
                  * implement TCSADRAIN / TCSAFLUSH
                  */
-
                 flags = spin_lock_irqsave(NULL);
                 s32k1xx_disableuartint(priv, &ie);
                 ret = dev->ops->setup(dev);
@@ -1223,9 +1205,9 @@ static int s32k1xx_ioctl(struct file* filep, int cmd, unsigned long arg) {
                 spin_unlock_irqrestore(NULL, flags);
             }
         } break;
-#endif /* CONFIG_SERIAL_TERMIOS */
+        #endif /* CONFIG_SERIAL_TERMIOS */
 
-#ifdef CONFIG_S32K1XX_LPUART_INVERT
+        #ifdef CONFIG_S32K1XX_LPUART_INVERT
         case TIOCSINVERT : {
             uint32_t               ctrl;
             uint32_t               stat;
@@ -1267,7 +1249,7 @@ static int s32k1xx_ioctl(struct file* filep, int cmd, unsigned long arg) {
 
             spin_unlock_irqrestore(NULL, flags);
         } break;
-#endif
+        #endif
 
         case TIOCSBRK : /* BSD compatibility: Turn break on, unconditionally */
         case TIOCCBRK : /* BSD compatibility: Turn break off, unconditionally */
@@ -1288,7 +1270,6 @@ static int s32k1xx_ioctl(struct file* filep, int cmd, unsigned long arg) {
  *   receipt are provided in the return 'status'.
  *
  ****************************************************************************/
-
 #ifndef SERIAL_HAVE_ONLY_RXDMA
 static int s32k1xx_receive(struct uart_dev_s* dev, unsigned int* status) {
     struct s32k1xx_uart_s* priv = (struct s32k1xx_uart_s*)dev->priv;
@@ -1307,7 +1288,6 @@ static int s32k1xx_receive(struct uart_dev_s* dev, unsigned int* status) {
  *   Call to enable or disable RX interrupts
  *
  ****************************************************************************/
-
 #ifndef SERIAL_HAVE_ONLY_RXDMA
 static void s32k1xx_rxint(struct uart_dev_s* dev, bool enable) {
     struct s32k1xx_uart_s* priv = (struct s32k1xx_uart_s*)dev->priv;
@@ -1315,18 +1295,17 @@ static void s32k1xx_rxint(struct uart_dev_s* dev, bool enable) {
     uint32_t               regval;
 
     /* Enable interrupts for data available at Rx */
-
     flags = spin_lock_irqsave(NULL);
     if (enable) {
-#ifndef CONFIG_SUPPRESS_SERIAL_INTS
+        #ifndef CONFIG_SUPPRESS_SERIAL_INTS
         priv->ie |= LPUART_CTRL_RIE | LPUART_CTRL_FEIE | LPUART_CTRL_ORIE;
-#endif
+        #endif
     }
     else {
         priv->ie &= ~(LPUART_CTRL_RIE | LPUART_CTRL_FEIE | LPUART_CTRL_ORIE);
     }
 
-    regval = s32k1xx_serialin(priv, S32K1XX_LPUART_CTRL_OFFSET);
+    regval  = s32k1xx_serialin(priv, S32K1XX_LPUART_CTRL_OFFSET);
     regval &= ~LPUART_ALL_INTS;
     regval |= priv->ie;
     s32k1xx_serialout(priv, S32K1XX_LPUART_CTRL_OFFSET, regval);
@@ -1341,14 +1320,12 @@ static void s32k1xx_rxint(struct uart_dev_s* dev, bool enable) {
  *   Return true if the receive fifo is not empty
  *
  ****************************************************************************/
-
 #ifndef SERIAL_HAVE_ONLY_RXDMA
 static bool s32k1xx_rxavailable(struct uart_dev_s* dev) {
     struct s32k1xx_uart_s* priv = (struct s32k1xx_uart_s*)dev->priv;
-    uint32_t               regval;
+    uint32_t regval;
 
     /* Return true is data is ready in the Rx FIFO */
-
     regval = s32k1xx_serialin(priv, S32K1XX_LPUART_STAT_OFFSET);
     return ((regval & LPUART_STAT_RDRF) != 0);
 }
@@ -1376,19 +1353,17 @@ static bool s32k1xx_rxavailable(struct uart_dev_s* dev) {
  *   true if RX flow control activated.
  *
  ****************************************************************************/
-
 #ifdef CONFIG_SERIAL_IFLOWCONTROL
 static bool s32k1xx_rxflowcontrol(struct uart_dev_s* dev, unsigned int nbuffered, bool upper) {
     struct s32k1xx_uart_s* priv     = (struct s32k1xx_uart_s*)dev;
-    bool                   use_swhs = false;
+    bool use_swhs = false;
 
-#if defined(CONFIG_SERIAL_IFLOWCONTROL_WATERMARKS)
+    #if defined(CONFIG_SERIAL_IFLOWCONTROL_WATERMARKS)
     use_swhs = (priv->rts_gpio & _PIN_MODE_MASK) == _PIN_MODE_GPIO;
-#endif
+    #endif
 
     if (use_swhs && priv->iflow && (priv->rts_gpio != 0)) {
         /* Assert/de-assert nRTS set it high resume/stop sending */
-
         s32k1xx_gpiowrite(priv->rts_gpio, upper);
 
         if (upper) {
@@ -1401,15 +1376,13 @@ static bool s32k1xx_rxflowcontrol(struct uart_dev_s* dev, unsigned int nbuffered
              * Therefore, return 'false' so input data is still being processed
              * until sending end reacts on nRTS signal and stops sending more.
              */
-
-            return false;
+            return (false);
         }
 
-        return upper;
+        return (upper);
     }
     else {
         /* Is the RX buffer full? */
-
         if (upper) {
             /* Disable Rx interrupt to prevent more data being from
              * peripheral.  When hardware RTS is enabled, this will
@@ -1422,24 +1395,20 @@ static bool s32k1xx_rxflowcontrol(struct uart_dev_s* dev, unsigned int nbuffered
              * when buffer is read empty and thus we do not have to re-
              * enable Rx interrupts.
              */
-
             uart_disablerxint(dev);
-            return true;
+            return (true);
         }
-
         /* No.. The RX buffer is empty */
-
         else {
             /* We might leave Rx interrupt disabled if full recv buffer was
              * read empty.  Enable Rx interrupt to make sure that more input is
              * received.
              */
-
             uart_enablerxint(dev);
         }
     }
 
-    return false;
+    return (false);
 }
 #endif
 
@@ -1455,8 +1424,8 @@ static bool s32k1xx_rxflowcontrol(struct uart_dev_s* dev, unsigned int nbuffered
 #ifdef SERIAL_HAVE_RXDMA
 static int s32k1xx_dma_receive(struct uart_dev_s* dev, unsigned int* status) {
     struct s32k1xx_uart_s* priv   = (struct s32k1xx_uart_s*)dev;
-    uint32_t               nextrx = s32k1xx_dma_nextrx(priv);
-    int                    c      = 0;
+    uint32_t nextrx = s32k1xx_dma_nextrx(priv);
+    int      c      = 0;
 
     /* Check if more data is available */
     if (nextrx != priv->rxdmanext) {
@@ -1475,8 +1444,7 @@ static int s32k1xx_dma_receive(struct uart_dev_s* dev, unsigned int* status) {
      * driver must call s32k1xx_dma_rxavailable prior to calling this
      * function to assure that this never happens.
      */
-
-    return c;
+    return (c);
 }
 #endif
 
@@ -1487,17 +1455,14 @@ static int s32k1xx_dma_receive(struct uart_dev_s* dev, unsigned int* status) {
  *   Call to re-enable RX DMA.
  *
  ****************************************************************************/
-
 #if defined(SERIAL_HAVE_RXDMA) && defined(CONFIG_PM)
 static void s32k1xx_dma_reenable(struct s32k1xx_uart_s* priv) {
     struct s32k1xx_edma_xfrconfig_s config;
 
     /* Stop an reset the RX DMA */
-
     s32k1xx_dmach_stop(priv->rxdma);
 
     /* Configure for circular DMA reception into the RX FIFO */
-
     config.saddr  = priv->uartbase + S32K1XX_LPUART_DATA_OFFSET;
     config.daddr  = (uint32_t)priv->rxfifo;
     config.soff   = 0;
@@ -1507,27 +1472,24 @@ static void s32k1xx_dma_reenable(struct s32k1xx_uart_s* priv) {
     config.ssize  = EDMA_8BIT;
     config.dsize  = EDMA_8BIT;
     config.nbytes = 1;
-#ifdef CONFIG_KINETIS_EDMA_ELINK
+    #ifdef CONFIG_KINETIS_EDMA_ELINK
     config.linkch = 0;
-#endif
+    #endif
 
     s32k1xx_dmach_xfrsetup(priv->rxdma, &config);
 
     /* Reset our DMA shadow pointer and Rx data availability count to match
      * the address just programmed above.
      */
-
     priv->rxdmanext = 0;
 
     /* Start the DMA channel, and arrange for callbacks at the half and
      * full points in the FIFO.  This ensures that we have half a FIFO
      * worth of time to claim bytes before they are overwritten.
      */
-
     s32k1xx_dmach_start(priv->rxdma, s32k1xx_dma_rxcallback, (void*)priv);
 
     /* Clear DMA suspended flag. */
-
     priv->rxdmasusp = false;
 }
 #endif
@@ -1539,7 +1501,6 @@ static void s32k1xx_dma_reenable(struct s32k1xx_uart_s* priv) {
  *   Call to enable or disable RX interrupts
  *
  ****************************************************************************/
-
 #ifdef SERIAL_HAVE_RXDMA
 static void s32k1xx_dma_rxint(struct uart_dev_s* dev, bool enable) {
     struct s32k1xx_uart_s* priv = (struct s32k1xx_uart_s*)dev;
@@ -1584,10 +1545,10 @@ static bool s32k1xx_dma_rxavailable(struct uart_dev_s* dev) {
 #ifdef SERIAL_HAVE_TXDMA
 static void s32k1xx_dma_txcallback(DMACH_HANDLE handle, void* arg, bool done, int result) {
     struct s32k1xx_uart_s* priv = (struct s32k1xx_uart_s*)arg;
+
     /* Update 'nbytes' indicating number of bytes actually transferred by DMA.
      * This is important to free TX buffer space by 'uart_xmitchars_done'.
      */
-
     priv->dev.dmatx.nbytes = priv->dev.dmatx.length + priv->dev.dmatx.nlength;
 
     /* Adjust the pointers */
@@ -1640,7 +1601,6 @@ static void s32k1xx_dma_send(struct uart_dev_s* dev) {
     /* Make use of setup function to update buffer and its length for next
      * transfer
      */
-
     config.iter   = dev->dmatx.length;
     config.flags  = EDMA_CONFIG_LINKTYPE_LINKNONE;
     config.ssize  = EDMA_8BIT;
@@ -1650,9 +1610,9 @@ static void s32k1xx_dma_send(struct uart_dev_s* dev) {
     config.daddr  = priv->uartbase + S32K1XX_LPUART_DATA_OFFSET;
     config.soff   = sizeof(dev->dmatx.buffer[0]);
     config.doff   = 0;
-#ifdef CONFIG_S32K1XX_EDMA_ELINK
+    #ifdef CONFIG_S32K1XX_EDMA_ELINK
     config.linkch = 0;
-#endif
+    #endif
 
     /* Setup first half */
     s32k1xx_dmach_xfrsetup(priv->txdma, &config);
@@ -1677,7 +1637,6 @@ static void s32k1xx_dma_send(struct uart_dev_s* dev) {
  *   This method will send one byte on the UART
  *
  ****************************************************************************/
-
 static void s32k1xx_send(struct uart_dev_s* dev, int ch) {
     struct s32k1xx_uart_s* priv = (struct s32k1xx_uart_s*)dev->priv;
     s32k1xx_serialout(priv, S32K1XX_LPUART_DATA_OFFSET, (uint32_t)ch);
@@ -1690,7 +1649,6 @@ static void s32k1xx_send(struct uart_dev_s* dev, int ch) {
  *   Call to enable or disable TX interrupts from the UART.
  *
  ****************************************************************************/
-
 #ifdef SERIAL_HAVE_TXDMA
 static void s32k1xx_dma_txint(struct uart_dev_s* dev, bool enable) {
     /* Nothing to do. */
@@ -1711,7 +1669,6 @@ static void s32k1xx_dma_txint(struct uart_dev_s* dev, bool enable) {
  *   Call to enable or disable TX interrupts
  *
  ****************************************************************************/
-
 #if !defined(SERIAL_HAVE_ONLY_TXDMA)
 static void s32k1xx_txint(struct uart_dev_s* dev, bool enable) {
     struct s32k1xx_uart_s* priv = (struct s32k1xx_uart_s*)dev->priv;
@@ -1719,18 +1676,17 @@ static void s32k1xx_txint(struct uart_dev_s* dev, bool enable) {
     uint32_t               regval;
 
     /* Enable interrupt for TX complete */
-
     flags = spin_lock_irqsave(NULL);
     if (enable) {
-#ifndef CONFIG_SUPPRESS_SERIAL_INTS
+        #ifndef CONFIG_SUPPRESS_SERIAL_INTS
         priv->ie |= LPUART_CTRL_TIE;
-#endif
+        #endif
     }
     else {
         priv->ie &= ~LPUART_CTRL_TIE;
     }
 
-    regval = s32k1xx_serialin(priv, S32K1XX_LPUART_CTRL_OFFSET);
+    regval  = s32k1xx_serialin(priv, S32K1XX_LPUART_CTRL_OFFSET);
     regval &= ~LPUART_ALL_INTS;
     regval |= priv->ie;
     s32k1xx_serialout(priv, S32K1XX_LPUART_CTRL_OFFSET, regval);
@@ -1745,7 +1701,6 @@ static void s32k1xx_txint(struct uart_dev_s* dev, bool enable) {
  *   Return true if the transmit is completed
  *
  ****************************************************************************/
-
 static bool s32k1xx_txready(struct uart_dev_s* dev) {
     struct s32k1xx_uart_s* priv = (struct s32k1xx_uart_s*)dev->priv;
     uint32_t               regval;
@@ -1828,54 +1783,47 @@ static void up_pm_notify(struct pm_callback_s* cb, int domain, enum pm_state_e p
 
     peripheral_clock_source_t clock_source;
 
-#ifdef CONFIG_PM_SERIAL0
+    #ifdef CONFIG_PM_SERIAL0
     struct s32k1xx_uart_s* priv0 = g_lpuart0priv.dev.priv;
-#endif
-#ifdef CONFIG_PM_SERIAL1
+    #endif
+    #ifdef CONFIG_PM_SERIAL1
     struct s32k1xx_uart_s* priv1 = g_lpuart1priv.dev.priv;
-#endif
-#ifdef CONFIG_PM_SERIAL2
+    #endif
+    #ifdef CONFIG_PM_SERIAL2
     struct s32k1xx_uart_s* priv2 = g_lpuart2priv.dev.priv;
-#endif
+    #endif
 
     uint32_t ret_reg = 0;
 
     /* check if the transition is from the IDLE domain to the NORMAL domain */
 
     /* or the mode is already done */
-
     if (((pm_querystate(PM_IDLE_DOMAIN) == PM_IDLE) && (pmstate == PM_NORMAL)) ||
         (((pm_querystate(PM_IDLE_DOMAIN) == pmstate)))) {
         /* return */
-
         return;
     }
 
     /* check which PM it is  */
-
     switch (pmstate) {
             /* in case it needs to change to the RUN mode */
-
         case PM_NORMAL : {
             /* Logic for PM_NORMAL goes here */
 
             /* set the right clock source to go back to RUN mode */
-
             clock_source = CLK_SRC_SPLL_DIV2;
-
             count = 1;
         } break;
+
         default : {
             /* don't do anything, just return OK */
         } break;
     }
 
     /* check if something needs to change */
-
     if (count) {
-#ifdef CONFIG_PM_SERIAL0
+        #ifdef CONFIG_PM_SERIAL0
         /* make the peripheral clock config struct */
-
         const struct peripheral_clock_config_s clock_config0 = {
             .clkname = LPUART0_CLK,
             .clkgate = true,
@@ -1885,43 +1833,33 @@ static void up_pm_notify(struct pm_callback_s* cb, int domain, enum pm_state_e p
         };
 
         /* read the FIFO register */
-
         ret_reg = getreg32(priv0->uartbase + S32K1XX_LPUART_FIFO_OFFSET);
 
         /* make the value */
-
         ret_reg |= (LPUART_FIFO_RXFLUSH + LPUART_FIFO_TXFLUSH);
 
         /* write the new value */
-
         putreg32(ret_reg, priv0->uartbase + S32K1XX_LPUART_FIFO_OFFSET);
 
         /* shutdown the LPUART1 (soft reset) */
-
         s32k1xx_shutdown(&g_lpuart0priv);
 
         /* change the clock config for the new mode */
-
         s32k1xx_periphclocks(count, &clock_config0);
 
         /* shutdown the LPUART1 (soft reset) */
-
         s32k1xx_shutdown(&g_lpuart0priv);
 
         /* set up the LPUART1 again for the new mode */
-
         s32k1xx_setup(&g_lpuart0priv);
 
         /* enable the interrupts */
-
         s32k1xx_rxint(&g_lpuart0priv, true);
         s32k1xx_txint(&g_lpuart0priv, true);
+        #endif
 
-#endif
-#ifdef CONFIG_PM_SERIAL1
-
+        #ifdef CONFIG_PM_SERIAL1
         /* make the peripheral clock config struct */
-
         const struct peripheral_clock_config_s clock_config1 = {
             .clkname = LPUART1_CLK,
             .clkgate = true,
@@ -1931,43 +1869,33 @@ static void up_pm_notify(struct pm_callback_s* cb, int domain, enum pm_state_e p
         };
 
         /* read the FIFO register */
-
         ret_reg = getreg32(priv1->uartbase + S32K1XX_LPUART_FIFO_OFFSET);
 
         /* make the value */
-
         ret_reg |= (LPUART_FIFO_RXFLUSH + LPUART_FIFO_TXFLUSH);
 
         /* write the new value */
-
         putreg32(ret_reg, priv1->uartbase + S32K1XX_LPUART_FIFO_OFFSET);
 
         /* shutdown the LPUART1 (soft reset) */
-
         s32k1xx_shutdown(&g_lpuart1priv);
 
         /* change the clock config for the new mode */
-
         s32k1xx_periphclocks(count, &clock_config1);
 
         /* shutdown the LPUART1 (soft reset) */
-
         s32k1xx_shutdown(&g_lpuart1priv);
 
         /* set up the LPUART1 again for the new mode */
-
         s32k1xx_setup(&g_lpuart1priv);
 
         /* enable the interrupts */
-
         s32k1xx_rxint(&g_lpuart1priv, true);
         s32k1xx_txint(&g_lpuart1priv, true);
+        #endif
 
-#endif
-#ifdef CONFIG_PM_SERIAL2
-
+        #ifdef CONFIG_PM_SERIAL2
         /* make the peripheral clock config struct */
-
         const struct peripheral_clock_config_s clock_config2 = {
             .clkname = LPUART2_CLK,
             .clkgate = true,
@@ -1977,39 +1905,30 @@ static void up_pm_notify(struct pm_callback_s* cb, int domain, enum pm_state_e p
         };
 
         /* read the FIFO register */
-
         ret_reg = getreg32(priv2->uartbase + S32K1XX_LPUART_FIFO_OFFSET);
 
         /* make the value */
-
         ret_reg |= (LPUART_FIFO_RXFLUSH + LPUART_FIFO_TXFLUSH);
 
         /* write the new value */
-
         putreg32(ret_reg, priv2->uartbase + S32K1XX_LPUART_FIFO_OFFSET);
 
         /* shutdown the LPUART1 (soft reset) */
-
         s32k1xx_shutdown(&g_lpuart2priv);
 
         /* change the clock config for the new mode */
-
         s32k1xx_periphclocks(count, &clock_config2);
 
         /* shutdown the LPUART1 (soft reset) */
-
         s32k1xx_shutdown(&g_lpuart2priv);
 
         /* set up the LPUART1 again for the new mode */
-
         s32k1xx_setup(&g_lpuart2priv);
 
         /* enable the interrupts */
-
         s32k1xx_rxint(&g_lpuart2priv, true);
         s32k1xx_txint(&g_lpuart2priv, true);
-
-#endif
+        #endif
     }
 }
 #endif
@@ -2047,7 +1966,6 @@ static void up_pm_notify(struct pm_callback_s* cb, int domain, enum pm_state_e p
  *
  *
  ****************************************************************************/
-
 #ifdef CONFIG_PM
 static int up_pm_prepare(struct pm_callback_s* cb, int domain, enum pm_state_e pmstate) {
     /* Logic to prepare for a reduced power state goes here. */
@@ -2056,20 +1974,21 @@ static int up_pm_prepare(struct pm_callback_s* cb, int domain, enum pm_state_e p
 
     peripheral_clock_source_t clock_source;
 
-#ifdef CONFIG_PM_SERIAL0
+    #ifdef CONFIG_PM_SERIAL0
     struct s32k1xx_uart_s* priv0 = (struct s32k1xx_uart_s*)g_lpuart0priv.dev.priv;
-#endif
-#ifdef CONFIG_PM_SERIAL1
+    #endif
+
+    #ifdef CONFIG_PM_SERIAL1
     struct s32k1xx_uart_s* priv1 = (struct s32k1xx_uart_s*)g_lpuart1priv.dev.priv;
-#endif
-#ifdef CONFIG_PM_SERIAL2
+    #endif
+
+    #ifdef CONFIG_PM_SERIAL2
     struct s32k1xx_uart_s* priv2 = (struct s32k1xx_uart_s*)g_lpuart2priv.dev.priv;
-#endif
+    #endif
 
     uint32_t ret_reg = 0;
 
     /* check if the transition to the mode is already done */
-
     if (pm_querystate(PM_IDLE_DOMAIN) == pmstate) {
         /* return */
 
@@ -2077,38 +1996,32 @@ static int up_pm_prepare(struct pm_callback_s* cb, int domain, enum pm_state_e p
     }
 
     /* check which PM it is  */
-
     switch (pmstate) {
             /* in case it needs to prepare for VLPR mode */
-
         case PM_STANDBY : {
             /* Logic for PM_STANDBY goes here */
 
             /* set the right clock source */
-
             clock_source = CLK_SRC_SIRC_DIV2;
         } break;
 
             /* in case it needs to prepare for sleep mode */
-
         case PM_SLEEP : {
             /* Logic for PM_SLEEP goes here */
 
             /* set the right clock source */
-
             clock_source = CLK_SRC_SIRC_DIV2;
         } break;
+
         default : {
             /* don't do anything, just return OK */
-
             return OK;
         } break;
     }
 
-#ifdef CONFIG_PM_SERIAL0
+    #ifdef CONFIG_PM_SERIAL0
 
     /* make the peripheral clock config struct */
-
     const struct peripheral_clock_config_s clock_config0 = {
         .clkname = LPUART0_CLK,
         .clkgate = true,
@@ -2118,43 +2031,33 @@ static int up_pm_prepare(struct pm_callback_s* cb, int domain, enum pm_state_e p
     };
 
     /* read the FIFO register */
-
     ret_reg = getreg32(priv0->uartbase + S32K1XX_LPUART_FIFO_OFFSET);
 
     /* make the value */
-
     ret_reg |= (LPUART_FIFO_RXFLUSH + LPUART_FIFO_TXFLUSH);
 
     /* write the new value */
-
     putreg32(ret_reg, priv0->uartbase + S32K1XX_LPUART_FIFO_OFFSET);
 
     /* shutdown the LPUART1 (soft reset) */
-
     s32k1xx_shutdown(&g_lpuart0priv);
 
     /* change the clock config for the new mode */
-
     s32k1xx_periphclocks(count, &clock_config0);
 
     /* shutdown the LPUART1 (soft reset) */
-
     s32k1xx_shutdown(&g_lpuart0priv);
 
     /* set up the LPUART1 again for the new mode */
-
     s32k1xx_setup(&g_lpuart0priv);
 
     /* enable the interrupts */
-
     s32k1xx_rxint(&g_lpuart0priv, true);
     s32k1xx_txint(&g_lpuart0priv, true);
+    #endif
 
-#endif
-#ifdef CONFIG_PM_SERIAL1
-
+    #ifdef CONFIG_PM_SERIAL1
     /* make the peripheral clock config struct */
-
     const struct peripheral_clock_config_s clock_config1 = {
         .clkname = LPUART1_CLK,
         .clkgate = true,
@@ -2164,43 +2067,33 @@ static int up_pm_prepare(struct pm_callback_s* cb, int domain, enum pm_state_e p
     };
 
     /* read the FIFO register */
-
     ret_reg = getreg32(priv1->uartbase + S32K1XX_LPUART_FIFO_OFFSET);
 
     /* make the value */
-
     ret_reg |= (LPUART_FIFO_RXFLUSH + LPUART_FIFO_TXFLUSH);
 
     /* write the new value */
-
     putreg32(ret_reg, priv1->uartbase + S32K1XX_LPUART_FIFO_OFFSET);
 
     /* shutdown the LPUART1 (soft reset) */
-
     s32k1xx_shutdown(&g_lpuart1priv);
 
     /* change the clock config for the new mode */
-
     s32k1xx_periphclocks(count, &clock_config1);
 
     /* shutdown the LPUART1 (soft reset) */
-
     s32k1xx_shutdown(&g_lpuart1priv);
 
     /* set up the LPUART1 again for the new mode */
-
     s32k1xx_setup(&g_lpuart1priv);
 
     /* enable the interrupts */
-
     s32k1xx_rxint(&g_lpuart1priv, true);
     s32k1xx_txint(&g_lpuart1priv, true);
+    #endif
 
-#endif
-#ifdef CONFIG_PM_SERIAL2
-
+    #ifdef CONFIG_PM_SERIAL2
     /* make the peripheral clock config struct */
-
     const struct peripheral_clock_config_s clock_config2 = {
         .clkname = LPUART2_CLK,
         .clkgate = true,
@@ -2210,41 +2103,32 @@ static int up_pm_prepare(struct pm_callback_s* cb, int domain, enum pm_state_e p
     };
 
     /* read the FIFO register */
-
     ret_reg = getreg32(priv2->uartbase + S32K1XX_LPUART_FIFO_OFFSET);
 
     /* make the value */
-
     ret_reg |= (LPUART_FIFO_RXFLUSH + LPUART_FIFO_TXFLUSH);
 
     /* write the new value */
-
     putreg32(ret_reg, priv2->uartbase + S32K1XX_LPUART_FIFO_OFFSET);
 
     /* shutdown the LPUART1 (soft reset) */
-
     s32k1xx_shutdown(&g_lpuart2priv);
 
     /* change the clock config for the new mode */
-
     s32k1xx_periphclocks(count, &clock_config2);
 
     /* shutdown the LPUART1 (soft reset) */
-
     s32k1xx_shutdown(&g_lpuart2priv);
 
     /* set up the LPUART1 again for the new mode */
-
     s32k1xx_setup(&g_lpuart2priv);
 
     /* enable the interrupts */
-
     s32k1xx_rxint(&g_lpuart2priv, true);
     s32k1xx_txint(&g_lpuart2priv, true);
+    #endif
 
-#endif
-
-    return OK;
+    return (OK);
 }
 #endif
 
@@ -2261,7 +2145,6 @@ static int up_pm_prepare(struct pm_callback_s* cb, int domain, enum pm_state_e p
  *   before arm_serialinit.
  *
  ****************************************************************************/
-
 void s32k1xx_earlyserialinit(void) {
     /* NOTE: This function assumes that low level hardware configuration
      * -- including all clocking and pin configuration -- was performed by the
@@ -2271,11 +2154,10 @@ void s32k1xx_earlyserialinit(void) {
     /* Enable the console UART.  The other UARTs will be initialized if and
      * when they are first opened.
      */
-
-#ifdef CONSOLE_DEV
+    #ifdef CONSOLE_DEV
     CONSOLE_DEV.dev.isconsole = true;
     s32k1xx_setup(&CONSOLE_DEV.dev);
-#endif
+    #endif
 }
 
 /****************************************************************************
@@ -2287,32 +2169,32 @@ void s32k1xx_earlyserialinit(void) {
  *
  ****************************************************************************/
 void arm_serialinit(void) {
-#ifdef CONFIG_PM
-#if defined(CONFIG_PM_SERIAL_STANDBY) || defined(CONFIG_PM_SERIAL_SLEEP)
+    #ifdef CONFIG_PM
+    #if defined(CONFIG_PM_SERIAL_STANDBY) || defined(CONFIG_PM_SERIAL_SLEEP)
     int ret;
 
     /* Register to receive power management callbacks */
     ret = pm_register(&g_serial_pmcb);
     DEBUGASSERT(ret == OK);
     UNUSED(ret);
-#endif
-#endif
+    #endif
+    #endif
 
-#ifdef CONSOLE_DEV
+    #ifdef CONSOLE_DEV
     uart_register("/dev/console", &CONSOLE_DEV.dev);
-#if defined(SERIAL_HAVE_CONSOLE_DMA)
+    #if defined(SERIAL_HAVE_CONSOLE_DMA)
     s32k1xx_dma_setup(&CONSOLE_DEV.dev);
-#endif
-#endif
+    #endif
+    #endif
 
     /* Register all UARTs */
     uart_register("/dev/ttyS0", &TTYS0_DEV.dev);
-#ifdef TTYS1_DEV
+    #ifdef TTYS1_DEV
     uart_register("/dev/ttyS1", &TTYS1_DEV.dev);
-#endif
-#ifdef TTYS2_DEV
+    #endif
+    #ifdef TTYS2_DEV
     uart_register("/dev/ttyS2", &TTYS2_DEV.dev);
-#endif
+    #endif
 }
 
 struct device* arm_get_serial_dev(uint8_t uart_no) {
@@ -2349,33 +2231,29 @@ struct device* arm_get_serial_dev(uint8_t uart_no) {
  * Name: up_putc
  *
  * Description:
- *   Provide priority, low-level access to support OS debug  writes
+ *   Provide priority, low-level access to support OS debug writes
  *
  ****************************************************************************/
 int up_putc(int ch) {
-#ifdef CONSOLE_DEV
+    #ifdef CONSOLE_DEV
     struct s32k1xx_uart_s* priv = (struct s32k1xx_uart_s*)CONSOLE_DEV.dev.priv;
-    uint32_t               ie;
+    uint32_t ie;
 
     s32k1xx_disableuartint(priv, &ie);
 
     /* Check for LF */
-
     if (ch == '\n') {
         /* Add CR */
-
         s32k1xx_lowputc('\r');
     }
 
     s32k1xx_lowputc(ch);
     s32k1xx_restoreuartint(priv, ie);
-#endif
+    #endif
 
     return ch;
 }
-
 #else /* USE_SERIALDRIVER */
-
 /****************************************************************************
  * Name: up_putc
  *
@@ -2384,17 +2262,15 @@ int up_putc(int ch) {
  *
  ****************************************************************************/
 int up_putc(int ch) {
-#if CONSOLE_LPUART > 0
+    #if (CONSOLE_LPUART > 0)
     /* Check for LF */
-
     if (ch == '\n') {
         /* Add CR */
-
         arm_lowputc('\r');
     }
 
     arm_lowputc(ch);
-#endif
+    #endif
 
     return ch;
 }

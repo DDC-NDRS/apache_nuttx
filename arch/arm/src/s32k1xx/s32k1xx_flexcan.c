@@ -53,13 +53,13 @@
 #include <arch/board/board.h>
 
 #include <sys/time.h>
+#include <zephyr/sys/util_macro.h>          /* IS_ENABLED */
 
 #ifdef CONFIG_S32K1XX_FLEXCAN
 
 /****************************************************************************
  * Pre-processor Definitions
  ****************************************************************************/
-
 /* If processing is not done at the interrupt level, then work queue support
  * is required.
  */
@@ -124,6 +124,19 @@
 
 static int peak_tx_mailbox_index_ = 0;
 
+/* @see Table 55-1. FlexCAN instances and features in S32K1XX reference manual */
+#if (IS_ENABLED(CONFIG_ARCH_CHIP_S32K142) || IS_ENABLED(CONFIG_ARCH_CHIP_S32K144))
+#define FLEXCAN1_HAS_16MB       TRUE
+#else /* CONFIG_ARCH_CHIP_S32K146 */
+#define FLEXCAN1_HAS_16MB       FALSE
+#endif
+
+#if (IS_ENABLED(CONFIG_ARCH_CHIP_S32K144) || IS_ENABLED(CONFIG_ARCH_CHIP_S32K146))
+#define FLEXCAN2_HAS_16MB       TRUE
+#else /* CONFIG_ARCH_CHIP_S32K146 */
+#define FLEXCAN2_HAS_16MB       FALSE
+#endif
+
 /****************************************************************************
  * Private Types
  ****************************************************************************/
@@ -177,7 +190,7 @@ struct mb_s {
     #ifdef CONFIG_NET_CAN_CANFD
     union data_e data[16];
     #else
-    union data_e      data[2];
+    union data_e data[2];
     #endif
 };
 
@@ -216,8 +229,8 @@ struct flexcan_timeseg {
 /* FlexCAN device structures */
 #ifdef CONFIG_S32K1XX_FLEXCAN0
 static const struct flexcan_config_s s32k1xx_flexcan0_config = {
-    .tx_pin = PIN_CAN0_TX,
-    .rx_pin = PIN_CAN0_RX,
+    .tx_pin      = PIN_CAN0_TX,
+    .rx_pin      = PIN_CAN0_RX,
     #ifdef PIN_CAN0_ENABLE
     .enable_pin  = PIN_CAN0_ENABLE,
     .enable_high = CAN0_ENABLE_OUT,
@@ -225,17 +238,17 @@ static const struct flexcan_config_s s32k1xx_flexcan0_config = {
     .enable_pin  = 0,
     .enable_high = 0,
     #endif
-    .bus_irq   = S32K1XX_IRQ_CAN0_BUS,
-    .error_irq = S32K1XX_IRQ_CAN0_ERROR,
-    .lprx_irq  = S32K1XX_IRQ_CAN0_LPRX,
-    .mb_irq    = S32K1XX_IRQ_CAN0_0_15,
+    .bus_irq     = S32K1XX_IRQ_CAN0_BUS,
+    .error_irq   = S32K1XX_IRQ_CAN0_ERROR,
+    .lprx_irq    = S32K1XX_IRQ_CAN0_LPRX,
+    .mb_irq      = S32K1XX_IRQ_CAN0_0_15,
 };
 #endif
 
 #ifdef CONFIG_S32K1XX_FLEXCAN1
 static const struct flexcan_config_s s32k1xx_flexcan1_config = {
-    .tx_pin = PIN_CAN1_TX,
-    .rx_pin = PIN_CAN1_RX,
+    .tx_pin      = PIN_CAN1_TX,
+    .rx_pin      = PIN_CAN1_RX,
     #ifdef PIN_CAN1_ENABLE
     .enable_pin  = PIN_CAN1_ENABLE,
     .enable_high = CAN1_ENABLE_OUT,
@@ -243,28 +256,28 @@ static const struct flexcan_config_s s32k1xx_flexcan1_config = {
     .enable_pin  = 0,
     .enable_high = 0,
     #endif
-    .bus_irq   = S32K1XX_IRQ_CAN1_BUS,
-    .error_irq = S32K1XX_IRQ_CAN1_ERROR,
-    .lprx_irq  = 0,
-    .mb_irq    = S32K1XX_IRQ_CAN1_0_15,
+    .bus_irq     = S32K1XX_IRQ_CAN1_BUS,
+    .error_irq   = S32K1XX_IRQ_CAN1_ERROR,
+    .lprx_irq    = 0,
+    .mb_irq      = S32K1XX_IRQ_CAN1_0_15,
 };
 #endif
 
 #ifdef CONFIG_S32K1XX_FLEXCAN2
 static const struct flexcan_config_s s32k1xx_flexcan2_config = {
-    .tx_pin = PIN_CAN2_TX,
-    .rx_pin = PIN_CAN2_RX,
+    .tx_pin     = PIN_CAN2_TX,
+    .rx_pin     = PIN_CAN2_RX,
     #ifdef PIN_CAN2_ENABLE
     .enable_pin = PIN_CAN2_ENABLE,
     .rx_pin     = CAN2_ENABLE_HIGH,
     #else
-    .enable_pin  = 0,
-    .rx_pin      = 0,
+    .enable_pin = 0,
+    .rx_pin     = 0,
     #endif
-    .bus_irq   = S32K1XX_IRQ_CAN2_BUS,
-    .error_irq = S32K1XX_IRQ_CAN2_ERROR,
-    .lprx_irq  = 0,
-    .mb_irq    = S32K1XX_IRQ_CAN2_0_15,
+    .bus_irq    = S32K1XX_IRQ_CAN2_BUS,
+    .error_irq  = S32K1XX_IRQ_CAN2_ERROR,
+    .lprx_irq   = 0,
+    .mb_irq     = S32K1XX_IRQ_CAN2_0_15,
 };
 #endif
 
@@ -437,16 +450,17 @@ uint32_t s32k1xx_bitratetotimeseg(struct flexcan_timeseg* timeseg, int32_t sp_to
                 else {
                     timeseg->propseg = tmppropseg;
                 }
+
                 timeseg->pseg1   = tmppseg1;
                 timeseg->pseg2   = tmppseg2;
                 timeseg->presdiv = tmppresdiv;
                 timeseg->samplep = tmpsample;
-                return 1;
+                return (1);
             }
         }
     }
 
-    return 0;
+    return (0);
 }
 
 /* Common TX logic */
@@ -1353,7 +1367,6 @@ static int s32k1xx_ioctl(struct net_driver_s* dev, int cmd, unsigned long arg) {
  ****************************************************************************/
 static int /**/s32k1xx_initialize(struct s32k1xx_driver_s* priv) {
     uint32_t regval;
-    uint32_t i;
 
     /* initialize CAN device */
     s32k1xx_setenable(priv->base, 0);
@@ -1376,8 +1389,8 @@ static int /**/s32k1xx_initialize(struct s32k1xx_driver_s* priv) {
 
     /* Reset CTRL1 register to reset value */
     regval  = getreg32(priv->base + S32K1XX_CAN_CTRL1_OFFSET);
-    regval &= ~(CAN_CTRL1_LOM | CAN_CTRL1_LBUF | CAN_CTRL1_TSYN | CAN_CTRL1_BOFFREC | CAN_CTRL1_SMP |
-                CAN_CTRL1_RWRNMSK | CAN_CTRL1_TWRNMSK | CAN_CTRL1_LPB | CAN_CTRL1_ERRMSK | CAN_CTRL1_BOFFMSK);
+    regval &= ~(CAN_CTRL1_LOM     | CAN_CTRL1_LBUF    | CAN_CTRL1_TSYN | CAN_CTRL1_BOFFREC | CAN_CTRL1_SMP |
+                CAN_CTRL1_RWRNMSK | CAN_CTRL1_TWRNMSK | CAN_CTRL1_LPB  | CAN_CTRL1_ERRMSK  | CAN_CTRL1_BOFFMSK);
     putreg32(regval, priv->base + S32K1XX_CAN_CTRL1_OFFSET);
 
     #ifndef CONFIG_NET_CAN_CANFD
@@ -1441,19 +1454,32 @@ static int /**/s32k1xx_initialize(struct s32k1xx_driver_s* priv) {
 
     putreg32(0x0, priv->base + S32K1XX_CAN_RXFGMASK_OFFSET);
 
-    for (i = 0; i < S32K1XX_CAN_RXIMR_COUNT; i++) {
+    uint32_t rximr_cnt;
+    if ((FLEXCAN1_HAS_16MB == TRUE) &&
+        (priv->base == S32K1XX_FLEXCAN1_BASE)) {
+        rximr_cnt = (S32K1XX_CAN_RXIMR_COUNT / 2U);             /* 16 MBs */
+    }
+    else if ((FLEXCAN2_HAS_16MB == TRUE) &&
+        (priv->base == S32K1XX_FLEXCAN2_BASE)) {
+        rximr_cnt = (S32K1XX_CAN_RXIMR_COUNT / 2U);             /* 16 MBs */
+    }
+    else {
+        rximr_cnt = S32K1XX_CAN_RXIMR_COUNT;                    /* 32 MBs */
+    }
+
+    for (uint32_t i = 0U; i < rximr_cnt; i++) {
         putreg32(0, priv->base + S32K1XX_CAN_RXIMR_OFFSET(i));
     }
 
-    for (i = 0; i < RXMBCOUNT; i++) {
+    for (uint32_t i = 0U; i < RXMBCOUNT; i++) {
         ninfo("Set MB%" PRIu32 " to receive %p\n", i, &priv->rx[i]);
-        priv->rx[i].cs.edl  = 0x1;
-        priv->rx[i].cs.brs  = 0x1;
-        priv->rx[i].cs.esi  = 0x0;
+        priv->rx[i].cs.edl  = 0x01;
+        priv->rx[i].cs.brs  = 0x01;
+        priv->rx[i].cs.esi  = 0x00;
         priv->rx[i].cs.code = 4;
-        priv->rx[i].cs.srr  = 0x0;
-        priv->rx[i].cs.ide  = 0x1;
-        priv->rx[i].cs.rtr  = 0x0;
+        priv->rx[i].cs.srr  = 0x00;
+        priv->rx[i].cs.ide  = 0x01;
+        priv->rx[i].cs.rtr  = 0x00;
     }
 
     putreg32(IFLAG1_RX, priv->base + S32K1XX_CAN_IFLAG1_OFFSET);
@@ -1463,10 +1489,10 @@ static int /**/s32k1xx_initialize(struct s32k1xx_driver_s* priv) {
     s32k1xx_setfreeze(priv->base, 0);
     if (!s32k1xx_waitfreezeack_change(priv->base, 0)) {
         ninfo("FLEXCAN: unfreeze fail\n");
-        return -1;
+        return (-1);
     }
 
-    return 1;
+    return (1);
 }
 
 /****************************************************************************

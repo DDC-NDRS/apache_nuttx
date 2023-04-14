@@ -491,7 +491,6 @@ static inline void s32k1xx_lpspi_write_dword(struct s32k1xx_lpspidev_s* priv, ui
  *   value: frame size
  *
  ****************************************************************************/
-
 static inline uint16_t s32k1xx_lpspi_9to16bitmode(struct s32k1xx_lpspidev_s* priv) {
     uint16_t ret;
 
@@ -515,7 +514,6 @@ static inline uint16_t s32k1xx_lpspi_9to16bitmode(struct s32k1xx_lpspidev_s* pri
  *   None
  *
  ****************************************************************************/
-
 static void s32k1xx_lpspi_modifyreg32(struct s32k1xx_lpspidev_s* priv, uint8_t offset, uint32_t clrbits,
                                       uint32_t setbits) {
     modifyreg32(priv->spibase + offset, clrbits, setbits);
@@ -535,44 +533,42 @@ static void s32k1xx_lpspi_modifyreg32(struct s32k1xx_lpspidev_s* priv, uint8_t o
  *   (or zero on a failure)
  *
  ****************************************************************************/
-
 static uint32_t s32k1xx_lpspi_pckfreq(uintptr_t base) {
     enum clock_names_e clkname;
-    uint32_t           pccclk;
-    int                ret;
+    uint32_t pccclk;
+    int ret;
 
     /* Get the PCC source clock */
-
-#ifdef CONFIG_S32K1XX_LPSPI0
+    #ifdef CONFIG_S32K1XX_LPSPI0
     if (base == S32K1XX_LPSPI0_BASE) {
         clkname = LPSPI0_CLK;
     }
     else
-#endif
-#ifdef CONFIG_S32K1XX_LPSPI1
-        if (base == S32K1XX_LPSPI1_BASE) {
+    #endif
+    #ifdef CONFIG_S32K1XX_LPSPI1
+    if (base == S32K1XX_LPSPI1_BASE) {
         clkname = LPSPI1_CLK;
     }
     else
-#endif
-#ifdef CONFIG_S32K1XX_LPSPI2
+    #endif
+    #ifdef CONFIG_S32K1XX_LPSPI2
         if (base == S32K1XX_LPSPI2_BASE) {
         clkname = LPSPI2_CLK;
     }
     else
-#endif
+    #endif
     {
         DEBUGPANIC();
-        return -EINVAL;
+        return (-EINVAL);
     }
 
     ret = s32k1xx_get_pclkfreq(clkname, &pccclk);
     DEBUGASSERT(ret >= 0);
     if (ret < 0) {
-        return 0;
+        return (0);
     }
 
-    return pccclk;
+    return (pccclk);
 }
 
 /****************************************************************************
@@ -590,7 +586,6 @@ static uint32_t s32k1xx_lpspi_pckfreq(uintptr_t base) {
  *   None
  *
  ****************************************************************************/
-
 static inline void s32k1xx_lpspi_set_delay_scaler(struct s32k1xx_lpspidev_s* priv, uint32_t scaler,
                                                   enum s32k1xx_delay_e type) {
     switch (type) {
@@ -626,7 +621,6 @@ static inline void s32k1xx_lpspi_set_delay_scaler(struct s32k1xx_lpspidev_s* pri
  *   None
  *
  ****************************************************************************/
-
 static inline void s32k1xx_lpspi_set_delays(struct s32k1xx_lpspidev_s* priv, uint32_t delay_ns,
                                             enum s32k1xx_delay_e type) {
     uint32_t inclock;
@@ -640,21 +634,18 @@ static inline void s32k1xx_lpspi_set_delays(struct s32k1xx_lpspidev_s* priv, uin
     uint32_t additional_scaler;
 
     /* Get the frequency of the LPSPI functional input clock */
-
     inclock = s32k1xx_lpspi_pckfreq(priv->spibase);
     DEBUGASSERT(inclock != 0);
 
     /* Get the pre-scaled input clock */
-
     clock_div_prescaler =
         inclock / (1 << ((s32k1xx_lpspi_getreg32(priv, S32K1XX_LPSPI_TCR_OFFSET) & LPSPI_TCR_PRESCALE_MASK) >>
                          LPSPI_TCR_PRESCALE_SHIFT));
 
-    min_diff = 0xffffffff;
+    min_diff = 0xFFFFFFFF;
 
     /* Initialize scaler to max value to generate the max delay */
-
-    best_scaler = 0xff;
+    best_scaler = 0xFF;
 
     if (type == LPSPI_BETWEEN_TRANSFER) {
         /* First calculate the initial, default delay, note min delay is 2
@@ -662,7 +653,6 @@ static inline void s32k1xx_lpspi_set_delays(struct s32k1xx_lpspidev_s* priv, uin
          * we need to break up the calculation into several steps to ensure
          * accurate calculated results
          */
-
         initial_delay_ns = 1000000000U;
         initial_delay_ns *= 2;
         initial_delay_ns /= clock_div_prescaler;
@@ -675,7 +665,6 @@ static inline void s32k1xx_lpspi_set_delays(struct s32k1xx_lpspidev_s* priv, uin
          * break up the calculation into several steps to ensure accurate
          * calculated * results.
          */
-
         initial_delay_ns = 1000000000U;
         initial_delay_ns /= clock_div_prescaler;
 
@@ -686,7 +675,6 @@ static inline void s32k1xx_lpspi_set_delays(struct s32k1xx_lpspidev_s* priv, uin
      * then * set the delay to their initial value (0) and return the delay. In
      * other words, * there is no way to decrease the delay value further.
      */
-
     if (initial_delay_ns >= delay_ns) {
         s32k1xx_lpspi_set_delay_scaler(priv, 0, type);
     }
@@ -699,7 +687,6 @@ static inline void s32k1xx_lpspi_set_delays(struct s32k1xx_lpspidev_s* priv, uin
              * we need to break up the calculation into several steps to ensure
              * accurate calculated results
              */
-
             real_delay = 1000000000U;
             real_delay *= (scaler + 1 + additional_scaler);
             real_delay /= clock_div_prescaler;
@@ -708,12 +695,10 @@ static inline void s32k1xx_lpspi_set_delays(struct s32k1xx_lpspidev_s* priv, uin
              * statement that states that the calculated delay must not be less
              * then the desired delay
              */
-
             if (real_delay >= delay_ns) {
                 diff = real_delay - delay_ns;
                 if (min_diff > diff) {
                     /* A better match found */
-
                     min_diff    = diff;
                     best_scaler = scaler;
                 }
@@ -744,13 +729,11 @@ static inline void s32k1xx_lpspi_set_delays(struct s32k1xx_lpspidev_s* priv, uin
  *   None
  *
  ****************************************************************************/
-
 static int s32k1xx_lpspi_lock(struct spi_dev_s* dev, bool lock) {
     struct s32k1xx_lpspidev_s* priv = (struct s32k1xx_lpspidev_s*)dev;
-    int                        ret;
+    int ret;
 
     /* It could be that this needs to be disabled for low level debugging */
-
     if (lock) {
         ret = nxmutex_lock(&priv->lock);
     }
@@ -758,7 +741,7 @@ static int s32k1xx_lpspi_lock(struct spi_dev_s* dev, bool lock) {
         ret = nxmutex_unlock(&priv->lock);
     }
 
-    return ret;
+    return (ret);
 }
 
 #ifdef CONFIG_S32K1XX_LPSPI_HWPCS
@@ -779,16 +762,13 @@ static int s32k1xx_lpspi_lock(struct spi_dev_s* dev, bool lock) {
  *   None
  *
  ****************************************************************************/
-
 static void s32k1xx_lpspi_select(struct spi_dev_s* dev, uint32_t devid, bool selected) {
     struct s32k1xx_lpspidev_s* priv = (struct s32k1xx_lpspidev_s*)dev;
 
     /* LPSPI on S32K1XX supports PCS 0-3 */
-
     DEBUGASSERT(SPIDEVID_INDEX(devid) <= 3);
 
     /* Has the Peripheral Chip Select changed? */
-
     if (devid != priv->pcs) {
         s32k1xx_lpspi_modifyreg32(priv, S32K1XX_LPSPI_TCR_OFFSET, LPSPI_TCR_PCS_MASK,
                                   LPSPI_TCR_PCS(SPIDEVID_INDEX(devid)));
@@ -813,10 +793,8 @@ static void s32k1xx_lpspi_select(struct spi_dev_s* dev, uint32_t devid, bool sel
  *   Returns the actual frequency selected
  *
  ****************************************************************************/
-
 static uint32_t s32k1xx_lpspi_setfrequency(struct spi_dev_s* dev, uint32_t frequency) {
     struct s32k1xx_lpspidev_s* priv = (struct s32k1xx_lpspidev_s*)dev;
-
     uint32_t men;
     uint32_t inclock;
     uint32_t prescaler;
@@ -829,21 +807,18 @@ static uint32_t s32k1xx_lpspi_setfrequency(struct spi_dev_s* dev, uint32_t frequ
     uint32_t min_diff;
 
     /* Has the LPSPI bus frequency changed? */
-
     if (frequency != priv->frequency) {
         /* Disable LPSPI if it is enabled */
-
         men = s32k1xx_lpspi_getreg32(priv, S32K1XX_LPSPI_CR_OFFSET) & LPSPI_CR_MEN;
         if (men) {
             s32k1xx_lpspi_modifyreg32(priv, S32K1XX_LPSPI_CR_OFFSET, LPSPI_CR_MEN, 0);
         }
 
         /* Get the frequency of the LPSPI functional input clock */
-
         inclock = s32k1xx_lpspi_pckfreq(priv->spibase);
         DEBUGASSERT(inclock != 0);
 
-        min_diff       = 0xffffffff;
+        min_diff       = 0xFFFFFFFF;
         best_prescaler = 7;
         best_scaler    = 255;
         best_frequency = 0;
@@ -856,12 +831,10 @@ static uint32_t s32k1xx_lpspi_setfrequency(struct spi_dev_s* dev, uint32_t frequ
                  * statement that states that the calculated frequency must not
                  * exceed desired frequency.
                  */
-
                 if (frequency >= real_frequency) {
                     diff = frequency - real_frequency;
                     if (min_diff > diff) {
                         /* A better match found */
-
                         min_diff       = diff;
                         best_prescaler = prescaler;
                         best_scaler    = scaler;
@@ -872,7 +845,6 @@ static uint32_t s32k1xx_lpspi_setfrequency(struct spi_dev_s* dev, uint32_t frequ
         }
 
         /* Write the best values in the CCR register */
-
         s32k1xx_lpspi_modifyreg32(priv, S32K1XX_LPSPI_TCR_OFFSET, LPSPI_TCR_PRESCALE_MASK,
                                   LPSPI_TCR_PRESCALE(best_prescaler));
 
@@ -886,13 +858,12 @@ static uint32_t s32k1xx_lpspi_setfrequency(struct spi_dev_s* dev, uint32_t frequ
         s32k1xx_lpspi_modifyreg32(priv, S32K1XX_LPSPI_CCR_OFFSET, LPSPI_CCR_SCKDIV_MASK, LPSPI_CCR_SCKDIV(best_scaler));
 
         /* Re-enable LPSPI if it was enabled previously */
-
         if (men) {
             s32k1xx_lpspi_modifyreg32(priv, S32K1XX_LPSPI_CR_OFFSET, 0, LPSPI_CR_MEN);
         }
     }
 
-    return priv->actual;
+    return (priv->actual);
 }
 
 /****************************************************************************
@@ -909,20 +880,17 @@ static uint32_t s32k1xx_lpspi_setfrequency(struct spi_dev_s* dev, uint32_t frequ
  *   none
  *
  ****************************************************************************/
-
 static void s32k1xx_lpspi_setmode(struct spi_dev_s* dev, enum spi_mode_e mode) {
     struct s32k1xx_lpspidev_s* priv = (struct s32k1xx_lpspidev_s*)dev;
-    uint32_t                   setbits;
-    uint32_t                   clrbits;
-    uint32_t                   men;
+    uint32_t setbits;
+    uint32_t clrbits;
+    uint32_t men;
 
     spiinfo("mode=%d\n", mode);
 
     /* Has the mode changed? */
-
     if (mode != priv->mode) {
         /* Disable LPSPI if it is enabled */
-
         men = s32k1xx_lpspi_getreg32(priv, S32K1XX_LPSPI_CR_OFFSET) & LPSPI_CR_MEN;
         if (men) {
             s32k1xx_lpspi_modifyreg32(priv, S32K1XX_LPSPI_CR_OFFSET, LPSPI_CR_MEN, 0);
@@ -957,16 +925,13 @@ static void s32k1xx_lpspi_setmode(struct spi_dev_s* dev, enum spi_mode_e mode) {
 
         while ((s32k1xx_lpspi_getreg32(priv, S32K1XX_LPSPI_RSR_OFFSET) & LPSPI_RSR_RXEMPTY) != LPSPI_RSR_RXEMPTY) {
             /* Flush SPI read FIFO */
-
             s32k1xx_lpspi_getreg32(priv, S32K1XX_LPSPI_RSR_OFFSET);
         }
 
         /* Save the mode so that subsequent re-configurations will be faster */
-
         priv->mode = mode;
 
         /* Re-enable LPSPI if it was enabled previously */
-
         if (men) {
             s32k1xx_lpspi_modifyreg32(priv, S32K1XX_LPSPI_CR_OFFSET, 0, LPSPI_CR_MEN);
         }
@@ -987,30 +952,27 @@ static void s32k1xx_lpspi_setmode(struct spi_dev_s* dev, enum spi_mode_e mode) {
  *   None
  *
  ****************************************************************************/
-
 static void s32k1xx_lpspi_setbits(struct spi_dev_s* dev, int nbits) {
     struct s32k1xx_lpspidev_s* priv = (struct s32k1xx_lpspidev_s*)dev;
-    uint32_t                   regval;
-    uint32_t                   men;
-    int                        savbits = nbits;
+    uint32_t regval;
+    uint32_t men;
+    int      savbits = nbits;
 
     spiinfo("nbits=%d\n", nbits);
 
     /* Has the number of bits changed? */
-
     if (nbits != priv->nbits) {
         if (nbits < 2 || nbits > 4096) {
             return;
         }
 
         /* Disable LPSPI if it is enabled */
-
         men = s32k1xx_lpspi_getreg32(priv, S32K1XX_LPSPI_CR_OFFSET) & LPSPI_CR_MEN;
         if (men) {
             s32k1xx_lpspi_modifyreg32(priv, S32K1XX_LPSPI_CR_OFFSET, LPSPI_CR_MEN, 0);
         }
 
-        regval = s32k1xx_lpspi_getreg32(priv, S32K1XX_LPSPI_TCR_OFFSET);
+        regval  = s32k1xx_lpspi_getreg32(priv, S32K1XX_LPSPI_TCR_OFFSET);
         regval &= ~LPSPI_TCR_FRAMESZ_MASK;
         regval |= LPSPI_TCR_FRAMESZ(nbits - 1);
 
@@ -1019,12 +981,10 @@ static void s32k1xx_lpspi_setbits(struct spi_dev_s* dev, int nbits) {
         /* Save the selection so that subsequent re-configurations will
          * be faster.
          */
-
         priv->nbits = savbits; /* nbits has been clobbered... save the signed
                                 * value. */
 
         /* Re-enable LPSPI if it was enabled previously */
-
         if (men) {
             s32k1xx_lpspi_modifyreg32(priv, S32K1XX_LPSPI_CR_OFFSET, 0, LPSPI_CR_MEN);
         }
@@ -1046,19 +1006,17 @@ static void s32k1xx_lpspi_setbits(struct spi_dev_s* dev, int nbits) {
  *   value if any H/W feature is not supportable.
  *
  ****************************************************************************/
-
 #ifdef CONFIG_SPI_HWFEATURES
 static int s32k1xx_lpspi_hwfeatures(struct spi_dev_s* dev, spi_hwfeatures_t features) {
 #ifdef CONFIG_SPI_BITORDER
     struct s32k1xx_lpspidev_s* priv = (struct s32k1xx_lpspidev_s*)dev;
-    uint32_t                   setbits;
-    uint32_t                   clrbits;
-    int                        savbits = nbits;
+    uint32_t setbits;
+    uint32_t clrbits;
+    int      savbits = nbits;
 
     spiinfo("features=%08x\n", features);
 
     /* Transfer data LSB first? */
-
     if ((features & HWFEAT_LSBFIRST) != 0) {
         setbits = LPSPI_TCR_LSBF;
         clrbits = 0;
@@ -1071,11 +1029,10 @@ static int s32k1xx_lpspi_hwfeatures(struct spi_dev_s* dev, spi_hwfeatures_t feat
     s32k1xx_lpspi_modifyreg32(priv, S32K1XX_LPSPI_TCR_OFFSET, clrbits, setbits);
 
     /* Other H/W features are not supported */
-
     return ((features & ~HWFEAT_LSBFIRST) == 0) ? OK : -ENOSYS;
-#else
+    #else
     return -ENOSYS;
-#endif
+    #endif
 }
 #endif
 
@@ -1094,25 +1051,24 @@ static int s32k1xx_lpspi_hwfeatures(struct spi_dev_s* dev, spi_hwfeatures_t feat
  *   response
  *
  ****************************************************************************/
-
 static uint32_t s32k1xx_lpspi_send(struct spi_dev_s* dev, uint32_t wd) {
     struct s32k1xx_lpspidev_s* priv = (struct s32k1xx_lpspidev_s*)dev;
-    uint32_t                   regval;
-    uint32_t                   ret;
+    uint32_t regval;
+    uint32_t ret;
 
     DEBUGASSERT(priv && priv->spibase);
 
     s32k1xx_lpspi_writeword(priv, wd);
 
-    while ((s32k1xx_lpspi_getreg32(priv, S32K1XX_LPSPI_SR_OFFSET) & LPSPI_SR_RDF) != LPSPI_SR_RDF)
-        ;
+    while ((s32k1xx_lpspi_getreg32(priv, S32K1XX_LPSPI_SR_OFFSET) & LPSPI_SR_RDF) != LPSPI_SR_RDF) {
+        /* pass */
+    }
 
     ret = s32k1xx_lpspi_readword(priv);
 
     /* Check and clear any error flags (Reading from the SR clears the error
      * flags).
      */
-
     regval = s32k1xx_lpspi_getreg32(priv, S32K1XX_LPSPI_SR_OFFSET);
 
     spiinfo("Sent: %04" PRIx32 " Return: %04" PRIx32 " Status: %02" PRIx32 "\n", wd, ret, regval);
@@ -1227,7 +1183,6 @@ static void s32k1xx_lpspi_exchange_nodma(struct spi_dev_s* dev, void const* txbu
             /* Get the next word to write.  Is there a source buffer? */
             if (src) {
                 /* read the required number of bytes */
-
                 switch (framesize) {
                     #ifdef CONFIG_S32K1XX_LPSPI_DWORD
                     case 40 :
@@ -1291,7 +1246,6 @@ static void s32k1xx_lpspi_exchange_nodma(struct spi_dev_s* dev, void const* txbu
             /* Get the next word to write.  Is there a source buffer? */
             if (src) {
                 /* read the required number of bytes */
-
                 switch (framesize) {
                     case 32 :
                         word = __builtin_bswap32(*src);
@@ -1357,11 +1311,10 @@ static void s32k1xx_lpspi_exchange_nodma(struct spi_dev_s* dev, void const* txbu
             /* Get the next word to write.  Is there a source buffer? */
             if (src) {
                 word = swap16(*src++);
-
                 /* read the required number of bytes */
             }
             else {
-                word = 0xffff;
+                word = 0xFFFF;
             }
 
             /* Exchange one word */
@@ -1601,11 +1554,10 @@ static void s32k1xx_lpspi_bus_initialize(struct s32k1xx_lpspidev_s* priv) {
     s32k1xx_lpspi_modifyreg32(priv, S32K1XX_LPSPI_CFGR1_OFFSET, 0, LPSPI_CFGR1_MASTER);
 
     /* Set specific PCS to active high or low */
-
     /* TODO: Not needed for now */
 
     /* Set Configuration Register 1 related setting. */
-    reg = s32k1xx_lpspi_getreg32(priv, S32K1XX_LPSPI_CFGR1_OFFSET);
+    reg  = s32k1xx_lpspi_getreg32(priv, S32K1XX_LPSPI_CFGR1_OFFSET);
     reg &= ~(LPSPI_CFGR1_OUTCFG | LPSPI_CFGR1_PINCFG_MASK | LPSPI_CFGR1_NOSTALL);
     reg |= LPSPI_CFGR1_OUTCFG_RETAIN | LPSPI_CFGR1_PINCFG_SIN_SOUT;
     s32k1xx_lpspi_putreg32(priv, S32K1XX_LPSPI_CFGR1_OFFSET, reg);
