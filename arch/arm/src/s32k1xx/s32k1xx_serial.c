@@ -217,6 +217,10 @@ struct s32k1xx_uart_s {
     char* const        rxfifo;       /* Receive DMA buffer */
     #endif
 
+    #ifdef CONFIG_PM
+    bool rxdmasusp;                  /* Rx DMA suspended */
+    #endif
+
     /* Zephyr Extension */
     uart_callback_t    async_cb;     
     char* const        async_rx_buf;

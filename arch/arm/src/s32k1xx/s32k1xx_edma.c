@@ -44,7 +44,6 @@
 /****************************************************************************
  * Included Files
  ****************************************************************************/
-
 #include <nuttx/config.h>
 
 #include <stdint.h>
@@ -1239,7 +1238,6 @@ unsigned int s32k1xx_dmach_getcount(DMACH_HANDLE *handle)
  *   - DMA handle allocated by s32k1xx_dmach_alloc()
  *
  ****************************************************************************/
-
 #ifdef CONFIG_DEBUG_DMA
 void s32k1xx_dmasample(DMACH_HANDLE handle, struct s32k1xx_dmaregs_s *regs)
 {
