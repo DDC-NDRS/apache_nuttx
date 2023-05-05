@@ -21,18 +21,17 @@
 /****************************************************************************
  * Included Files
  ****************************************************************************/
-
 #include <nuttx/config.h>
 #include <nuttx/compiler.h>
 #include <time.h>
 
 #if CONFIG_RR_INTERVAL > 0
-#  include <sched.h>
-#  include <nuttx/arch.h>
+#include <sched.h>
+#include <nuttx/arch.h>
 #endif
 
 #ifdef CONFIG_SYSTEMTICK_HOOK
-#  include <nuttx/board.h>
+#include <nuttx/board.h>
 #endif
 
 #include "sched/sched.h"
@@ -57,37 +56,29 @@
  *   None
  *
  ****************************************************************************/
+#if ((CONFIG_RR_INTERVAL > 0) || defined(CONFIG_SCHED_SPORADIC))
+static inline void nxsched_cpu_scheduler(int cpu) {
+    FAR struct tcb_s* rtcb = current_task(cpu);
 
-#if CONFIG_RR_INTERVAL > 0 || defined(CONFIG_SCHED_SPORADIC)
-static inline void nxsched_cpu_scheduler(int cpu)
-{
-  FAR struct tcb_s *rtcb = current_task(cpu);
-
-#if CONFIG_RR_INTERVAL > 0
-  /* Check if the currently executing task uses round robin scheduling. */
-
-  if ((rtcb->flags & TCB_FLAG_POLICY_MASK) == TCB_FLAG_SCHED_RR)
-    {
-      /* Yes, check if the currently executing task has exceeded its
-       * timeslice.
-       */
-
-      nxsched_process_roundrobin(rtcb, 1, false);
+    #if (CONFIG_RR_INTERVAL > 0)
+    /* Check if the currently executing task uses round robin scheduling. */
+    if ((rtcb->flags & TCB_FLAG_POLICY_MASK) == TCB_FLAG_SCHED_RR) {
+        /* Yes, check if the currently executing task has exceeded its
+         * timeslice.
+         */
+        nxsched_process_roundrobin(rtcb, 1, false);
     }
-#endif
+    #endif
 
-#ifdef CONFIG_SCHED_SPORADIC
-  /* Check if the currently executing task uses sporadic scheduling. */
-
-  if ((rtcb->flags & TCB_FLAG_POLICY_MASK) == TCB_FLAG_SCHED_SPORADIC)
-    {
-      /* Yes, check if the currently executing task has exceeded its
-       * budget.
-       */
-
-      nxsched_process_sporadic(rtcb, 1, false);
+    #ifdef CONFIG_SCHED_SPORADIC
+    /* Check if the currently executing task uses sporadic scheduling. */
+    if ((rtcb->flags & TCB_FLAG_POLICY_MASK) == TCB_FLAG_SCHED_SPORADIC) {
+        /* Yes, check if the currently executing task has exceeded its
+         * budget.
+         */
+        nxsched_process_sporadic(rtcb, 1, false);
     }
-#endif
+    #endif
 }
 #endif
 
@@ -105,41 +96,35 @@ static inline void nxsched_cpu_scheduler(int cpu)
  *   None
  *
  ****************************************************************************/
+#if ((CONFIG_RR_INTERVAL > 0) || defined(CONFIG_SCHED_SPORADIC))
+static inline void nxsched_process_scheduler(void) {
+    #ifdef CONFIG_SMP
+    irqstate_t flags;
+    int        i;
 
-#if CONFIG_RR_INTERVAL > 0 || defined(CONFIG_SCHED_SPORADIC)
-static inline void nxsched_process_scheduler(void)
-{
-#ifdef CONFIG_SMP
-  irqstate_t flags;
-  int i;
+    /* If we are running on a single CPU architecture, then we know interrupts
+     * are disabled and there is no need to explicitly call
+     * enter_critical_section().  However, in the SMP case,
+     * enter_critical_section() does much more than just disable interrupts on
+     * the local CPU; it also manages spinlocks to assure the stability of the
+     * TCB that we are manipulating.
+     */
+    flags = enter_critical_section();
 
-  /* If we are running on a single CPU architecture, then we know interrupts
-   * are disabled and there is no need to explicitly call
-   * enter_critical_section().  However, in the SMP case,
-   * enter_critical_section() does much more than just disable interrupts on
-   * the local CPU; it also manages spinlocks to assure the stability of the
-   * TCB that we are manipulating.
-   */
-
-  flags = enter_critical_section();
-
-  /* Perform scheduler operations on all CPUs */
-
-  for (i = 0; i < CONFIG_SMP_NCPUS; i++)
-    {
-      nxsched_cpu_scheduler(i);
+    /* Perform scheduler operations on all CPUs */
+    for (i = 0; i < CONFIG_SMP_NCPUS; i++) {
+        nxsched_cpu_scheduler(i);
     }
 
-  leave_critical_section(flags);
+    leave_critical_section(flags);
 
-#else
-  /* Perform scheduler operations on the single CPUs */
-
-  nxsched_cpu_scheduler(0);
-#endif
+    #else
+    /* Perform scheduler operations on the single CPUs */
+    nxsched_cpu_scheduler(0);
+    #endif
 }
 #else
-#  define nxsched_process_scheduler()
+#define nxsched_process_scheduler()
 #endif
 
 /****************************************************************************
@@ -155,27 +140,25 @@ static inline void nxsched_process_scheduler(void)
  *   None
  *
  ****************************************************************************/
-
 #ifdef CONFIG_SMP
-static inline void nxsched_process_wdtimer(void)
-{
-  irqstate_t flags;
+static inline void nxsched_process_wdtimer(void) {
+    irqstate_t flags;
 
-  /* We are in an interrupt handler and, as a consequence, interrupts are
-   * disabled.  But in the SMP case, interrupts MAY be disabled only on
-   * the local CPU since most architectures do not permit disabling
-   * interrupts on other CPUS.
-   *
-   * Hence, we must follow rules for critical sections even here in the
-   * SMP case.
-   */
+    /* We are in an interrupt handler and, as a consequence, interrupts are
+     * disabled.  But in the SMP case, interrupts MAY be disabled only on
+     * the local CPU since most architectures do not permit disabling
+     * interrupts on other CPUS.
+     *
+     * Hence, we must follow rules for critical sections even here in the
+     * SMP case.
+     */
 
-  flags = enter_critical_section();
-  wd_timer();
-  leave_critical_section(flags);
+    flags = enter_critical_section();
+    wd_timer();
+    leave_critical_section(flags);
 }
 #else
-#  define nxsched_process_wdtimer() wd_timer()
+#define nxsched_process_wdtimer() wd_timer()
 #endif
 
 /****************************************************************************
@@ -207,42 +190,34 @@ static inline void nxsched_process_wdtimer(void)
  *   None
  *
  ****************************************************************************/
+void /**/nxsched_process_timer(void) {
+    #ifdef CONFIG_CLOCK_TIMEKEEPING
+    /* Process wall time */
+    clock_update_wall_time();
+    #endif
 
-void nxsched_process_timer(void)
-{
-#ifdef CONFIG_CLOCK_TIMEKEEPING
-  /* Process wall time */
+    /* Increment the system time (if in the link) */
+    clock_timer();
 
-  clock_update_wall_time();
-#endif
+    #ifndef CONFIG_SCHED_CPULOAD_EXTCLK
+    /* Perform CPU load measurements (before any timer-initiated context
+     * switches can occur)
+     */
+    nxsched_process_cpuload();
+    #endif
 
-  /* Increment the system time (if in the link) */
+    /* Check if the currently executing task has exceeded its
+     * timeslice.
+     */
+    nxsched_process_scheduler();
 
-  clock_timer();
+    /* Process watchdogs */
+    nxsched_process_wdtimer();
 
-#ifndef CONFIG_SCHED_CPULOAD_EXTCLK
-  /* Perform CPU load measurements (before any timer-initiated context
-   * switches can occur)
-   */
-
-  nxsched_process_cpuload();
-#endif
-
-  /* Check if the currently executing task has exceeded its
-   * timeslice.
-   */
-
-  nxsched_process_scheduler();
-
-  /* Process watchdogs */
-
-  nxsched_process_wdtimer();
-
-#ifdef CONFIG_SYSTEMTICK_HOOK
-  /* Call out to a user-provided function in order to perform board-specific,
-   * custom timer operations.
-   */
-
-  board_timerhook();
-#endif
+    #ifdef CONFIG_SYSTEMTICK_HOOK
+    /* Call out to a user-provided function in order to perform board-specific,
+     * custom timer operations.
+     */
+    board_timerhook();
+    #endif
 }

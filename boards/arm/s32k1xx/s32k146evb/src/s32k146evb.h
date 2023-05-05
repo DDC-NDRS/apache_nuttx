@@ -24,7 +24,6 @@
 /****************************************************************************
  * Included Files
  ****************************************************************************/
-
 #include <nuttx/config.h>
 #include <nuttx/compiler.h>
 
@@ -37,11 +36,8 @@
 /****************************************************************************
  * Pre-processor Definitions
  ****************************************************************************/
-
 /* Configuration ************************************************************/
-
 /* S32K146EVB GPIOs *********************************************************/
-
 /* LEDs.  The S32K146EVB has one RGB LED:
  *
  *   RedLED    PTD15  (FTM0 CH0)
@@ -50,7 +46,6 @@
  *
  * An output of '1' illuminates the LED.
  */
-
 #define GPIO_LED_R  (PIN_PTD15 | GPIO_LOWDRIVE | GPIO_OUTPUT_ZERO)
 #define GPIO_LED_G  (PIN_PTD16 | GPIO_LOWDRIVE | GPIO_OUTPUT_ZERO)
 #define GPIO_LED_B  (PIN_PTD0  | GPIO_LOWDRIVE | GPIO_OUTPUT_ZERO)
@@ -60,24 +55,19 @@
  *   SW2  PTC12
  *   SW3  PTC13
  */
-
 #define GPIO_SW2    (PIN_PTC12 | PIN_INT_BOTH)
 #define GPIO_SW3    (PIN_PTC13 | PIN_INT_BOTH)
 
 /****************************************************************************
  * Public Data
  ****************************************************************************/
-
 #ifndef __ASSEMBLY__
-
 /* User peripheral configuration structure 0 */
-
 extern const struct peripheral_clock_config_s g_peripheral_clockconfig0[];
 
 /****************************************************************************
  * Public Function Prototypes
  ****************************************************************************/
-
 /****************************************************************************
  * Name: s32k1xx_bringup
  *
@@ -91,8 +81,16 @@ extern const struct peripheral_clock_config_s g_peripheral_clockconfig0[];
  *     Called from the NSH library
  *
  ****************************************************************************/
-
 int s32k1xx_bringup(void);
+
+/****************************************************************************
+ * Name: s32k1xx_gpio_initialize
+ *
+ * Description:
+ *   Initialize GPIO drivers for use with /apps/examples/gpio
+ *
+ ****************************************************************************/
+int s32k1xx_gpio_initialize(void);
 
 /****************************************************************************
  * Name: s32k1xx_i2cdev_initialize
@@ -101,7 +99,6 @@ int s32k1xx_bringup(void);
  *   Initialize I2C driver and register /dev/i2cN devices.
  *
  ****************************************************************************/
-
 int s32k1xx_i2cdev_initialize(void);
 
 /****************************************************************************
@@ -112,7 +109,6 @@ int s32k1xx_i2cdev_initialize(void);
  *   /dev/spiN devices.
  *
  ****************************************************************************/
-
 int s32k1xx_spidev_initialize(void);
 
 #endif /* __ASSEMBLY__ */

@@ -21,7 +21,6 @@
 /****************************************************************************
  * Included Files
  ****************************************************************************/
-
 #include <nuttx/config.h>
 
 #include <sys/types.h>
@@ -63,30 +62,22 @@
  *  values).
  *
  ****************************************************************************/
+ssize_t /**/file_write(FAR struct file* filep, FAR void const* buf, size_t nbytes) {
+    FAR struct inode* inode;
 
-ssize_t file_write(FAR struct file *filep, FAR const void *buf,
-                   size_t nbytes)
-{
-  FAR struct inode *inode;
-
-  /* Was this file opened for write access? */
-
-  if ((filep->f_oflags & O_WROK) == 0)
-    {
-      return -EACCES;
+    /* Was this file opened for write access? */
+    if ((filep->f_oflags & O_WROK) == 0) {
+        return -EACCES;
     }
 
-  /* Is a driver registered? Does it support the write method? */
-
-  inode = filep->f_inode;
-  if (!inode || !inode->u.i_ops || !inode->u.i_ops->write)
-    {
-      return -EBADF;
+    /* Is a driver registered? Does it support the write method? */
+    inode = filep->f_inode;
+    if (!inode || !inode->u.i_ops || !inode->u.i_ops->write) {
+        return -EBADF;
     }
 
-  /* Yes, then let the driver perform the write */
-
-  return inode->u.i_ops->write(filep, buf, nbytes);
+    /* Yes, then let the driver perform the write */
+    return inode->u.i_ops->write(filep, buf, nbytes);
 }
 
 /****************************************************************************
@@ -113,32 +104,26 @@ ssize_t file_write(FAR struct file *filep, FAR const void *buf,
  *   values).
  *
  ****************************************************************************/
+ssize_t /**/nx_write(int fd, FAR void const* buf, size_t nbytes) {
+    FAR struct file* filep;
+    ssize_t ret;
 
-ssize_t nx_write(int fd, FAR const void *buf, size_t nbytes)
-{
-  FAR struct file *filep;
-  ssize_t ret;
-
-  if (buf == NULL)
-    {
-      return -EINVAL;
+    if (buf == NULL) {
+        return -EINVAL;
     }
 
-  /* First, get the file structure.
-   * Note that fs_getfilep() will return the errno on failure.
-   */
-
-  ret = (ssize_t)fs_getfilep(fd, &filep);
-  if (ret >= 0)
-    {
-      /* Perform the write operation using the file descriptor as an
-       * index.  Note that file_write() will return the errno on failure.
-       */
-
-      ret = file_write(filep, buf, nbytes);
+    /* First, get the file structure.
+     * Note that fs_getfilep() will return the errno on failure.
+     */
+    ret = (ssize_t)fs_getfilep(fd, &filep);
+    if (ret >= 0) {
+        /* Perform the write operation using the file descriptor as an
+         * index.  Note that file_write() will return the errno on failure.
+         */
+        ret = file_write(filep, buf, nbytes);
     }
 
-  return ret;
+    return (ret);
 }
 
 /****************************************************************************
@@ -188,24 +173,19 @@ ssize_t nx_write(int fd, FAR const void *buf, size_t nbytes)
  *    catches, blocks or ignores this signal.)
  *
  ****************************************************************************/
+ssize_t /**/write(int fd, FAR void const* buf, size_t nbytes) {
+    ssize_t ret;
 
-ssize_t write(int fd, FAR const void *buf, size_t nbytes)
-{
-  ssize_t ret;
+    /* write() is a cancellation point */
+    enter_cancellation_point();
 
-  /* write() is a cancellation point */
-
-  enter_cancellation_point();
-
-  /* Let nx_write() do all of the work */
-
-  ret = nx_write(fd, buf, nbytes);
-  if (ret < 0)
-    {
-      set_errno(-ret);
-      ret = ERROR;
+    /* Let nx_write() do all of the work */
+    ret = nx_write(fd, buf, nbytes);
+    if (ret < 0) {
+        set_errno(-ret);
+        ret = ERROR;
     }
 
-  leave_cancellation_point();
-  return ret;
+    leave_cancellation_point();
+    return (ret);
 }

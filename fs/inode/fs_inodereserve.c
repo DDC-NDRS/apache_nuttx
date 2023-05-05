@@ -45,85 +45,71 @@ static ino_t g_ino;
 /****************************************************************************
  * Name: inode_namelen
  ****************************************************************************/
-
-static int inode_namelen(FAR const char *name)
-{
-  const char *tmp = name;
-  while (*tmp && *tmp != '/')
-    {
-      tmp++;
+static int inode_namelen(FAR char const* name) {
+    char const* tmp = name;
+    while (*tmp && *tmp != '/') {
+        tmp++;
     }
 
-  return tmp - name;
+    return tmp - name;
 }
 
 /****************************************************************************
  * Name: inode_namecpy
  ****************************************************************************/
-
-static void inode_namecpy(char *dest, const char *src)
-{
-  while (*src && *src != '/')
-    {
-      *dest++ = *src++;
+static void inode_namecpy(char* dest, char const* src) {
+    while (*src && *src != '/') {
+        *dest++ = *src++;
     }
 
-  *dest = '\0';
+    *dest = '\0';
 }
 
 /****************************************************************************
  * Name: inode_alloc
  ****************************************************************************/
+static FAR struct inode* inode_alloc(FAR char const* name, mode_t mode) {
+    FAR struct inode* node;
+    int namelen;
 
-static FAR struct inode *inode_alloc(FAR const char *name, mode_t mode)
-{
-  FAR struct inode *node;
-  int namelen;
+    namelen = inode_namelen(name);
+    node    = (FAR struct inode*)kmm_zalloc(FSNODE_SIZE(namelen));
+    if (node) {
+        node->i_ino = g_ino++;
+        #ifdef CONFIG_PSEUDOFS_ATTRIBUTES
+        node->i_mode = mode;
+        clock_gettime(CLOCK_REALTIME, &node->i_atime);
+        node->i_mtime = node->i_atime;
+        node->i_ctime = node->i_atime;
+        #endif
 
-  namelen = inode_namelen(name);
-  node    = (FAR struct inode *)kmm_zalloc(FSNODE_SIZE(namelen));
-  if (node)
-    {
-      node->i_ino   = g_ino++;
-#ifdef CONFIG_PSEUDOFS_ATTRIBUTES
-      node->i_mode  = mode;
-      clock_gettime(CLOCK_REALTIME, &node->i_atime);
-      node->i_mtime = node->i_atime;
-      node->i_ctime = node->i_atime;
-#endif
-      inode_namecpy(node->i_name, name);
+        inode_namecpy(node->i_name, name);
     }
 
-  return node;
+    return node;
 }
 
 /****************************************************************************
  * Name: inode_insert
  ****************************************************************************/
+static void inode_insert(FAR struct inode* node, FAR struct inode* peer, FAR struct inode* parent) {
+    /* If peer is non-null, then new node simply goes to the right
+     * of that peer node.
+     */
 
-static void inode_insert(FAR struct inode *node,
-                         FAR struct inode *peer,
-                         FAR struct inode *parent)
-{
-  /* If peer is non-null, then new node simply goes to the right
-   * of that peer node.
-   */
-
-  if (peer)
-    {
-      node->i_peer   = peer->i_peer;
-      node->i_parent = parent;
-      peer->i_peer   = node;
+    if (peer) {
+        node->i_peer   = peer->i_peer;
+        node->i_parent = parent;
+        peer->i_peer   = node;
     }
 
-  /* Then it must go at the head of parent's list of children. */
+    /* Then it must go at the head of parent's list of children. */
 
-  else
-    {
-      DEBUGASSERT(parent != NULL);
-      node->i_peer    = parent->i_child;
-      node->i_parent  = parent;
-      parent->i_child = node;
+    else {
+        DEBUGASSERT(parent != NULL);
+        node->i_peer    = parent->i_child;
+        node->i_parent  = parent;
+        parent->i_child = node;
     }
 }
 
@@ -138,10 +124,8 @@ static void inode_insert(FAR struct inode *node,
  *   Reserve the root inode for the pseudo file system.
  *
  ****************************************************************************/
-
-void inode_root_reserve(void)
-{
-  g_root_inode = inode_alloc("", 0777);
+void inode_root_reserve(void) {
+    g_root_inode = inode_alloc("", 0777);
 }
 
 /****************************************************************************
@@ -168,93 +152,80 @@ void inode_root_reserve(void)
  *   Caller must hold the inode semaphore
  *
  ****************************************************************************/
+int /**/inode_reserve(FAR char const* path, mode_t mode, FAR struct inode** inode) {
+    struct inode_search_s desc;
+    FAR struct inode*     left;
+    FAR struct inode*     parent;
+    FAR char const*       name;
+    int ret;
 
-int inode_reserve(FAR const char *path,
-                  mode_t mode, FAR struct inode **inode)
-{
-  struct inode_search_s desc;
-  FAR struct inode *left;
-  FAR struct inode *parent;
-  FAR const char *name;
-  int ret;
+    /* Assume failure */
+    DEBUGASSERT(path != NULL && inode != NULL);
+    *inode = NULL;
 
-  /* Assume failure */
-
-  DEBUGASSERT(path != NULL && inode != NULL);
-  *inode = NULL;
-
-  if (path[0] == '\0')
-    {
-      return -EINVAL;
+    if (path[0] == '\0') {
+        return -EINVAL;
     }
 
-  /* Find the location to insert the new subtree */
+    /* Find the location to insert the new subtree */
+    SETUP_SEARCH(&desc, path, false);
 
-  SETUP_SEARCH(&desc, path, false);
+    ret = inode_search(&desc);
+    if (ret >= 0) {
+        /* It is an error if the node already exists in the tree (or if it
+         * lies within a mountpoint, we don't distinguish here).
+         */
 
-  ret = inode_search(&desc);
-  if (ret >= 0)
-    {
-      /* It is an error if the node already exists in the tree (or if it
-       * lies within a mountpoint, we don't distinguish here).
-       */
-
-      ret = -EEXIST;
-      goto errout_with_search;
+        ret = -EEXIST;
+        goto errout_with_search;
     }
 
-  /* Now we now where to insert the subtree */
+    /* Now we now where to insert the subtree */
 
-  name   = desc.path;
-  left   = desc.peer;
-  parent = desc.parent;
+    name   = desc.path;
+    left   = desc.peer;
+    parent = desc.parent;
+    for (;;) {
+        FAR struct inode* node;
 
-  for (; ; )
-    {
-      FAR struct inode *node;
+        /* Create a new node -- we need to know if this is the
+         * the leaf node or some intermediary.  We can find this
+         * by looking at the next name.
+         */
 
-      /* Create a new node -- we need to know if this is the
-       * the leaf node or some intermediary.  We can find this
-       * by looking at the next name.
-       */
+        FAR char const* nextname = inode_nextname(name);
+        if (*nextname != '\0') {
+            /* Insert an operationless node */
 
-      FAR const char *nextname = inode_nextname(name);
-      if (*nextname != '\0')
-        {
-          /* Insert an operationless node */
+            node = inode_alloc(name, 0777);
+            if (node != NULL) {
+                inode_insert(node, left, parent);
 
-          node = inode_alloc(name, 0777);
-          if (node != NULL)
-            {
-              inode_insert(node, left, parent);
+                /* Set up for the next time through the loop */
 
-              /* Set up for the next time through the loop */
-
-              name   = nextname;
-              left   = NULL;
-              parent = node;
-              continue;
+                name   = nextname;
+                left   = NULL;
+                parent = node;
+                continue;
             }
         }
-      else
-        {
-          node = inode_alloc(name, mode);
-          if (node != NULL)
-            {
-              inode_insert(node, left, parent);
-              *inode = node;
-              ret = OK;
-              break;
+        else {
+            node = inode_alloc(name, mode);
+            if (node != NULL) {
+                inode_insert(node, left, parent);
+                *inode = node;
+                ret    = OK;
+                break;
             }
         }
 
-      /* We get here on failures to allocate node memory */
+        /* We get here on failures to allocate node memory */
 
-      ret = -ENOMEM;
-      break;
+        ret = -ENOMEM;
+        break;
     }
 
 errout_with_search:
-  RELEASE_SEARCH(&desc);
-  return ret;
+    RELEASE_SEARCH(&desc);
+    return ret;
 }

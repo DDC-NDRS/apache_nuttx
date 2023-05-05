@@ -21,7 +21,6 @@
 /****************************************************************************
  * Included Files
  ****************************************************************************/
-
 #include <nuttx/config.h>
 
 #include <sys/types.h>
@@ -102,14 +101,13 @@ volatile spinlock_t g_cpu_schedlock = SP_UNLOCKED;
 /* Used to keep track of which CPU(s) hold the IRQ lock. */
 
 volatile spinlock_t g_cpu_locksetlock;
-volatile cpu_set_t g_cpu_lockset;
+volatile cpu_set_t  g_cpu_lockset;
 
 #endif /* CONFIG_SMP */
 
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
-
 /****************************************************************************
  * Name:  sched_lock
  *
@@ -127,146 +125,116 @@ volatile cpu_set_t g_cpu_lockset;
  *   OK on success; ERROR on failure
  *
  ****************************************************************************/
-
 #ifdef CONFIG_SMP
+int sched_lock(void) {
+    FAR struct tcb_s* rtcb;
 
-int sched_lock(void)
-{
-  FAR struct tcb_s *rtcb;
+    /* If the CPU supports suppression of interprocessor interrupts, then
+     * simple disabling interrupts will provide sufficient protection for
+     * the following operation.
+     */
 
-  /* If the CPU supports suppression of interprocessor interrupts, then
-   * simple disabling interrupts will provide sufficient protection for
-   * the following operation.
-   */
+    rtcb = this_task();
 
-  rtcb = this_task();
+    /* Check for some special cases:  (1) rtcb may be NULL only during early
+     * boot-up phases, and (2) sched_lock() should have no effect if called
+     * from the interrupt level.
+     */
+    if (rtcb != NULL && !up_interrupt_context()) {
+        irqstate_t flags;
 
-  /* Check for some special cases:  (1) rtcb may be NULL only during early
-   * boot-up phases, and (2) sched_lock() should have no effect if called
-   * from the interrupt level.
-   */
+        /* Catch attempts to increment the lockcount beyond the range of the
+         * integer type.
+        */
+        DEBUGASSERT(rtcb->lockcount < MAX_LOCK_COUNT);
 
-  if (rtcb != NULL && !up_interrupt_context())
-    {
-      irqstate_t flags;
+        flags = enter_critical_section();
 
-      /* Catch attempts to increment the lockcount beyond the range of the
-       * integer type.
-       */
-
-      DEBUGASSERT(rtcb->lockcount < MAX_LOCK_COUNT);
-
-      flags = enter_critical_section();
-
-      /* We must hold the lock on this CPU before we increment the lockcount
-       * for the first time. Holding the lock is sufficient to lockout
-       * context switching.
-       */
-
-      if (rtcb->lockcount == 0)
-        {
-          /* We don't have the scheduler locked.  But logic running on a
-           * different CPU may have the scheduler locked.  It is not
-           * possible for some other task on this CPU to have the scheduler
-           * locked (or we would not be executing!).
-           */
-
-          spin_setbit(&g_cpu_lockset, this_cpu(), &g_cpu_locksetlock,
-                      &g_cpu_schedlock);
+        /* We must hold the lock on this CPU before we increment the lockcount
+         * for the first time. Holding the lock is sufficient to lockout
+         * context switching.
+         */
+        if (rtcb->lockcount == 0) {
+            /* We don't have the scheduler locked.  But logic running on a
+             * different CPU may have the scheduler locked.  It is not
+             * possible for some other task on this CPU to have the scheduler
+             * locked (or we would not be executing!).
+             */
+            spin_setbit(&g_cpu_lockset, this_cpu(), &g_cpu_locksetlock, &g_cpu_schedlock);
         }
-      else
-        {
-          /* If this thread already has the scheduler locked, then
-           * g_cpu_schedlock() should indicate that the scheduler is locked
-           * and g_cpu_lockset should include the bit setting for this CPU.
-           */
-
-          DEBUGASSERT(g_cpu_schedlock == SP_LOCKED &&
-                      (g_cpu_lockset & (1 << this_cpu())) != 0);
+        else {
+            /* If this thread already has the scheduler locked, then
+             * g_cpu_schedlock() should indicate that the scheduler is locked
+             * and g_cpu_lockset should include the bit setting for this CPU.
+             */
+            DEBUGASSERT(g_cpu_schedlock == SP_LOCKED && (g_cpu_lockset & (1 << this_cpu())) != 0);
         }
 
-      /* A counter is used to support locking.  This allows nested lock
-       * operations on this thread (on any CPU)
-       */
+        /* A counter is used to support locking.  This allows nested lock
+         * operations on this thread (on any CPU)
+         */
+        rtcb->lockcount++;
 
-      rtcb->lockcount++;
-
-#if defined(CONFIG_SCHED_INSTRUMENTATION_PREEMPTION) || \
-    defined(CONFIG_SCHED_CRITMONITOR)
-      /* Check if we just acquired the lock */
-
-      if (rtcb->lockcount == 1)
-        {
-          /* Note that we have pre-emption locked */
-
-#ifdef CONFIG_SCHED_CRITMONITOR
-          nxsched_critmon_preemption(rtcb, true);
-#endif
-#ifdef CONFIG_SCHED_INSTRUMENTATION_PREEMPTION
-          sched_note_premption(rtcb, true);
-#endif
+        #if defined(CONFIG_SCHED_INSTRUMENTATION_PREEMPTION) || defined(CONFIG_SCHED_CRITMONITOR)
+        /* Check if we just acquired the lock */
+        if (rtcb->lockcount == 1) {
+            /* Note that we have pre-emption locked */
+            #ifdef CONFIG_SCHED_CRITMONITOR
+            nxsched_critmon_preemption(rtcb, true);
+            #endif
+            #ifdef CONFIG_SCHED_INSTRUMENTATION_PREEMPTION
+            sched_note_premption(rtcb, true);
+            #endif
         }
-#endif
+        #endif
 
-      /* Move any tasks in the ready-to-run list to the pending task list
-       * where they will not be available to run until the scheduler is
-       * unlocked and nxsched_merge_pending() is called.
-       */
+        /* Move any tasks in the ready-to-run list to the pending task list
+         * where they will not be available to run until the scheduler is
+         * unlocked and nxsched_merge_pending() is called.
+         */
+        nxsched_merge_prioritized(&g_readytorun, &g_pendingtasks, TSTATE_TASK_PENDING);
 
-      nxsched_merge_prioritized(&g_readytorun,
-                                &g_pendingtasks,
-                                TSTATE_TASK_PENDING);
-
-      leave_critical_section(flags);
+        leave_critical_section(flags);
     }
 
-  return OK;
+    return (OK);
 }
 
 #else /* CONFIG_SMP */
+int /**/ sched_lock(void) {
+    FAR struct tcb_s* rtcb = this_task();
 
-int sched_lock(void)
-{
-  FAR struct tcb_s *rtcb = this_task();
+    /* Check for some special cases:  (1) rtcb may be NULL only during early
+     * boot-up phases, and (2) sched_lock() should have no effect if called
+     * from the interrupt level.
+     */
+    if (rtcb != NULL && !up_interrupt_context()) {
+        /* Catch attempts to increment the lockcount beyond the range of the
+         * integer type.
+         */
+        DEBUGASSERT(rtcb->lockcount < MAX_LOCK_COUNT);
 
-  /* Check for some special cases:  (1) rtcb may be NULL only during early
-   * boot-up phases, and (2) sched_lock() should have no effect if called
-   * from the interrupt level.
-   */
+        /* A counter is used to support locking.  This allows nested lock
+         * operations on this thread (on any CPU)
+         */
+        rtcb->lockcount++;
 
-  if (rtcb != NULL && !up_interrupt_context())
-    {
-      /* Catch attempts to increment the lockcount beyond the range of the
-       * integer type.
-       */
+        #if defined(CONFIG_SCHED_INSTRUMENTATION_PREEMPTION) || defined(CONFIG_SCHED_CRITMONITOR)
+        /* Check if we just acquired the lock */
+        if (rtcb->lockcount == 1) {
+            /* Note that we have pre-emption locked */
+            #ifdef CONFIG_SCHED_CRITMONITOR
+            nxsched_critmon_preemption(rtcb, true);
+            #endif
 
-      DEBUGASSERT(rtcb->lockcount < MAX_LOCK_COUNT);
-
-      /* A counter is used to support locking.  This allows nested lock
-       * operations on this thread (on any CPU)
-       */
-
-      rtcb->lockcount++;
-
-#if defined(CONFIG_SCHED_INSTRUMENTATION_PREEMPTION) || \
-    defined(CONFIG_SCHED_CRITMONITOR)
-      /* Check if we just acquired the lock */
-
-      if (rtcb->lockcount == 1)
-        {
-          /* Note that we have pre-emption locked */
-
-#ifdef CONFIG_SCHED_CRITMONITOR
-          nxsched_critmon_preemption(rtcb, true);
-#endif
-#ifdef CONFIG_SCHED_INSTRUMENTATION_PREEMPTION
-          sched_note_premption(rtcb, true);
-#endif
+            #ifdef CONFIG_SCHED_INSTRUMENTATION_PREEMPTION
+            sched_note_premption(rtcb, true);
+            #endif
         }
-#endif
+        #endif
     }
 
-  return OK;
+    return (OK);
 }
 
 #endif /* CONFIG_SMP */

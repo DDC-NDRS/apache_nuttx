@@ -35,6 +35,7 @@
 
 #include <nuttx/fs/fs.h>
 #include <nuttx/semaphore.h>
+#include <zephyr/drivers/uart_common.h>     // #CUSTOM@NDRS
 
 /****************************************************************************
  * Pre-processor Definitions
@@ -73,7 +74,6 @@
 #endif
 
 /* vtable access helpers */
-
 #define uart_setup(dev)          dev->ops->setup(dev)
 #define uart_shutdown(dev)       dev->ops->shutdown(dev)
 #define uart_attach(dev)         dev->ops->attach(dev)
@@ -117,7 +117,6 @@
  * The serial infrastructure will initialize the 'sem' field but all other
  * fields must be initialized by the caller of uart_register().
  */
-
 struct uart_buffer_s
 {
   mutex_t          lock;   /* Used to control exclusive access to the buffer */
@@ -269,7 +268,6 @@ struct uart_ops_s
 struct uart_dev_s
 {
   /* State data */
-
   uint8_t              open_count;   /* Number of times the device has been opened */
   uint8_t              escape;       /* Number of the character to be escaped */
   volatile bool        xmitwaiting;  /* true: User waiting for space in xmit.buffer */
@@ -285,36 +283,32 @@ struct uart_dev_s
 #endif
 
   /* Terminal control flags */
-
   tcflag_t             tc_iflag;     /* Input modes */
   tcflag_t             tc_oflag;     /* Output modes */
   tcflag_t             tc_lflag;     /* Local modes */
 
   /* Semaphores & mutex */
-
   sem_t                xmitsem;      /* Wakeup user waiting for space in xmit.buffer */
   sem_t                recvsem;      /* Wakeup user waiting for data in recv.buffer */
   mutex_t              closelock;    /* Locks out new open while close is in progress */
   mutex_t              polllock;     /* Manages exclusive access to fds[] */
 
   /* I/O buffers */
-
   struct uart_buffer_s xmit;         /* Describes transmit buffer */
   struct uart_buffer_s recv;         /* Describes receive buffer */
 
   /* DMA transfers */
-
-#ifdef CONFIG_SERIAL_TXDMA
+  #ifdef CONFIG_SERIAL_TXDMA
   struct uart_dmaxfer_s dmatx;       /* Describes transmit DMA transfer */
-#endif
-#ifdef CONFIG_SERIAL_RXDMA
+  #endif
+
+  #ifdef CONFIG_SERIAL_RXDMA
   struct uart_dmaxfer_s dmarx;       /* Describes receive DMA transfer */
-#endif
+  #endif
 
   /* Driver interface */
-
-  FAR const struct uart_ops_s *ops;  /* Arch-specific operations */
-  FAR void            *priv;         /* Used by the arch-specific logic */
+  FAR const struct uart_ops_s* ops;  /* Arch-specific operations */
+  FAR void* priv;                    /* Used by the arch-specific logic */
 
   /* The following is a list if poll structures of threads waiting for
    * driver events. The 'struct pollfd' reference for each open is also
@@ -328,6 +322,9 @@ struct uart_dev_s
 #endif
 
   struct pollfd *fds[CONFIG_SERIAL_NPOLLWAITERS];
+
+  /* Zephyr Extension */
+  struct zephyr_uart_cb_t zephyr;
 };
 
 typedef struct uart_dev_s uart_dev_t;

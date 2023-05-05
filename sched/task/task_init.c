@@ -21,7 +21,6 @@
 /****************************************************************************
  * Included Files
  ****************************************************************************/
-
 #include <nuttx/config.h>
 
 #include <sys/types.h>
@@ -81,126 +80,99 @@
  *   state).
  *
  ****************************************************************************/
+int /**/nxtask_init(FAR struct task_tcb_s* tcb, char const* name, int priority, FAR void* stack, uint32_t stack_size,
+                     main_t entry, FAR char* const argv[], FAR char* const envp[]) {
+    uint8_t ttype = (tcb->cmn.flags & TCB_FLAG_TTYPE_MASK);
+    int     ret;
 
-int nxtask_init(FAR struct task_tcb_s *tcb, const char *name, int priority,
-                FAR void *stack, uint32_t stack_size,
-                main_t entry, FAR char * const argv[],
-                FAR char * const envp[])
-{
-  uint8_t ttype = tcb->cmn.flags & TCB_FLAG_TTYPE_MASK;
-  int ret;
+    #ifndef CONFIG_DISABLE_PTHREAD
+    /* Only tasks and kernel threads can be initialized in this way */
+    DEBUGASSERT(tcb && ttype != TCB_FLAG_TTYPE_PTHREAD);
+    #endif
 
-#ifndef CONFIG_DISABLE_PTHREAD
-  /* Only tasks and kernel threads can be initialized in this way */
-
-  DEBUGASSERT(tcb && ttype != TCB_FLAG_TTYPE_PTHREAD);
-#endif
-
-#ifdef CONFIG_ARCH_ADDRENV
-  /* Kernel threads do not own any address environment */
-
-  if ((ttype & TCB_FLAG_TTYPE_MASK) == TCB_FLAG_TTYPE_KERNEL)
-    {
-      tcb->cmn.addrenv_own = NULL;
+    #ifdef CONFIG_ARCH_ADDRENV
+    /* Kernel threads do not own any address environment */
+    if ((ttype & TCB_FLAG_TTYPE_MASK) == TCB_FLAG_TTYPE_KERNEL) {
+        tcb->cmn.addrenv_own = NULL;
     }
-#endif
+    #endif
 
-  /* Create a new task group */
-
-  ret = group_allocate(tcb, tcb->cmn.flags);
-  if (ret < 0)
-    {
-      return ret;
+    /* Create a new task group */
+    ret = group_allocate(tcb, tcb->cmn.flags);
+    if (ret < 0) {
+        return ret;
     }
 
-  /* Duplicate the parent tasks environment */
-
-  ret = env_dup(tcb->cmn.group, envp);
-  if (ret < 0)
-    {
-      goto errout_with_group;
+    /* Duplicate the parent tasks environment */
+    ret = env_dup(tcb->cmn.group, envp);
+    if (ret < 0) {
+        goto errout_with_group;
     }
 
-  /* Associate file descriptors with the new task */
-
-  ret = group_setuptaskfiles(tcb);
-  if (ret < 0)
-    {
-      goto errout_with_group;
+    /* Associate file descriptors with the new task */
+    ret = group_setuptaskfiles(tcb);
+    if (ret < 0) {
+        goto errout_with_group;
     }
 
-  if (stack)
-    {
-      /* Use pre-allocated stack */
-
-      ret = up_use_stack(&tcb->cmn, stack, stack_size);
+    if (stack) {
+        /* Use pre-allocated stack */
+        ret = up_use_stack(&tcb->cmn, stack, stack_size);
     }
-  else
-    {
-      /* Allocate the stack for the TCB */
-
-      ret = up_create_stack(&tcb->cmn, stack_size, ttype);
+    else {
+        /* Allocate the stack for the TCB */
+        ret = up_create_stack(&tcb->cmn, stack_size, ttype);
     }
 
-  if (ret < OK)
-    {
-      goto errout_with_group;
+    if (ret < OK) {
+        goto errout_with_group;
     }
 
-  /* Initialize thread local storage */
-
-  ret = tls_init_info(&tcb->cmn);
-  if (ret < OK)
-    {
-      goto errout_with_group;
+    /* Initialize thread local storage */
+    ret = tls_init_info(&tcb->cmn);
+    if (ret < OK) {
+        goto errout_with_group;
     }
 
-  /* Initialize the task control block */
-
-  ret = nxtask_setup_scheduler(tcb, priority, nxtask_start,
-                               entry, ttype);
-  if (ret < OK)
-    {
-      goto errout_with_group;
+    /* Initialize the task control block */
+    ret = nxtask_setup_scheduler(tcb, priority, nxtask_start, entry, ttype);
+    if (ret < OK) {
+        goto errout_with_group;
     }
 
-  /* Setup to pass parameters to the new task */
-
-  ret = nxtask_setup_arguments(tcb, name, argv);
-  if (ret < OK)
-    {
-      goto errout_with_group;
+    /* Setup to pass parameters to the new task */
+    ret = nxtask_setup_arguments(tcb, name, argv);
+    if (ret < OK) {
+        goto errout_with_group;
     }
 
-  /* Now we have enough in place that we can join the group */
-
-  group_initialize(tcb);
-  return ret;
+    /* Now we have enough in place that we can join the group */
+    group_initialize(tcb);
+    return ret;
 
 errout_with_group:
-  if (!stack && tcb->cmn.stack_alloc_ptr)
-    {
-#ifdef CONFIG_BUILD_KERNEL
-      /* If the exiting thread is not a kernel thread, then it has an
-       * address environment.  Don't bother to release the stack memory
-       * in this case... There is no point since the memory lies in the
-       * user memory region that will be destroyed anyway (and the
-       * address environment has probably already been destroyed at
-       * this point.. so we would crash if we even tried it).  But if
-       * this is a privileged group, when we still have to release the
-       * memory using the kernel allocator.
-       */
+    if (!stack && tcb->cmn.stack_alloc_ptr) {
+        #ifdef CONFIG_BUILD_KERNEL
+        /* If the exiting thread is not a kernel thread, then it has an
+         * address environment.  Don't bother to release the stack memory
+         * in this case... There is no point since the memory lies in the
+         * user memory region that will be destroyed anyway (and the
+         * address environment has probably already been destroyed at
+         * this point.. so we would crash if we even tried it).  But if
+         * this is a privileged group, when we still have to release the
+         * memory using the kernel allocator.
+         */
 
-      if (ttype == TCB_FLAG_TTYPE_KERNEL)
-#endif
+        if (ttype == TCB_FLAG_TTYPE_KERNEL)
+        #endif
         {
-          up_release_stack(&tcb->cmn, ttype);
+            up_release_stack(&tcb->cmn, ttype);
         }
     }
 
-  group_leave(&tcb->cmn);
+    group_leave(&tcb->cmn);
 
-  return ret;
+    return (ret);
 }
 
 /****************************************************************************
@@ -221,19 +193,16 @@ errout_with_group:
  *   OK on success; negative error value on failure appropriately.
  *
  ****************************************************************************/
+void nxtask_uninit(FAR struct task_tcb_s* tcb) {
+    /* The TCB was added to the inactive task list by
+     * nxtask_setup_scheduler().
+     */
 
-void nxtask_uninit(FAR struct task_tcb_s *tcb)
-{
-  /* The TCB was added to the inactive task list by
-   * nxtask_setup_scheduler().
-   */
+    dq_rem((FAR dq_entry_t*)tcb, &g_inactivetasks);
 
-  dq_rem((FAR dq_entry_t *)tcb, &g_inactivetasks);
+    /* Release all resources associated with the TCB... Including the TCB
+     * itself.
+     */
 
-  /* Release all resources associated with the TCB... Including the TCB
-   * itself.
-   */
-
-  nxsched_release_tcb((FAR struct tcb_s *)tcb,
-                      tcb->cmn.flags & TCB_FLAG_TTYPE_MASK);
+    nxsched_release_tcb((FAR struct tcb_s*)tcb, tcb->cmn.flags & TCB_FLAG_TTYPE_MASK);
 }

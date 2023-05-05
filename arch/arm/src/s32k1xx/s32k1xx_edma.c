@@ -44,7 +44,6 @@
 /****************************************************************************
  * Included Files
  ****************************************************************************/
-
 #include <nuttx/config.h>
 
 #include <stdint.h>
@@ -917,8 +916,8 @@ void s32k1xx_dmach_free(DMACH_HANDLE handle)
  *
  ****************************************************************************/
 
-int s32k1xx_dmach_xfrsetup(DMACH_HANDLE *handle,
-                           const struct s32k1xx_edma_xfrconfig_s *config)
+int /**/s32k1xx_dmach_xfrsetup(DMACH_HANDLE *handle,
+                               const struct s32k1xx_edma_xfrconfig_s *config)
 {
   struct s32k1xx_dmach_s *dmach = (struct s32k1xx_dmach_s *)handle;
 #if CONFIG_S32K1XX_EDMA_NTCD > 0
@@ -1239,7 +1238,6 @@ unsigned int s32k1xx_dmach_getcount(DMACH_HANDLE *handle)
  *   - DMA handle allocated by s32k1xx_dmach_alloc()
  *
  ****************************************************************************/
-
 #ifdef CONFIG_DEBUG_DMA
 void s32k1xx_dmasample(DMACH_HANDLE handle, struct s32k1xx_dmaregs_s *regs)
 {

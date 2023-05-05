@@ -547,6 +547,7 @@ ifeq ($(CONFIG_UBOOT_UIMAGE),y)
 	fi
 	$(Q) echo "uImage" >> nuttx.manifest
 endif
+	mv $(BIN) nuttx.elf		# CUSTOM@NDRS - Rename the ELF file to nuttx.elf
 	$(call POSTBUILD, $(TOPDIR))
 
 # flash (or download : DEPRECATED)

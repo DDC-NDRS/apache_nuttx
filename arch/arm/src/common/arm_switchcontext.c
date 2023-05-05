@@ -21,7 +21,6 @@
 /****************************************************************************
  * Included Files
  ****************************************************************************/
-
 #include <nuttx/config.h>
 
 #include <sched.h>
@@ -38,7 +37,6 @@
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
-
 /****************************************************************************
  * Name: up_switch_context
  *
@@ -52,52 +50,39 @@
  *   rtcb: Refers to the running task which will be blocked.
  *
  ****************************************************************************/
+void /**/up_switch_context(struct tcb_s* tcb, struct tcb_s* rtcb) {
+    /* Update scheduler parameters */
+    nxsched_suspend_scheduler(rtcb);
 
-void up_switch_context(struct tcb_s *tcb, struct tcb_s *rtcb)
-{
-  /* Update scheduler parameters */
+    /* Are we in an interrupt handler? */
+    if (CURRENT_REGS) {
+        /* Yes, then we have to do things differently.
+         * Just copy the CURRENT_REGS into the OLD rtcb.
+         */
+        arm_savestate(rtcb->xcp.regs);
 
-  nxsched_suspend_scheduler(rtcb);
+        /* Update scheduler parameters */
+        nxsched_resume_scheduler(tcb);
 
-  /* Are we in an interrupt handler? */
-
-  if (CURRENT_REGS)
-    {
-      /* Yes, then we have to do things differently.
-       * Just copy the CURRENT_REGS into the OLD rtcb.
-       */
-
-      arm_savestate(rtcb->xcp.regs);
-
-      /* Update scheduler parameters */
-
-      nxsched_resume_scheduler(tcb);
-
-      /* Then switch contexts.  Any necessary address environment
-       * changes will be made when the interrupt returns.
-       */
-
-      arm_restorestate(tcb->xcp.regs);
+        /* Then switch contexts.  Any necessary address environment
+         * changes will be made when the interrupt returns.
+         */
+        arm_restorestate(tcb->xcp.regs);
     }
+    /* No, then we will need to perform the user context switch */
+    else {
+        /* Update scheduler parameters */
+        nxsched_resume_scheduler(tcb);
 
-  /* No, then we will need to perform the user context switch */
+        /* Switch context to the context of the task at the head of the
+         * ready to run list.
+         */
+        arm_switchcontext(&rtcb->xcp.regs, tcb->xcp.regs);
 
-  else
-    {
-      /* Update scheduler parameters */
-
-      nxsched_resume_scheduler(tcb);
-
-      /* Switch context to the context of the task at the head of the
-       * ready to run list.
-       */
-
-      arm_switchcontext(&rtcb->xcp.regs, tcb->xcp.regs);
-
-      /* arm_switchcontext forces a context switch to the task at the
-       * head of the ready-to-run list.  It does not 'return' in the
-       * normal sense.  When it does return, it is because the blocked
-       * task is again ready to run and has execution priority.
-       */
+        /* arm_switchcontext forces a context switch to the task at the
+         * head of the ready-to-run list.  It does not 'return' in the
+         * normal sense.  When it does return, it is because the blocked
+         * task is again ready to run and has execution priority.
+         */
     }
 }

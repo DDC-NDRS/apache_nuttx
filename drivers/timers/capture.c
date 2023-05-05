@@ -21,7 +21,6 @@
 /****************************************************************************
  * Included Files
  ****************************************************************************/
-
 #include <nuttx/config.h>
 
 #include <sys/types.h>
@@ -48,52 +47,42 @@
 /****************************************************************************
  * Pre-processor Definitions
  ****************************************************************************/
-
 /* Debug ********************************************************************/
-
 /****************************************************************************
  * Private Type Definitions
  ****************************************************************************/
 
 /* This structure describes the state of the upper half driver */
-
-struct cap_upperhalf_s
-{
-  uint8_t                    crefs;    /* The number of times the device has been opened */
-  mutex_t                    lock;     /* Supports mutual exclusion */
-  FAR struct cap_lowerhalf_s *lower;   /* lower-half state */
+struct cap_upperhalf_s {
+    uint8_t crefs;              /* The number of times the device has been opened */
+    mutex_t lock;               /* Supports mutual exclusion */
+    FAR struct cap_lowerhalf_s* lower;      /* lower-half state */
 };
 
 /****************************************************************************
  * Private Function Prototypes
  ****************************************************************************/
-
-static int     cap_open(FAR struct file *filep);
-static int     cap_close(FAR struct file *filep);
-static ssize_t cap_read(FAR struct file *filep, FAR char *buffer,
-                       size_t buflen);
-static ssize_t cap_write(FAR struct file *filep, FAR const char *buffer,
-                        size_t buflen);
-static int cap_ioctl(FAR struct file *filep, int cmd, unsigned long arg);
+static int     cap_open(FAR struct file* filep);
+static int     cap_close(FAR struct file* filep);
+static ssize_t cap_read(FAR struct file* filep, FAR char* buffer, size_t buflen);
+static ssize_t cap_write(FAR struct file* filep, FAR char const* buffer, size_t buflen);
+static int     cap_ioctl(FAR struct file* filep, int cmd, unsigned long arg);
 
 /****************************************************************************
  * Private Data
  ****************************************************************************/
-
-static const struct file_operations g_capops =
-{
-  cap_open,  /* open */
-  cap_close, /* close */
-  cap_read,  /* read */
-  cap_write, /* write */
-  NULL,      /* seek */
-  cap_ioctl, /* ioctl */
+static const struct file_operations g_capops = {
+    cap_open,                   /* open */
+    cap_close,                  /* close */
+    cap_read,                   /* read */
+    cap_write,                  /* write */
+    NULL,                       /* seek */
+    cap_ioctl,                  /* ioctl */
 };
 
 /****************************************************************************
  * Private Functions
  ****************************************************************************/
-
 /****************************************************************************
  * Name: cap_open
  *
@@ -101,63 +90,51 @@ static const struct file_operations g_capops =
  *   This function is called whenever the PWM Capture device is opened.
  *
  ****************************************************************************/
+static int cap_open(FAR struct file* filep) {
+    FAR struct inode* inode = filep->f_inode;
+    FAR struct cap_upperhalf_s* upper = inode->i_private;
+    uint8_t tmp;
+    int ret;
 
-static int cap_open(FAR struct file *filep)
-{
-  FAR struct inode           *inode = filep->f_inode;
-  FAR struct cap_upperhalf_s *upper = inode->i_private;
-  uint8_t                     tmp;
-  int                         ret;
-
-  /* Get exclusive access to the device structures */
-
-  ret = nxmutex_lock(&upper->lock);
-  if (ret < 0)
-    {
-      goto errout;
+    /* Get exclusive access to the device structures */
+    ret = nxmutex_lock(&upper->lock);
+    if (ret < 0) {
+        goto errout;
     }
 
-  /* Increment the count of references to the device.  If this is the first
-   * time that the driver has been opened for this device, then initialize
-   * the device.
-   */
-
-  tmp = upper->crefs + 1;
-  if (tmp == 0)
-    {
-      /* More than 255 opens; uint8_t overflows to zero */
-
-      ret = -EMFILE;
-      goto errout_with_lock;
+    /* Increment the count of references to the device.  If this is the first
+     * time that the driver has been opened for this device, then initialize
+     * the device.
+     */
+    tmp = upper->crefs + 1;
+    if (tmp == 0) {
+        /* More than 255 opens; uint8_t overflows to zero */
+        ret = -EMFILE;
+        goto errout_with_lock;
     }
 
-  /* Check if this is the first time that the driver has been opened. */
+    /* Check if this is the first time that the driver has been opened. */
+    if (tmp == 1) {
+        FAR struct cap_lowerhalf_s* lower = upper->lower;
 
-  if (tmp == 1)
-    {
-      FAR struct cap_lowerhalf_s *lower = upper->lower;
+        /* Yes.. perform one time hardware initialization. */
+        DEBUGASSERT(lower->ops->start != NULL);
 
-      /* Yes.. perform one time hardware initialization. */
-
-      DEBUGASSERT(lower->ops->start != NULL);
-
-      ret = lower->ops->start(lower);
-      if (ret < 0)
-        {
-          goto errout_with_lock;
+        ret = lower->ops->start(lower);
+        if (ret < 0) {
+            goto errout_with_lock;
         }
     }
 
-  /* Save the new open count on success */
-
-  upper->crefs = tmp;
-  ret = OK;
+    /* Save the new open count on success */
+    upper->crefs = tmp;
+    ret = OK;
 
 errout_with_lock:
-  nxmutex_unlock(&upper->lock);
+    nxmutex_unlock(&upper->lock);
 
 errout:
-  return ret;
+    return (ret);
 }
 
 /****************************************************************************
@@ -167,49 +144,40 @@ errout:
  *   This function is called when the PWM Capture device is closed.
  *
  ****************************************************************************/
+static int cap_close(FAR struct file* filep) {
+    FAR struct inode* inode = filep->f_inode;
+    FAR struct cap_upperhalf_s* upper = inode->i_private;
+    int ret;
 
-static int cap_close(FAR struct file *filep)
-{
-  FAR struct inode           *inode = filep->f_inode;
-  FAR struct cap_upperhalf_s *upper = inode->i_private;
-  int                         ret;
-
-  /* Get exclusive access to the device structures */
-
-  ret = nxmutex_lock(&upper->lock);
-  if (ret < 0)
-    {
-      goto errout;
+    /* Get exclusive access to the device structures */
+    ret = nxmutex_lock(&upper->lock);
+    if (ret < 0) {
+        goto errout;
     }
 
-  /* Decrement the references to the driver.  If the reference count will
-   * decrement to 0, then uninitialize the driver.
-   */
-
-  if (upper->crefs > 1)
-    {
-      upper->crefs--;
+    /* Decrement the references to the driver.  If the reference count will
+     * decrement to 0, then uninitialize the driver.
+     */
+    if (upper->crefs > 1) {
+        upper->crefs--;
     }
-  else
-    {
-      FAR struct cap_lowerhalf_s *lower = upper->lower;
+    else {
+        FAR struct cap_lowerhalf_s* lower = upper->lower;
 
-      /* There are no more references to the port */
+        /* There are no more references to the port */
+        upper->crefs = 0;
 
-      upper->crefs = 0;
+        /* Disable the PWM Capture device */
+        DEBUGASSERT(lower->ops->stop != NULL);
 
-      /* Disable the PWM Capture device */
-
-      DEBUGASSERT(lower->ops->stop != NULL);
-
-      lower->ops->stop(lower);
+        lower->ops->stop(lower);
     }
 
-  nxmutex_unlock(&upper->lock);
-  ret = OK;
+    nxmutex_unlock(&upper->lock);
+    ret = OK;
 
 errout:
-  return ret;
+    return (ret);
 }
 
 /****************************************************************************
@@ -219,14 +187,9 @@ errout:
  *   A dummy read method.  This is provided only to satisfy the VFS layer.
  *
  ****************************************************************************/
-
-static ssize_t cap_read(FAR struct file *filep,
-                       FAR char *buffer,
-                       size_t buflen)
-{
-  /* Return zero -- usually meaning end-of-file */
-
-  return 0;
+static ssize_t cap_read(FAR struct file* filep, FAR char* buffer, size_t buflen) {
+    /* Return zero -- usually meaning end-of-file */
+    return (0);
 }
 
 /****************************************************************************
@@ -236,14 +199,9 @@ static ssize_t cap_read(FAR struct file *filep,
  *   A dummy write method.  This is provided only to satisfy the VFS layer.
  *
  ****************************************************************************/
-
-static ssize_t cap_write(FAR struct file *filep,
-                        FAR const char *buffer,
-                        size_t buflen)
-{
-  /* Return a failure */
-
-  return -EPERM;
+static ssize_t cap_write(FAR struct file* filep, FAR char const* buffer, size_t buflen) {
+    /* Return a failure */
+    return (-EPERM);
 }
 
 /****************************************************************************
@@ -254,75 +212,59 @@ static ssize_t cap_write(FAR struct file *filep,
  *   This is where ALL of the PWM Capture work is done.
  *
  ****************************************************************************/
+static int cap_ioctl(FAR struct file* filep, int cmd, unsigned long arg) {
+    FAR struct inode* inode = filep->f_inode;
+    FAR struct cap_upperhalf_s* upper;
+    FAR struct cap_lowerhalf_s* lower;
+    int ret;
 
-static int cap_ioctl(FAR struct file *filep, int cmd, unsigned long arg)
-{
-  FAR struct inode          *inode = filep->f_inode;
-  FAR struct cap_upperhalf_s *upper;
-  FAR struct cap_lowerhalf_s *lower;
-  int                        ret;
+    tmrinfo("cmd: %d arg: %ld\n", cmd, arg);
+    upper = inode->i_private;
+    DEBUGASSERT(upper != NULL);
+    lower = upper->lower;
+    DEBUGASSERT(lower != NULL);
 
-  snprintf("cmd: %d arg: %ld\n", cmd, arg);
-  upper = inode->i_private;
-  DEBUGASSERT(upper != NULL);
-  lower = upper->lower;
-  DEBUGASSERT(lower != NULL);
-
-  /* Get exclusive access to the device structures */
-
-  ret = nxmutex_lock(&upper->lock);
-  if (ret < 0)
-    {
-      return ret;
+    /* Get exclusive access to the device structures */
+    ret = nxmutex_lock(&upper->lock);
+    if (ret < 0) {
+        return (ret);
     }
 
-  /* Handle built-in ioctl commands */
+    /* Handle built-in ioctl commands */
+    switch (cmd) {
+            /* CAPIOC_DUTYCYCLE - Get the pwm duty from the capture.
+             * Argument: int8_t pointer to the location to return the duty.
+             */
+        case CAPIOC_DUTYCYCLE : {
+            FAR uint8_t* ptr = (FAR uint8_t*)((uintptr_t)arg);
+            DEBUGASSERT(lower->ops->getduty != NULL && ptr);
+            ret = lower->ops->getduty(lower, ptr);
+        } break;
 
-  switch (cmd)
-    {
-      /* CAPIOC_DUTYCYCLE - Get the pwm duty from the capture.
-       * Argument: int8_t pointer to the location to return the duty.
-       */
+            /* CAPIOC_FREQUENCE - Get the pulse frequence from the capture.
+             * Argument: int32_t pointer to the location to return the frequence.
+             */
+        case CAPIOC_FREQUENCE : {
+            FAR uint32_t* ptr = (FAR uint32_t*)((uintptr_t)arg);
+            DEBUGASSERT(lower->ops->getfreq != NULL && ptr);
+            ret = lower->ops->getfreq(lower, ptr);
+        } break;
 
-      case CAPIOC_DUTYCYCLE:
-        {
-          FAR uint8_t *ptr = (FAR uint8_t *)((uintptr_t)arg);
-          DEBUGASSERT(lower->ops->getduty != NULL && ptr);
-          ret = lower->ops->getduty(lower, ptr);
-        }
-        break;
-
-      /* CAPIOC_FREQUENCE - Get the pulse frequence from the capture.
-       * Argument: int32_t pointer to the location to return the frequence.
-       */
-
-      case CAPIOC_FREQUENCE:
-        {
-          FAR uint32_t *ptr = (FAR uint32_t *)((uintptr_t)arg);
-          DEBUGASSERT(lower->ops->getfreq != NULL && ptr);
-          ret = lower->ops->getfreq(lower, ptr);
-        }
-        break;
-
-      /* Any unrecognized IOCTL commands might be platform-specific ioctl
-       * commands
-       */
-
-      default:
-        {
-          snprintf("Forwarding unrecognized cmd: %d arg: %ld\n", cmd, arg);
-        }
-        break;
+            /* Any unrecognized IOCTL commands might be platform-specific ioctl
+             * commands
+             */
+        default : {
+            tmrinfo("Forwarding unrecognized cmd: %d arg: %ld\n", cmd, arg);
+        } break;
     }
 
-  nxmutex_unlock(&upper->lock);
-  return ret;
+    nxmutex_unlock(&upper->lock);
+    return (ret);
 }
 
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
-
 /****************************************************************************
  * Name: cap_register
  *
@@ -343,30 +285,23 @@ static int cap_ioctl(FAR struct file *filep, int cmd, unsigned long arg)
  *   ENOMEM - Failed to allocate in-memory resources for the operation
  *
  ****************************************************************************/
+int cap_register(FAR char const* devpath, FAR struct cap_lowerhalf_s* lower) {
+    FAR struct cap_upperhalf_s* upper;
 
-int cap_register(FAR const char *devpath, FAR struct cap_lowerhalf_s *lower)
-{
-  FAR struct cap_upperhalf_s *upper;
-
-  /* Allocate the upper-half data structure */
-
-  upper = (FAR struct cap_upperhalf_s *)
-           kmm_zalloc(sizeof(struct cap_upperhalf_s));
-  if (!upper)
-    {
-      return -ENOMEM;
+    /* Allocate the upper-half data structure */
+    upper = (FAR struct cap_upperhalf_s*)kmm_zalloc(sizeof(struct cap_upperhalf_s));
+    if (!upper) {
+        return -ENOMEM;
     }
 
-  /* Initialize the PWM Capture device structure
-   * (it was already zeroed by kmm_zalloc())
-   */
+    /* Initialize the PWM Capture device structure
+     * (it was already zeroed by kmm_zalloc())
+     */
+    nxmutex_init(&upper->lock);
+    upper->lower = lower;
 
-  nxmutex_init(&upper->lock);
-  upper->lower = lower;
-
-  /* Register the PWM Capture device */
-
-  return register_driver(devpath, &g_capops, 0666, upper);
+    /* Register the PWM Capture device */
+    return register_driver(devpath, &g_capops, 0666, upper);
 }
 
 #endif /* CONFIG_CAPTURE */

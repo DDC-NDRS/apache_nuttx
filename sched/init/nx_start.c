@@ -125,7 +125,7 @@ dq_queue_t g_assignedtasks[CONFIG_SMP_NCPUS];
  * It is valid only when up_interrupt_context() returns true.
  */
 
-FAR struct tcb_s *g_running_tasks[CONFIG_SMP_NCPUS];
+FAR struct tcb_s* g_running_tasks[CONFIG_SMP_NCPUS];
 
 /* This is the list of all tasks that are ready-to-run, but cannot be placed
  * in the g_readytorun list because:  (1) They are higher priority than the
@@ -170,8 +170,8 @@ volatile pid_t g_lastpid;
  * 2. Is used to quickly map a process ID into a TCB.
  */
 
-FAR struct tcb_s **g_pidhash;
-volatile int g_npidhash;
+FAR struct tcb_s** g_pidhash;
+volatile int       g_npidhash;
 
 /* This is a table of task lists.  This table is indexed by the task stat
  * enumeration type (tstate_t) and provides a pointer to the associated
@@ -277,9 +277,9 @@ static struct task_tcb_s g_idletcb[CONFIG_SMP_NCPUS];
 
 #if CONFIG_TASK_NAME_SIZE <= 0 || !defined(CONFIG_SMP)
 #ifdef CONFIG_SMP
-static const char g_idlename[] = "CPU Idle";
+static char const g_idlename[] = "CPU Idle";
 #else
-static const char g_idlename[] = "Idle Task";
+static char const g_idlename[] = "Idle Task";
 #endif
 #endif
 
@@ -288,7 +288,7 @@ static const char g_idlename[] = "Idle Task";
  * do things s little differently here for the IDLE tasks.
  */
 
-static FAR char *g_idleargv[CONFIG_SMP_NCPUS][2];
+static FAR char* g_idleargv[CONFIG_SMP_NCPUS][2];
 
 /****************************************************************************
  * Public Functions
@@ -309,392 +309,324 @@ static FAR char *g_idleargv[CONFIG_SMP_NCPUS][2];
  *   Does not return.
  *
  ****************************************************************************/
+void /**/nx_start(void) {
+    int i;
 
-void nx_start(void)
-{
-  int i;
+    sinfo("Entry\n");
 
-  sinfo("Entry\n");
+    /* Boot up is complete */
+    g_nx_initstate = OSINIT_BOOT;
 
-  /* Boot up is complete */
+    /* Initialize RTOS Data ***************************************************/
 
-  g_nx_initstate = OSINIT_BOOT;
+    /* Initialize the IDLE task TCB *******************************************/
+    for (i = 0; i < CONFIG_SMP_NCPUS; i++) {
+        FAR dq_queue_t* tasklist;
 
-  /* Initialize RTOS Data ***************************************************/
+        /* Initialize a TCB for this thread of execution.  NOTE:  The default
+         * value for most components of the g_idletcb are zero.  The entire
+         * structure is set to zero.  Then only the (potentially) non-zero
+         * elements are initialized. NOTE:  The idle task is the only task in
+         * that has pid == 0 and sched_priority == 0.
+         */
+        memset((void*)&g_idletcb[i], 0, sizeof(struct task_tcb_s));
+        g_idletcb[i].cmn.pid        = i;
+        g_idletcb[i].cmn.task_state = TSTATE_TASK_RUNNING;
 
-  /* Initialize the IDLE task TCB *******************************************/
-
-  for (i = 0; i < CONFIG_SMP_NCPUS; i++)
-    {
-      FAR dq_queue_t *tasklist;
-
-      /* Initialize a TCB for this thread of execution.  NOTE:  The default
-       * value for most components of the g_idletcb are zero.  The entire
-       * structure is set to zero.  Then only the (potentially) non-zero
-       * elements are initialized. NOTE:  The idle task is the only task in
-       * that has pid == 0 and sched_priority == 0.
-       */
-
-      memset((void *)&g_idletcb[i], 0, sizeof(struct task_tcb_s));
-      g_idletcb[i].cmn.pid        = i;
-      g_idletcb[i].cmn.task_state = TSTATE_TASK_RUNNING;
-
-      /* Set the entry point.  This is only for debug purposes.  NOTE: that
-       * the start_t entry point is not saved.  That is acceptable, however,
-       * because it can be used only for restarting a task: The IDLE task
-       * cannot be restarted.
-       */
-
-#ifdef CONFIG_SMP
-      if (i > 0)
-        {
-          g_idletcb[i].cmn.start      = nx_idle_trampoline;
-          g_idletcb[i].cmn.entry.main = (main_t)nx_idle_trampoline;
+        /* Set the entry point.  This is only for debug purposes.  NOTE: that
+         * the start_t entry point is not saved.  That is acceptable, however,
+         * because it can be used only for restarting a task: The IDLE task
+         * cannot be restarted.
+         */
+        #ifdef CONFIG_SMP
+        if (i > 0) {
+            g_idletcb[i].cmn.start      = nx_idle_trampoline;
+            g_idletcb[i].cmn.entry.main = (main_t)nx_idle_trampoline;
         }
-      else
-#endif
+        else
+        #endif
         {
-          g_idletcb[i].cmn.start      = nx_start;
-          g_idletcb[i].cmn.entry.main = (main_t)nx_start;
+            g_idletcb[i].cmn.start      = nx_start;
+            g_idletcb[i].cmn.entry.main = (main_t)nx_start;
         }
 
-      /* Set the task flags to indicate that this is a kernel thread and, if
-       * configured for SMP, that this task is locked to this CPU.
-       */
+        /* Set the task flags to indicate that this is a kernel thread and, if
+         * configured for SMP, that this task is locked to this CPU.
+         */
+        #ifdef CONFIG_SMP
+        g_idletcb[i].cmn.flags = (TCB_FLAG_TTYPE_KERNEL | TCB_FLAG_NONCANCELABLE | TCB_FLAG_CPU_LOCKED);
+        g_idletcb[i].cmn.cpu   = i;
 
-#ifdef CONFIG_SMP
-      g_idletcb[i].cmn.flags = (TCB_FLAG_TTYPE_KERNEL |
-                                TCB_FLAG_NONCANCELABLE |
-                                TCB_FLAG_CPU_LOCKED);
-      g_idletcb[i].cmn.cpu   = i;
+        /* Set the affinity mask to allow the thread to run on all CPUs.  No,
+         * this IDLE thread can only run on its assigned CPU.  That is
+         * enforced by the TCB_FLAG_CPU_LOCKED which overrides the affinity
+         * mask.  This is essential because all tasks inherit the affinity
+         * mask from their parent and, ultimately, the parent of all tasks is
+         * the IDLE task.
+         */
+        g_idletcb[i].cmn.affinity = (cpu_set_t)(CONFIG_SMP_DEFAULT_CPUSET & SCHED_ALL_CPUS);
+        #else
+        g_idletcb[i].cmn.flags = (TCB_FLAG_TTYPE_KERNEL | TCB_FLAG_NONCANCELABLE);
+        #endif
 
-      /* Set the affinity mask to allow the thread to run on all CPUs.  No,
-       * this IDLE thread can only run on its assigned CPU.  That is
-       * enforced by the TCB_FLAG_CPU_LOCKED which overrides the affinity
-       * mask.  This is essential because all tasks inherit the affinity
-       * mask from their parent and, ultimately, the parent of all tasks is
-       * the IDLE task.
-       */
+        #if (CONFIG_TASK_NAME_SIZE > 0)
+        /* Set the IDLE task name */
+        #ifdef CONFIG_SMP
+        snprintf(g_idletcb[i].cmn.name, CONFIG_TASK_NAME_SIZE, "CPU%d IDLE", i);
+        #else
+        strlcpy(g_idletcb[i].cmn.name, g_idlename, CONFIG_TASK_NAME_SIZE);
+        #endif
 
-      g_idletcb[i].cmn.affinity =
-        (cpu_set_t)(CONFIG_SMP_DEFAULT_CPUSET & SCHED_ALL_CPUS);
-#else
-      g_idletcb[i].cmn.flags = (TCB_FLAG_TTYPE_KERNEL |
-                                TCB_FLAG_NONCANCELABLE);
-#endif
+        /* Configure the task name in the argument list.  The IDLE task does
+         * not really have an argument list, but this name is still useful
+         * for things like the NSH PS command.
+         *
+         * In the kernel mode build, the arguments are saved on the task's
+         * stack and there is no support that yet.
+         */
 
-#if CONFIG_TASK_NAME_SIZE > 0
-      /* Set the IDLE task name */
+        g_idleargv[i][0] = g_idletcb[i].cmn.name;
+        #else
+        g_idleargv[i][0]       = (FAR char*)g_idlename;
+        #endif /* CONFIG_TASK_NAME_SIZE */
 
-#  ifdef CONFIG_SMP
-      snprintf(g_idletcb[i].cmn.name, CONFIG_TASK_NAME_SIZE, "CPU%d IDLE",
-               i);
-#  else
-      strlcpy(g_idletcb[i].cmn.name, g_idlename, CONFIG_TASK_NAME_SIZE);
-#  endif
+        /* Then add the idle task's TCB to the head of the current ready to
+         * run list.
+         */
+        #ifdef CONFIG_SMP
+        tasklist = TLIST_HEAD(&g_idletcb[i].cmn, i);
+        #else
+        tasklist = TLIST_HEAD(&g_idletcb[i].cmn);
+        #endif
 
-      /* Configure the task name in the argument list.  The IDLE task does
-       * not really have an argument list, but this name is still useful
-       * for things like the NSH PS command.
-       *
-       * In the kernel mode build, the arguments are saved on the task's
-       * stack and there is no support that yet.
-       */
+        dq_addfirst((FAR dq_entry_t*)&g_idletcb[i], tasklist);
 
-      g_idleargv[i][0] = g_idletcb[i].cmn.name;
-#else
-      g_idleargv[i][0] = (FAR char *)g_idlename;
-#endif /* CONFIG_TASK_NAME_SIZE */
-
-      /* Then add the idle task's TCB to the head of the current ready to
-       * run list.
-       */
-
-#ifdef CONFIG_SMP
-      tasklist = TLIST_HEAD(&g_idletcb[i].cmn, i);
-#else
-      tasklist = TLIST_HEAD(&g_idletcb[i].cmn);
-#endif
-      dq_addfirst((FAR dq_entry_t *)&g_idletcb[i], tasklist);
-
-      /* Mark the idle task as the running task */
-
-      g_running_tasks[i] = &g_idletcb[i].cmn;
+        /* Mark the idle task as the running task */
+        g_running_tasks[i] = &g_idletcb[i].cmn;
     }
 
-  /* Task lists are initialized */
+    /* Task lists are initialized */
+    g_nx_initstate = OSINIT_TASKLISTS;
 
-  g_nx_initstate = OSINIT_TASKLISTS;
+    /* Initialize RTOS facilities *********************************************/
 
-  /* Initialize RTOS facilities *********************************************/
+    /* Initialize the semaphore facility.  This has to be done very early
+     * because many subsystems depend upon fully functional semaphores.
+     */
+    nxsem_initialize();
 
-  /* Initialize the semaphore facility.  This has to be done very early
-   * because many subsystems depend upon fully functional semaphores.
-   */
-
-  nxsem_initialize();
-
-#if defined(MM_KERNEL_USRHEAP_INIT) || defined(CONFIG_MM_KERNEL_HEAP) || \
-    defined(CONFIG_MM_PGALLOC)
-  /* Initialize the memory manager */
-
+    #if defined(MM_KERNEL_USRHEAP_INIT) || defined(CONFIG_MM_KERNEL_HEAP) || defined(CONFIG_MM_PGALLOC)
+    /* Initialize the memory manager */
     {
-      FAR void *heap_start;
-      size_t heap_size;
+        FAR void* heap_start;
+        size_t    heap_size;
 
-#ifdef MM_KERNEL_USRHEAP_INIT
-      /* Get the user-mode heap from the platform specific code and configure
-       * the user-mode memory allocator.
-       */
+        #ifdef MM_KERNEL_USRHEAP_INIT
+        /* Get the user-mode heap from the platform specific code and configure
+         * the user-mode memory allocator.
+         */
+        up_allocate_heap(&heap_start, &heap_size);
+        kumm_initialize(heap_start, heap_size);
+        #endif
 
-      up_allocate_heap(&heap_start, &heap_size);
-      kumm_initialize(heap_start, heap_size);
-#endif
+        #ifdef CONFIG_MM_KERNEL_HEAP
+        /* Get the kernel-mode heap from the platform specific code and
+         * configure the kernel-mode memory allocator.
+         */
+        up_allocate_kheap(&heap_start, &heap_size);
+        kmm_initialize(heap_start, heap_size);
+        #endif
 
-#ifdef CONFIG_MM_KERNEL_HEAP
-      /* Get the kernel-mode heap from the platform specific code and
-       * configure the kernel-mode memory allocator.
-       */
+        #ifdef CONFIG_MM_PGALLOC
+        /* If there is a page allocator in the configuration, then get the page
+         * heap information from the platform-specific code and configure the
+         * page allocator.
+         */
 
-      up_allocate_kheap(&heap_start, &heap_size);
-      kmm_initialize(heap_start, heap_size);
-#endif
-
-#ifdef CONFIG_MM_PGALLOC
-      /* If there is a page allocator in the configuration, then get the page
-       * heap information from the platform-specific code and configure the
-       * page allocator.
-       */
-
-      up_allocate_pgheap(&heap_start, &heap_size);
-      mm_pginitialize(heap_start, heap_size);
-#endif
+        up_allocate_pgheap(&heap_start, &heap_size);
+        mm_pginitialize(heap_start, heap_size);
+        #endif
     }
-#endif
+    #endif
 
-#ifdef CONFIG_ARCH_HAVE_EXTRA_HEAPS
-  /* Initialize any extra heap. */
+    #ifdef CONFIG_ARCH_HAVE_EXTRA_HEAPS
+    /* Initialize any extra heap. */
+    up_extraheaps_init();
+    #endif
 
-  up_extraheaps_init();
-#endif
+    #ifdef CONFIG_MM_IOB
+    /* Initialize IO buffering */
+    iob_initialize();
+    #endif
 
-#ifdef CONFIG_MM_IOB
-  /* Initialize IO buffering */
-
-  iob_initialize();
-#endif
-
-  /* Initialize the logic that determine unique process IDs. */
-
-  g_npidhash = 4;
-  while (g_npidhash <= CONFIG_SMP_NCPUS)
-    {
-      g_npidhash <<= 1;
+    /* Initialize the logic that determine unique process IDs. */
+    g_npidhash = 4;
+    while (g_npidhash <= CONFIG_SMP_NCPUS) {
+        g_npidhash <<= 1;
     }
+    g_pidhash = kmm_zalloc(sizeof(*g_pidhash) * g_npidhash);
+    DEBUGASSERT(g_pidhash);
 
-  g_pidhash = kmm_zalloc(sizeof(*g_pidhash) * g_npidhash);
-  DEBUGASSERT(g_pidhash);
+    /* IDLE Group Initialization **********************************************/
+    for (i = 0; i < CONFIG_SMP_NCPUS; i++) {
+        int hashndx;
 
-  /* IDLE Group Initialization **********************************************/
+        /* Assign the process ID(s) of ZERO to the idle task(s) */
+        hashndx = PIDHASH(i);
+        g_pidhash[hashndx] = &g_idletcb[i].cmn;
 
-  for (i = 0; i < CONFIG_SMP_NCPUS; i++)
-    {
-      int hashndx;
+        /* Allocate the IDLE group */
+        DEBUGVERIFY(group_allocate(&g_idletcb[i], g_idletcb[i].cmn.flags));
+        g_idletcb[i].cmn.group->tg_info->argv = &g_idleargv[i][0];
 
-      /* Assign the process ID(s) of ZERO to the idle task(s) */
-
-      hashndx            = PIDHASH(i);
-      g_pidhash[hashndx] = &g_idletcb[i].cmn;
-
-      /* Allocate the IDLE group */
-
-      DEBUGVERIFY(group_allocate(&g_idletcb[i], g_idletcb[i].cmn.flags));
-      g_idletcb[i].cmn.group->tg_info->argv = &g_idleargv[i][0];
-
-#ifdef CONFIG_SMP
-      /* Create a stack for all CPU IDLE threads (except CPU0 which already
-       * has a stack).
-       */
-
-      if (i > 0)
-        {
-          DEBUGVERIFY(up_cpu_idlestack(i, &g_idletcb[i].cmn,
-                                       CONFIG_IDLETHREAD_STACKSIZE));
+        #ifdef CONFIG_SMP
+        /* Create a stack for all CPU IDLE threads (except CPU0 which already
+         * has a stack).
+         */
+        if (i > 0) {
+            DEBUGVERIFY(up_cpu_idlestack(i, &g_idletcb[i].cmn, CONFIG_IDLETHREAD_STACKSIZE));
         }
-#endif
+        #endif
 
-      /* Initialize the processor-specific portion of the TCB */
+        /* Initialize the processor-specific portion of the TCB */
+        up_initial_state(&g_idletcb[i].cmn);
 
-      up_initial_state(&g_idletcb[i].cmn);
+        /* Initialize the thread local storage */
+        tls_init_info(&g_idletcb[i].cmn);
 
-      /* Initialize the thread local storage */
-
-      tls_init_info(&g_idletcb[i].cmn);
-
-      /* Complete initialization of the IDLE group.  Suppress retention
-       * of child status in the IDLE group.
-       */
-
-      group_initialize(&g_idletcb[i]);
-      g_idletcb[i].cmn.group->tg_flags = GROUP_FLAG_NOCLDWAIT |
-                                         GROUP_FLAG_PRIVILEGED;
+        /* Complete initialization of the IDLE group.  Suppress retention
+         * of child status in the IDLE group.
+         */
+        group_initialize(&g_idletcb[i]);
+        g_idletcb[i].cmn.group->tg_flags = GROUP_FLAG_NOCLDWAIT | GROUP_FLAG_PRIVILEGED;
     }
 
-  g_lastpid = CONFIG_SMP_NCPUS - 1;
+    g_lastpid = CONFIG_SMP_NCPUS - 1;
 
-  /* The memory manager is available */
+    /* The memory manager is available */
+    g_nx_initstate = OSINIT_MEMORY;
 
-  g_nx_initstate = OSINIT_MEMORY;
+    /* Initialize tasking data structures */
+    task_initialize();
 
-  /* Initialize tasking data structures */
+    /* Disables context switching because we need take the memory manager
+     * semaphore on this CPU so that it will not be available on the other
+     * CPUs until we have finished initialization.
+     */
+    sched_lock();
 
-  task_initialize();
+    /* Initialize the file system (needed to support device drivers) */
+    fs_initialize();
 
-  /* Disables context switching because we need take the memory manager
-   * semaphore on this CPU so that it will not be available on the other
-   * CPUs until we have finished initialization.
-   */
+    /* Initialize the interrupt handling subsystem (if included) */
+    irq_initialize();
 
-  sched_lock();
+    /* Initialize the POSIX timer facility (if included in the link) */
+    clock_initialize();
 
-  /* Initialize the file system (needed to support device drivers) */
+    #ifndef CONFIG_DISABLE_POSIX_TIMERS
+    timer_initialize();
+    #endif
 
-  fs_initialize();
+    /* Initialize the signal facility (if in link) */
+    nxsig_initialize();
 
-  /* Initialize the interrupt handling subsystem (if included) */
+    #if !defined(CONFIG_DISABLE_MQUEUE) || !defined(CONFIG_DISABLE_MQUEUE_SYSV)
+    /* Initialize the named message queue facility (if in link) */
+    nxmq_initialize();
+    #endif
 
-  irq_initialize();
+    #ifndef CONFIG_DISABLE_MQUEUE_SYSV
+    /* Initialize the System V message queue facility (if in link) */
+    nxmsg_initialize();
+    #endif
 
-  /* Initialize the POSIX timer facility (if included in the link) */
+    #ifdef CONFIG_NET
+    /* Initialize the networking system */
+    net_initialize();
+    #endif
 
-  clock_initialize();
+    #ifndef CONFIG_BINFMT_DISABLE
+    /* Initialize the binfmt system */
+    binfmt_initialize();
+    #endif
 
-#ifndef CONFIG_DISABLE_POSIX_TIMERS
-  timer_initialize();
-#endif
+    /* Initialize Hardware Facilities *****************************************/
 
-  /* Initialize the signal facility (if in link) */
+    /* The processor specific details of running the operating system
+     * will be handled here.  Such things as setting up interrupt
+     * service routines and starting the clock are some of the things
+     * that are different for each  processor and hardware platform.
+     */
+    up_initialize();
 
-  nxsig_initialize();
+    /* Initialize common drivers */
+    drivers_initialize();
 
-#if !defined(CONFIG_DISABLE_MQUEUE) || !defined(CONFIG_DISABLE_MQUEUE_SYSV)
-  /* Initialize the named message queue facility (if in link) */
+    #ifdef CONFIG_BOARD_EARLY_INITIALIZE
+    /* Call the board-specific up_initialize() extension to support
+     * early initialization of board-specific drivers and resources
+     * that cannot wait until board_late_initialize.
+     */
 
-  nxmq_initialize();
-#endif
+    board_early_initialize();
+    #endif
 
-#ifndef CONFIG_DISABLE_MQUEUE_SYSV
-  /* Initialize the System V message queue facility (if in link) */
+    /* Hardware resources are now available */
+    g_nx_initstate = OSINIT_HARDWARE;
 
-  nxmsg_initialize();
-#endif
+    /* Setup for Multi-Tasking ************************************************/
 
-#ifdef CONFIG_NET
-  /* Initialize the networking system */
+    /* Announce that the CPU0 IDLE task has started */
+    sched_note_start(&g_idletcb[0].cmn);
 
-  net_initialize();
-#endif
-
-#ifndef CONFIG_BINFMT_DISABLE
-  /* Initialize the binfmt system */
-
-  binfmt_initialize();
-#endif
-
-  /* Initialize Hardware Facilities *****************************************/
-
-  /* The processor specific details of running the operating system
-   * will be handled here.  Such things as setting up interrupt
-   * service routines and starting the clock are some of the things
-   * that are different for each  processor and hardware platform.
-   */
-
-  up_initialize();
-
-  /* Initialize common drivers */
-
-  drivers_initialize();
-
-#ifdef CONFIG_BOARD_EARLY_INITIALIZE
-  /* Call the board-specific up_initialize() extension to support
-   * early initialization of board-specific drivers and resources
-   * that cannot wait until board_late_initialize.
-   */
-
-  board_early_initialize();
-#endif
-
-  /* Hardware resources are now available */
-
-  g_nx_initstate = OSINIT_HARDWARE;
-
-  /* Setup for Multi-Tasking ************************************************/
-
-  /* Announce that the CPU0 IDLE task has started */
-
-  sched_note_start(&g_idletcb[0].cmn);
-
-  /* Initialize stdio for the IDLE task of each CPU */
-
-  for (i = 0; i < CONFIG_SMP_NCPUS; i++)
-    {
-      if (i > 0)
-        {
-          /* Clone stdout, stderr, stdin from the CPU0 IDLE task. */
-
-          DEBUGVERIFY(group_setuptaskfiles(&g_idletcb[i]));
+    /* Initialize stdio for the IDLE task of each CPU */
+    for (i = 0; i < CONFIG_SMP_NCPUS; i++) {
+        if (i > 0) {
+            /* Clone stdout, stderr, stdin from the CPU0 IDLE task. */
+            DEBUGVERIFY(group_setuptaskfiles(&g_idletcb[i]));
         }
-      else
-        {
-          /* Create stdout, stderr, stdin on the CPU0 IDLE task.  These
-           * will be inherited by all of the threads created by the CPU0
-           * IDLE task.
-           */
-
-          DEBUGVERIFY(group_setupidlefiles(&g_idletcb[i]));
+        else {
+            /* Create stdout, stderr, stdin on the CPU0 IDLE task.  These
+             * will be inherited by all of the threads created by the CPU0
+             * IDLE task.
+             */
+            DEBUGVERIFY(group_setupidlefiles(&g_idletcb[i]));
         }
     }
 
-#ifdef CONFIG_SMP
-  /* Start all CPUs *********************************************************/
+    #ifdef CONFIG_SMP
+    /* Start all CPUs *********************************************************/
 
-  /* A few basic sanity checks */
+    /* A few basic sanity checks */
+    DEBUGASSERT(this_cpu() == 0);
 
-  DEBUGASSERT(this_cpu() == 0);
+    /* Then start the other CPUs */
 
-  /* Then start the other CPUs */
+    DEBUGVERIFY(nx_smp_start());
 
-  DEBUGVERIFY(nx_smp_start());
+    #endif /* CONFIG_SMP */
 
-#endif /* CONFIG_SMP */
+    /* Bring Up the System ****************************************************/
 
-  /* Bring Up the System ****************************************************/
+    /* The OS is fully initialized and we are beginning multi-tasking */
+    g_nx_initstate = OSINIT_OSREADY;
 
-  /* The OS is fully initialized and we are beginning multi-tasking */
+    /* Create initial tasks and bring-up the system */
+    DEBUGVERIFY(nx_bringup());
 
-  g_nx_initstate = OSINIT_OSREADY;
+    /* Enter to idleloop */
+    g_nx_initstate = OSINIT_IDLELOOP;
 
-  /* Create initial tasks and bring-up the system */
+    /* Let other threads have access to the memory manager */
+    sched_unlock();
 
-  DEBUGVERIFY(nx_bringup());
+    /* The IDLE Loop **********************************************************/
 
-  /* Enter to idleloop */
-
-  g_nx_initstate = OSINIT_IDLELOOP;
-
-  /* Let other threads have access to the memory manager */
-
-  sched_unlock();
-
-  /* The IDLE Loop **********************************************************/
-
-  /* When control is return to this point, the system is idle. */
-
-  sinfo("CPU0: Beginning Idle Loop\n");
-  for (; ; )
-    {
-      /* Perform any processor-specific idle state operations */
-
-      up_idle();
+    /* When control is return to this point, the system is idle. */
+    sinfo("CPU0: Beginning Idle Loop\n");
+    for (;;) {
+        /* Perform any processor-specific idle state operations */
+        up_idle();
     }
 }

@@ -22,7 +22,6 @@
 /****************************************************************************
  * Included Files
  ****************************************************************************/
-
 #include <nuttx/config.h>
 
 #include "s32k14x/s32k14x_clocknames.h"
@@ -37,121 +36,117 @@
 /* Each S32K1XX board must provide the following initialized structure.
  * This is needed to establish the initial peripheral clocking.
  */
-
-const struct peripheral_clock_config_s g_peripheral_clockconfig0[] =
-{
-  {
-    .clkname = FLEXCAN0_CLK,
-#ifdef CONFIG_S32K1XX_FLEXCAN0
-    .clkgate = true,
-#else
-    .clkgate = false,
-#endif
-  },
-  {
-    .clkname = FLEXCAN1_CLK,
-#ifdef CONFIG_S32K1XX_FLEXCAN1
-    .clkgate = true,
-#else
-    .clkgate = false,
-#endif
-  },
-  {
-    .clkname = FLEXCAN2_CLK,
-#ifdef CONFIG_S32K1XX_FLEXCAN2
-    .clkgate = true,
-#else
-    .clkgate = false,
-#endif
-  },
-  {
-    .clkname = LPI2C0_CLK,
-#ifdef CONFIG_S32K1XX_LPI2C0
-    .clkgate = true,
-#else
-    .clkgate = false,
-#endif
-    .clksrc  = CLK_SRC_SIRC_DIV2,
-  },
-  {
-    .clkname = LPSPI0_CLK,
-#ifdef CONFIG_S32K1XX_LPSPI0
-    .clkgate = true,
-#else
-    .clkgate = false,
-#endif
-    .clksrc  = CLK_SRC_SIRC_DIV2,
-  },
-  {
-    .clkname = LPSPI1_CLK,
-#ifdef CONFIG_S32K1XX_LPSPI1
-    .clkgate = true,
-#else
-    .clkgate = false,
-#endif
-    .clksrc  = CLK_SRC_SIRC_DIV2,
-  },
-  {
-    .clkname = LPSPI2_CLK,
-#ifdef CONFIG_S32K1XX_LPSPI2
-    .clkgate = true,
-#else
-    .clkgate = false,
-#endif
-    .clksrc  = CLK_SRC_SIRC_DIV2,
-  },
-  {
-    .clkname = LPUART0_CLK,
-#ifdef CONFIG_S32K1XX_LPUART0
-    .clkgate = true,
-#else
-    .clkgate = false,
-#endif
-    .clksrc  = CLK_SRC_SIRC_DIV2,
-  },
-  {
-    .clkname = LPUART1_CLK,
-#ifdef CONFIG_S32K1XX_LPUART1
-    .clkgate = true,
-#else
-    .clkgate = false,
-#endif
-    .clksrc  = CLK_SRC_SIRC_DIV2,
-  },
-  {
-    .clkname = LPUART2_CLK,
-#ifdef CONFIG_S32K1XX_LPUART2
-    .clkgate = true,
-#else
-    .clkgate = false,
-#endif
-    .clksrc  = CLK_SRC_SIRC_DIV2,
-  },
-  {
-    .clkname = PORTA_CLK,
-    .clkgate = true,
-  },
-  {
-    .clkname = PORTB_CLK,
-    .clkgate = true,
-  },
-  {
-    .clkname = PORTC_CLK,
-    .clkgate = true,
-  },
-  {
-    .clkname = PORTD_CLK,
-    .clkgate = true,
-  },
-  {
-    .clkname = PORTE_CLK,
-    .clkgate = true,
-  },
+const struct peripheral_clock_config_s g_peripheral_clockconfig0[] = {
+    {
+        .clkname = FLEXCAN0_CLK,
+        #ifdef CONFIG_S32K1XX_FLEXCAN0
+        .clkgate = true,
+        #else
+        .clkgate = false,
+        #endif
+    },
+    {
+        .clkname = FLEXCAN1_CLK,
+        #ifdef CONFIG_S32K1XX_FLEXCAN1
+        .clkgate = true,
+        #else
+        .clkgate = false,
+        #endif
+    },
+    {
+        .clkname = FLEXCAN2_CLK,
+        #ifdef CONFIG_S32K1XX_FLEXCAN2
+        .clkgate = true,
+        #else
+        .clkgate = false,
+        #endif
+    },
+    {
+        .clkname = LPI2C0_CLK,
+        #ifdef CONFIG_S32K1XX_LPI2C0
+        .clkgate = true,
+        #else
+        .clkgate = false,
+        #endif
+        .clksrc = CLK_SRC_SIRC_DIV2,
+    },
+    {
+        .clkname = LPSPI0_CLK,
+        #ifdef CONFIG_S32K1XX_LPSPI0
+        .clkgate = true,
+        #else
+        .clkgate = false,
+        #endif
+        .clksrc = CLK_SRC_SIRC_DIV2,
+    },
+    {
+        .clkname = LPSPI1_CLK,
+        #ifdef CONFIG_S32K1XX_LPSPI1
+        .clkgate = true,
+        #else
+        .clkgate = false,
+        #endif
+        .clksrc = CLK_SRC_SIRC_DIV2,
+    },
+    {
+        .clkname = LPSPI2_CLK,
+        #ifdef CONFIG_S32K1XX_LPSPI2
+        .clkgate = true,
+        #else
+        .clkgate = false,
+        #endif
+        .clksrc = CLK_SRC_SIRC_DIV2,
+    },
+    {
+        .clkname = LPUART0_CLK,
+        #ifdef CONFIG_S32K1XX_LPUART0
+        .clkgate = true,
+        #else
+        .clkgate = false,
+        #endif
+        .clksrc = CLK_SRC_SIRC_DIV2,
+    },
+    {
+        .clkname = LPUART1_CLK,
+        #ifdef CONFIG_S32K1XX_LPUART1
+        .clkgate = true,
+        #else
+        .clkgate = false,
+        #endif
+        .clksrc = CLK_SRC_SIRC_DIV2,
+    },
+    {
+        .clkname = LPUART2_CLK,
+        #ifdef CONFIG_S32K1XX_LPUART2
+        .clkgate = true,
+        #else
+        .clkgate = false,
+        #endif
+        .clksrc = CLK_SRC_SIRC_DIV2,
+    },
+    {
+        .clkname = PORTA_CLK,
+        .clkgate = true,
+    },
+    {
+        .clkname = PORTB_CLK,
+        .clkgate = true,
+    },
+    {
+        .clkname = PORTC_CLK,
+        .clkgate = true,
+    },
+    {
+        .clkname = PORTD_CLK,
+        .clkgate = true,
+    },
+    {
+        .clkname = PORTE_CLK,
+        .clkgate = true,
+    },
 };
 
-size_t const num_of_peripheral_clocks_0 =
-    sizeof(g_peripheral_clockconfig0) /
-    sizeof(g_peripheral_clockconfig0[0]);
+size_t const num_of_peripheral_clocks_0 = sizeof(g_peripheral_clockconfig0) / sizeof(g_peripheral_clockconfig0[0]);
 
 /****************************************************************************
  * Public Functions

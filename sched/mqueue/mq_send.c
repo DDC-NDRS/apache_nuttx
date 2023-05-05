@@ -21,7 +21,6 @@
 /****************************************************************************
  * Included Files
  ****************************************************************************/
-
 #include <nuttx/config.h>
 
 #include <assert.h>
@@ -67,76 +66,69 @@
  *   (see mq_send() for the list list valid return values).
  *
  ****************************************************************************/
+int file_mq_send(FAR struct file* mq, FAR char const* msg, size_t msglen, unsigned int prio) {
+    FAR struct mqueue_inode_s* msgq;
+    FAR struct mqueue_msg_s*   mqmsg;
+    irqstate_t flags;
+    int ret;
 
-int file_mq_send(FAR struct file *mq, FAR const char *msg, size_t msglen,
-                 unsigned int prio)
-{
-  FAR struct mqueue_inode_s *msgq;
-  FAR struct mqueue_msg_s *mqmsg;
-  irqstate_t flags;
-  int ret;
+    /* Verify the input parameters -- setting errno appropriately
+     * on any failures to verify.
+     */
 
-  /* Verify the input parameters -- setting errno appropriately
-   * on any failures to verify.
-   */
-
-  ret = nxmq_verify_send(mq, msg, msglen, prio);
-  if (ret < 0)
-    {
-      return ret;
+    ret = nxmq_verify_send(mq, msg, msglen, prio);
+    if (ret < 0) {
+        return ret;
     }
 
-  msgq = mq->f_inode->i_private;
+    msgq = mq->f_inode->i_private;
 
-  /* Allocate a message structure:
-   * - Immediately if we are called from an interrupt handler.
-   * - Immediately if the message queue is not full, or
-   * - After successfully waiting for the message queue to become
-   *   non-FULL.  This would fail with EAGAIN, EINTR, or ETIMEDOUT.
-   */
+    /* Allocate a message structure:
+     * - Immediately if we are called from an interrupt handler.
+     * - Immediately if the message queue is not full, or
+     * - After successfully waiting for the message queue to become
+     *   non-FULL.  This would fail with EAGAIN, EINTR, or ETIMEDOUT.
+     */
 
-  flags = enter_critical_section();
+    flags = enter_critical_section();
 
-  if (!up_interrupt_context())           /* In an interrupt handler? */
-    {
-      /* No.. Not in an interrupt handler.  Is the message queue FULL? */
+    if (!up_interrupt_context()) {          /* In an interrupt handler? */
+        /* No.. Not in an interrupt handler.  Is the message queue FULL? */
 
-      if (msgq->nmsgs >= msgq->maxmsgs)
-        {
-          /* Yes.. the message queue is full.  Wait for space to become
-           * available in the message queue.
-           */
+        if (msgq->nmsgs >= msgq->maxmsgs) {
+            /* Yes.. the message queue is full.  Wait for space to become
+             * available in the message queue.
+             */
 
-          ret = nxmq_wait_send(msgq, mq->f_oflags);
+            ret = nxmq_wait_send(msgq, mq->f_oflags);
         }
     }
 
-  /* ret can only be negative if nxmq_wait_send failed */
+    /* ret can only be negative if nxmq_wait_send failed */
 
-  if (ret == OK)
-    {
-      /* Now allocate the message. */
+    if (ret == OK) {
+        /* Now allocate the message. */
 
-      mqmsg = nxmq_alloc_msg();
-      DEBUGASSERT(mqmsg != NULL);
+        mqmsg = nxmq_alloc_msg();
+        DEBUGASSERT(mqmsg != NULL);
 
-      /* Check if the message was successfully allocated */
+        /* Check if the message was successfully allocated */
 
-      /* The allocation was successful (implying that we can also send the
-       * message). Perform the message send.
-       *
-       * NOTE: There is a race condition here: What if a message is added by
-       * interrupt related logic so that queue again becomes non-empty.
-       * That is handled because nxmq_do_send() will permit the maxmsgs limit
-       * to be exceeded in that case.
-       */
+        /* The allocation was successful (implying that we can also send the
+         * message). Perform the message send.
+         *
+         * NOTE: There is a race condition here: What if a message is added by
+         * interrupt related logic so that queue again becomes non-empty.
+         * That is handled because nxmq_do_send() will permit the maxmsgs limit
+         * to be exceeded in that case.
+         */
 
-      ret = nxmq_do_send(msgq, mqmsg, msg, msglen, prio);
+        ret = nxmq_do_send(msgq, mqmsg, msg, msglen, prio);
     }
 
-  leave_critical_section(flags);
+    leave_critical_section(flags);
 
-  return ret;
+    return ret;
 }
 
 /****************************************************************************
@@ -166,20 +158,16 @@ int file_mq_send(FAR struct file *mq, FAR const char *msg, size_t msglen,
  *   (see mq_send() for the list list valid return values).
  *
  ****************************************************************************/
+int nxmq_send(mqd_t mqdes, FAR char const* msg, size_t msglen, unsigned int prio) {
+    FAR struct file* filep;
+    int ret;
 
-int nxmq_send(mqd_t mqdes, FAR const char *msg, size_t msglen,
-              unsigned int prio)
-{
-  FAR struct file *filep;
-  int ret;
-
-  ret = fs_getfilep(mqdes, &filep);
-  if (ret < 0)
-    {
-      return ret;
+    ret = fs_getfilep(mqdes, &filep);
+    if (ret < 0) {
+        return ret;
     }
 
-  return file_mq_send(filep, msg, msglen, prio);
+    return file_mq_send(filep, msg, msglen, prio);
 }
 
 /****************************************************************************
@@ -222,25 +210,19 @@ int nxmq_send(mqd_t mqdes, FAR const char *msg, size_t msglen,
  *   EINTR    The call was interrupted by a signal handler.
  *
  ****************************************************************************/
+int /**/mq_send(mqd_t mqdes, FAR char const* msg, size_t msglen, unsigned int prio) {
+    int ret;
 
-int mq_send(mqd_t mqdes, FAR const char *msg, size_t msglen,
-            unsigned int prio)
-{
-  int ret;
+    /* mq_send() is a cancellation point */
+    enter_cancellation_point();
 
-  /* mq_send() is a cancellation point */
-
-  enter_cancellation_point();
-
-  /* Let nxmq_send() do all of the work */
-
-  ret = nxmq_send(mqdes, msg, msglen, prio);
-  if (ret < 0)
-    {
-      set_errno(-ret);
-      ret = ERROR;
+    /* Let nxmq_send() do all of the work */
+    ret = nxmq_send(mqdes, msg, msglen, prio);
+    if (ret < 0) {
+        set_errno(-ret);
+        ret = ERROR;
     }
 
-  leave_cancellation_point();
-  return ret;
+    leave_cancellation_point();
+    return ret;
 }

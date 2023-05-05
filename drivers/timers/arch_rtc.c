@@ -31,7 +31,7 @@
  * Private Data
  ****************************************************************************/
 
-static FAR struct rtc_lowerhalf_s *g_rtc_lower;
+static FAR struct rtc_lowerhalf_s* g_rtc_lower;
 
 /****************************************************************************
  * Public Data
@@ -43,24 +43,20 @@ static FAR struct rtc_lowerhalf_s *g_rtc_lower;
  * The value can be changed to false also during operation if RTC for
  * some reason fails.
  */
-
-volatile bool g_rtc_enabled = false;
+extern volatile bool g_rtc_enabled; /* declare as extern instead */
 
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
+void up_rtc_set_lowerhalf(FAR struct rtc_lowerhalf_s* lower, bool sync) {
+    g_rtc_lower   = lower;
+    g_rtc_enabled = true;
 
-void up_rtc_set_lowerhalf(FAR struct rtc_lowerhalf_s *lower, bool sync)
-{
-  g_rtc_lower   = lower;
-  g_rtc_enabled = true;
-
-#ifdef CONFIG_RTC_EXTERNAL
-  if (sync)
-    {
-      clock_synchronize(NULL);
+    #ifdef CONFIG_RTC_EXTERNAL
+    if (sync) {
+        clock_synchronize(NULL);
     }
-#endif
+    #endif
 }
 
 /****************************************************************************
@@ -80,23 +76,19 @@ void up_rtc_set_lowerhalf(FAR struct rtc_lowerhalf_s *lower, bool sync)
  *   The current time in seconds.
  *
  ****************************************************************************/
-
 #ifndef CONFIG_RTC_HIRES
-time_t weak_function up_rtc_time(void)
-{
-  time_t time = 0;
+time_t weak_function up_rtc_time(void) {
+    time_t time = 0;
 
-  if (g_rtc_lower != NULL)
-    {
-      struct rtc_time rtctime;
+    if (g_rtc_lower != NULL) {
+        struct rtc_time rtctime;
 
-      if (g_rtc_lower->ops->rdtime(g_rtc_lower, &rtctime) == 0)
-        {
-          time = timegm((FAR struct tm *)&rtctime);
+        if (g_rtc_lower->ops->rdtime(g_rtc_lower, &rtctime) == 0) {
+            time = timegm((FAR struct tm*)&rtctime);
         }
     }
 
-  return time;
+    return time;
 }
 #endif
 
@@ -117,23 +109,20 @@ time_t weak_function up_rtc_time(void)
  ****************************************************************************/
 
 #ifdef CONFIG_RTC_HIRES
-int weak_function up_rtc_gettime(FAR struct timespec *tp)
-{
-  int ret = -EAGAIN;
+int weak_function up_rtc_gettime(FAR struct timespec* tp) {
+    int ret = -EAGAIN;
 
-  if (g_rtc_lower != NULL)
-    {
-      struct rtc_time rtctime;
+    if (g_rtc_lower != NULL) {
+        struct rtc_time rtctime;
 
-      ret = g_rtc_lower->ops->rdtime(g_rtc_lower, &rtctime);
-      if (ret == 0)
-        {
-          tp->tv_sec = timegm((FAR struct tm *)&rtctime);
-          tp->tv_nsec = rtctime.tm_nsec;
+        ret = g_rtc_lower->ops->rdtime(g_rtc_lower, &rtctime);
+        if (ret == 0) {
+            tp->tv_sec  = timegm((FAR struct tm*)&rtctime);
+            tp->tv_nsec = rtctime.tm_nsec;
         }
     }
 
-  return ret;
+    return ret;
 }
 #endif
 
@@ -161,22 +150,19 @@ int weak_function up_rtc_gettime(FAR struct timespec *tp)
  ****************************************************************************/
 
 #ifdef CONFIG_RTC_DATETIME
-int weak_function up_rtc_getdatetime(FAR struct tm *tp)
-{
-  int ret = -EAGAIN;
+int weak_function up_rtc_getdatetime(FAR struct tm* tp) {
+    int ret = -EAGAIN;
 
-  if (g_rtc_lower != NULL)
-    {
-      struct rtc_time rtctime;
+    if (g_rtc_lower != NULL) {
+        struct rtc_time rtctime;
 
-      ret = g_rtc_lower->ops->rdtime(g_rtc_lower, &rtctime);
-      if (ret == 0)
-        {
-          *tp = *((FAR struct tm *)&rtctime);
+        ret = g_rtc_lower->ops->rdtime(g_rtc_lower, &rtctime);
+        if (ret == 0) {
+            *tp = *((FAR struct tm*)&rtctime);
         }
     }
 
-  return ret;
+    return ret;
 }
 #endif
 
@@ -205,24 +191,20 @@ int weak_function up_rtc_getdatetime(FAR struct tm *tp)
  ****************************************************************************/
 
 #if defined(CONFIG_RTC_DATETIME) && defined(CONFIG_ARCH_HAVE_RTC_SUBSECONDS)
-int weak_function up_rtc_getdatetime_with_subseconds(FAR struct tm *tp,
-                                                     FAR long *nsec)
-{
-  int ret = -EAGAIN;
+int weak_function up_rtc_getdatetime_with_subseconds(FAR struct tm* tp, FAR long* nsec) {
+    int ret = -EAGAIN;
 
-  if (g_rtc_lower != NULL)
-    {
-      struct rtc_time rtctime;
+    if (g_rtc_lower != NULL) {
+        struct rtc_time rtctime;
 
-      ret = g_rtc_lower->ops->rdtime(g_rtc_lower, &rtctime);
-      if (ret == 0)
-        {
-          *tp = *((FAR struct tm *)&rtctime);
-          *nsec = rtctime.tm_nsec;
+        ret = g_rtc_lower->ops->rdtime(g_rtc_lower, &rtctime);
+        if (ret == 0) {
+            *tp   = *((FAR struct tm*)&rtctime);
+            *nsec = rtctime.tm_nsec;
         }
     }
 
-  return ret;
+    return ret;
 }
 #endif
 
@@ -241,20 +223,18 @@ int weak_function up_rtc_getdatetime_with_subseconds(FAR struct tm *tp,
  *
  ****************************************************************************/
 
-int weak_function up_rtc_settime(FAR const struct timespec *tp)
-{
-  int ret = -EAGAIN;
+int weak_function up_rtc_settime(FAR const struct timespec* tp) {
+    int ret = -EAGAIN;
 
-  if (g_rtc_lower != NULL)
-    {
-      struct rtc_time rtctime;
+    if (g_rtc_lower != NULL) {
+        struct rtc_time rtctime;
 
-      gmtime_r(&tp->tv_sec, (FAR struct tm *)&rtctime);
+        gmtime_r(&tp->tv_sec, (FAR struct tm*)&rtctime);
 #if defined(CONFIG_RTC_HIRES) || defined(CONFIG_ARCH_HAVE_RTC_SUBSECONDS)
-      rtctime.tm_nsec = tp->tv_nsec;
+        rtctime.tm_nsec = tp->tv_nsec;
 #endif
-      ret = g_rtc_lower->ops->settime(g_rtc_lower, &rtctime);
+        ret = g_rtc_lower->ops->settime(g_rtc_lower, &rtctime);
     }
 
-  return ret;
+    return ret;
 }

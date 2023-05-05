@@ -380,7 +380,6 @@ int work_queue(int qid, FAR struct work_s *work, worker_t worker,
  *   -EINVAL - An invalid work queue was specified
  *
  ****************************************************************************/
-
 int work_cancel(int qid, FAR struct work_s *work);
 
 /****************************************************************************

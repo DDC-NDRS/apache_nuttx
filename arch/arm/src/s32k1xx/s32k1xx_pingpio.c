@@ -44,37 +44,31 @@
  *   Write one or zero to the selected GPIO pin
  *
  ****************************************************************************/
+void s32k1xx_gpiowrite(uint32_t pinset, bool value) {
+    uintptr_t    base;
+    unsigned int port;
+    unsigned int pin;
 
-void s32k1xx_gpiowrite(uint32_t pinset, bool value)
-{
-  uintptr_t    base;
-  unsigned int port;
-  unsigned int pin;
+    DEBUGASSERT((pinset & _PIN_MODE_MASK) == _PIN_MODE_GPIO);
+    DEBUGASSERT((pinset & _PIN_IO_MASK) == _PIN_OUTPUT);
 
-  DEBUGASSERT((pinset & _PIN_MODE_MASK) == _PIN_MODE_GPIO);
-  DEBUGASSERT((pinset & _PIN_IO_MASK) == _PIN_OUTPUT);
+    /* Get the port number and pin number */
+    port = (pinset & _PIN_PORT_MASK) >> _PIN_PORT_SHIFT;
+    pin  = (pinset & _PIN_MASK) >> _PIN_SHIFT;
 
-  /* Get the port number and pin number */
+    DEBUGASSERT(port < S32K1XX_NPORTS);
+    if (port < S32K1XX_NPORTS) {
+        /* Get the base address of GPIO block for this port */
 
-  port = (pinset & _PIN_PORT_MASK) >> _PIN_PORT_SHIFT;
-  pin  = (pinset & _PIN_MASK)      >> _PIN_SHIFT;
+        base = S32K1XX_GPIO_BASE(port);
 
-  DEBUGASSERT(port < S32K1XX_NPORTS);
-  if (port < S32K1XX_NPORTS)
-    {
-      /* Get the base address of GPIO block for this port */
+        /* Set or clear the output */
 
-      base = S32K1XX_GPIO_BASE(port);
-
-      /* Set or clear the output */
-
-      if (value)
-        {
-          putreg32((1 << pin), base + S32K1XX_GPIO_PSOR_OFFSET);
+        if (value) {
+            putreg32((1 << pin), base + S32K1XX_GPIO_PSOR_OFFSET);
         }
-      else
-        {
-          putreg32((1 << pin), base + S32K1XX_GPIO_PCOR_OFFSET);
+        else {
+            putreg32((1 << pin), base + S32K1XX_GPIO_PCOR_OFFSET);
         }
     }
 }
@@ -86,34 +80,31 @@ void s32k1xx_gpiowrite(uint32_t pinset, bool value)
  *   Read one or zero from the selected GPIO pin
  *
  ****************************************************************************/
+bool s32k1xx_gpioread(uint32_t pinset) {
+    uintptr_t    base;
+    uint32_t     regval;
+    unsigned int port;
+    unsigned int pin;
+    bool         ret = false;
 
-bool s32k1xx_gpioread(uint32_t pinset)
-{
-  uintptr_t    base;
-  uint32_t     regval;
-  unsigned int port;
-  unsigned int pin;
-  bool         ret = false;
+    DEBUGASSERT((pinset & _PIN_MODE_MASK) == _PIN_MODE_GPIO);
 
-  DEBUGASSERT((pinset & _PIN_MODE_MASK) == _PIN_MODE_GPIO);
+    /* Get the port number and pin number */
 
-  /* Get the port number and pin number */
+    port = (pinset & _PIN_PORT_MASK) >> _PIN_PORT_SHIFT;
+    pin  = (pinset & _PIN_MASK) >> _PIN_SHIFT;
 
-  port = (pinset & _PIN_PORT_MASK) >> _PIN_PORT_SHIFT;
-  pin  = (pinset & _PIN_MASK)      >> _PIN_SHIFT;
+    DEBUGASSERT(port < S32K1XX_NPORTS);
+    if (port < S32K1XX_NPORTS) {
+        /* Get the base address of GPIO block for this port */
 
-  DEBUGASSERT(port < S32K1XX_NPORTS);
-  if (port < S32K1XX_NPORTS)
-    {
-      /* Get the base address of GPIO block for this port */
+        base = S32K1XX_GPIO_BASE(port);
 
-      base = S32K1XX_GPIO_BASE(port);
+        /* return the state of the pin */
 
-      /* return the state of the pin */
-
-      regval = getreg32(base + S32K1XX_GPIO_PDIR_OFFSET);
-      ret    = ((regval & (1 << pin)) != 0);
+        regval = getreg32(base + S32K1XX_GPIO_PDIR_OFFSET);
+        ret    = ((regval & (1 << pin)) != 0);
     }
 
-  return ret;
+    return ret;
 }

@@ -21,7 +21,6 @@
 /****************************************************************************
  * Included Files
  ****************************************************************************/
-
 #include <nuttx/config.h>
 
 #include <sys/types.h>
@@ -47,48 +46,44 @@
 /****************************************************************************
  * Private Function Prototypes
  ****************************************************************************/
-
-static int  can_setup(FAR struct socket *psock);
-static sockcaps_t can_sockcaps(FAR struct socket *psock);
-static void can_addref(FAR struct socket *psock);
-static int  can_bind(FAR struct socket *psock,
-              FAR const struct sockaddr *addr, socklen_t addrlen);
-static int  can_poll_local(FAR struct socket *psock, FAR struct pollfd *fds,
-              bool setup);
-static int can_close(FAR struct socket *psock);
+static int        can_setup(FAR struct socket* psock);
+static sockcaps_t can_sockcaps(FAR struct socket* psock);
+static void       can_addref(FAR struct socket* psock);
+static int        can_bind(FAR struct socket* psock, FAR const struct sockaddr* addr, socklen_t addrlen);
+static int        can_poll_local(FAR struct socket* psock, FAR struct pollfd* fds, bool setup);
+static int        can_close(FAR struct socket* psock);
 
 /****************************************************************************
  * Public Data
  ****************************************************************************/
-
-const struct sock_intf_s g_can_sockif =
-{
-  can_setup,        /* si_setup */
-  can_sockcaps,     /* si_sockcaps */
-  can_addref,       /* si_addref */
-  can_bind,         /* si_bind */
-  NULL,             /* si_getsockname */
-  NULL,             /* si_getpeername */
-  NULL,             /* si_listen */
-  NULL,             /* si_connect */
-  NULL,             /* si_accept */
-  can_poll_local,   /* si_poll */
-  can_sendmsg,      /* si_sendmsg */
-  can_recvmsg,      /* si_recvmsg */
-  can_close,        /* si_close */
-  NULL,             /* si_ioctl */
-  NULL,             /* si_socketpair */
-  NULL              /* si_shutdown */
-#if defined(CONFIG_NET_SOCKOPTS) && defined(CONFIG_NET_CANPROTO_OPTIONS)
-  , can_getsockopt  /* si_getsockopt */
-  , can_setsockopt  /* si_setsockopt */
-#endif
+const struct sock_intf_s g_can_sockif = {
+    can_setup,      /* si_setup */
+    can_sockcaps,   /* si_sockcaps */
+    can_addref,     /* si_addref */
+    can_bind,       /* si_bind */
+    NULL,           /* si_getsockname */
+    NULL,           /* si_getpeername */
+    NULL,           /* si_listen */
+    NULL,           /* si_connect */
+    NULL,           /* si_accept */
+    can_poll_local, /* si_poll */
+    can_sendmsg,    /* si_sendmsg */
+    can_recvmsg,    /* si_recvmsg */
+    can_close,      /* si_close */
+    NULL,           /* si_ioctl */
+    NULL,           /* si_socketpair */
+    NULL            /* si_shutdown */
+    #if defined(CONFIG_NET_SOCKOPTS) && defined(CONFIG_NET_CANPROTO_OPTIONS)
+    ,
+    can_getsockopt /* si_getsockopt */
+    ,
+    can_setsockopt /* si_setsockopt */
+    #endif
 };
 
 /****************************************************************************
  * Private Functions
  ****************************************************************************/
-
 /****************************************************************************
  * Name: can_poll_eventhandler
  *
@@ -108,48 +103,35 @@ const struct sock_intf_s g_can_sockif =
  *   This function must be called with the network locked.
  *
  ****************************************************************************/
+static uint16_t can_poll_eventhandler(FAR struct net_driver_s* dev, 
+                                      FAR void* pvpriv, uint16_t flags) {
+    FAR struct can_poll_s* info = pvpriv;
 
-static uint16_t can_poll_eventhandler(FAR struct net_driver_s *dev,
-                                      FAR void *pvpriv, uint16_t flags)
-{
-  FAR struct can_poll_s *info = pvpriv;
+    DEBUGASSERT(!info || (info->psock && info->fds));
 
-  DEBUGASSERT(!info || (info->psock && info->fds));
+    /* 'priv' might be null in some race conditions (?) */
+    if (info) {
+        pollevent_t eventset = 0;
 
-  /* 'priv' might be null in some race conditions (?) */
-
-  if (info)
-    {
-      pollevent_t eventset = 0;
-
-      /* Check for data or connection availability events. */
-
-      if ((flags & CAN_NEWDATA) != 0)
-        {
-          eventset |= POLLIN;
+        /* Check for data or connection availability events. */
+        if ((flags & CAN_NEWDATA) != 0) {
+            eventset |= POLLIN;
         }
 
-      /* Check for loss of connection events. */
-
-      if ((flags & NETDEV_DOWN) != 0)
-        {
-          eventset |= (POLLHUP | POLLERR);
+        /* Check for loss of connection events. */
+        if ((flags & NETDEV_DOWN) != 0) {
+            eventset |= (POLLHUP | POLLERR);
+        }
+        /* A poll is a sign that we are free to send data. */
+        else if ((flags & CAN_POLL) != 0 && psock_can_cansend(info->psock) >= 0) {
+            eventset |= POLLOUT;
         }
 
-      /* A poll is a sign that we are free to send data. */
-
-      else if ((flags & CAN_POLL) != 0 &&
-                 psock_can_cansend(info->psock) >= 0)
-        {
-          eventset |= POLLOUT;
-        }
-
-      /* Awaken the caller of poll() is requested event occurred. */
-
-      poll_notify(&info->fds, 1, eventset);
+        /* Awaken the caller of poll() is requested event occurred. */
+        poll_notify(&info->fds, 1, eventset);
     }
 
-  return flags;
+    return (flags);
 }
 
 /****************************************************************************
@@ -169,64 +151,52 @@ static uint16_t can_poll_eventhandler(FAR struct net_driver_s *dev,
  *   returned.
  *
  ****************************************************************************/
+static int can_setup(FAR struct socket* psock) {
+    int domain = psock->s_domain;
+    int type   = psock->s_type;
+    int proto  = psock->s_proto;
 
-static int can_setup(FAR struct socket *psock)
-{
-  int domain = psock->s_domain;
-  int type = psock->s_type;
-  int proto = psock->s_proto;
+    /* Verify that the protocol is supported */
+    DEBUGASSERT((unsigned int)proto <= UINT8_MAX);
 
-  /* Verify that the protocol is supported */
+    switch (proto) {
+        case 0 :            /* INET subsystem for netlib_ifup */
+        case CAN_RAW :      /* RAW sockets */
+        case CAN_BCM :      /* Broadcast Manager */
+        case CAN_TP16 :     /* VAG Transport Protocol v1.6 */
+        case CAN_TP20 :     /* VAG Transport Protocol v2.0 */
+        case CAN_MCNET :    /* Bosch MCNet */
+        case CAN_ISOTP :    /* ISO 15765-2 Transport Protocol */
+        case CAN_J1939 :    /* SAE J1939 */
+            break;
 
-  DEBUGASSERT((unsigned int)proto <= UINT8_MAX);
-
-  switch (proto)
-    {
-      case 0:            /* INET subsystem for netlib_ifup */
-      case CAN_RAW:      /* RAW sockets */
-      case CAN_BCM:      /* Broadcast Manager */
-      case CAN_TP16:     /* VAG Transport Protocol v1.6 */
-      case CAN_TP20:     /* VAG Transport Protocol v2.0 */
-      case CAN_MCNET:    /* Bosch MCNet */
-      case CAN_ISOTP:    /* ISO 15765-2 Transport Protocol */
-      case CAN_J1939:    /* SAE J1939 */
-        break;
-
-      default:
-        return -EPROTONOSUPPORT;
+        default :
+            return -EPROTONOSUPPORT;
     }
 
-  /* Verify the socket type (domain should always be PF_CAN here) */
-
-  if (domain == PF_CAN &&
-      (type == SOCK_RAW || type == SOCK_DGRAM || type == SOCK_CTRL))
-    {
-      /* Allocate the CAN socket connection structure and save it in the
-       * new socket instance.
-       */
-
-      FAR struct can_conn_s *conn = can_alloc();
-      if (conn == NULL)
-        {
-          /* Failed to reserve a connection structure */
-
-          return -ENOMEM;
+    /* Verify the socket type (domain should always be PF_CAN here) */
+    if ((domain == PF_CAN) && ((type == SOCK_RAW) || (type == SOCK_DGRAM) || (type == SOCK_CTRL))) {
+        /* Allocate the CAN socket connection structure and save it in the
+         * new socket instance.
+         */
+        FAR struct can_conn_s* conn = can_alloc();
+        if (conn == NULL) {
+            /* Failed to reserve a connection structure */
+            return -ENOMEM;
         }
 
-      /* Set the reference count on the connection structure.  This
-       * reference count will be incremented only if the socket is
-       * dup'ed
-       */
+        /* Set the reference count on the connection structure.  This
+         * reference count will be incremented only if the socket is
+         * dup'ed
+         */
+        conn->crefs = 1;
 
-      conn->crefs = 1;
-
-      /* Attach the connection instance to the socket */
-
-      psock->s_conn = conn;
-      return OK;
+        /* Attach the connection instance to the socket */
+        psock->s_conn = conn;
+        return OK;
     }
 
-  return -EPROTONOSUPPORT;
+    return -EPROTONOSUPPORT;
 }
 
 /****************************************************************************
@@ -243,12 +213,9 @@ static int can_setup(FAR struct socket *psock)
  *   The non-negative set of socket capabilities is returned.
  *
  ****************************************************************************/
-
-static sockcaps_t can_sockcaps(FAR struct socket *psock)
-{
-  /* Permit vfcntl to set socket to non-blocking */
-
-  return SOCKCAP_NONBLOCKING;
+static sockcaps_t can_sockcaps(FAR struct socket* psock) {
+    /* Permit vfcntl to set socket to non-blocking */
+    return SOCKCAP_NONBLOCKING;
 }
 
 /****************************************************************************
@@ -265,16 +232,14 @@ static sockcaps_t can_sockcaps(FAR struct socket *psock)
  *   None
  *
  ****************************************************************************/
+static void can_addref(FAR struct socket* psock) {
+    FAR struct can_conn_s* conn;
 
-static void can_addref(FAR struct socket *psock)
-{
-  FAR struct can_conn_s *conn;
+    DEBUGASSERT(psock != NULL && psock->s_conn != NULL);
 
-  DEBUGASSERT(psock != NULL && psock->s_conn != NULL);
-
-  conn = psock->s_conn;
-  DEBUGASSERT(conn->crefs > 0 && conn->crefs < 255);
-  conn->crefs++;
+    conn = psock->s_conn;
+    DEBUGASSERT(conn->crefs > 0 && conn->crefs < 255);
+    conn->crefs++;
 }
 
 /****************************************************************************
@@ -306,31 +271,25 @@ static void can_addref(FAR struct socket *psock)
  * Assumptions:
  *
  ****************************************************************************/
+static int can_bind(FAR struct socket* psock, FAR const struct sockaddr* addr, socklen_t addrlen) {
+    FAR struct sockaddr_can* canaddr;
+    FAR struct can_conn_s*   conn;
+    DEBUGASSERT(psock != NULL && psock->s_conn != NULL && addr != NULL && addrlen >= sizeof(struct sockaddr_can));
 
-static int can_bind(FAR struct socket *psock,
-                    FAR const struct sockaddr *addr, socklen_t addrlen)
-{
-  FAR struct sockaddr_can *canaddr;
-  FAR struct can_conn_s *conn;
-  DEBUGASSERT(psock != NULL && psock->s_conn != NULL && addr != NULL &&
-              addrlen >= sizeof(struct sockaddr_can));
+    /* Save the address information in the connection structure */
+    canaddr = (FAR struct sockaddr_can*)addr;
+    conn    = (FAR struct can_conn_s*)psock->s_conn;
 
-  /* Save the address information in the connection structure */
+    /* Bind CAN device to socket */
+    #ifdef CONFIG_NETDEV_IFINDEX
+    conn->dev = netdev_findbyindex(canaddr->can_ifindex);
+    #else
+    char netdev_name[5] = "can0";
+    netdev_name[3] += canaddr->can_ifindex;
+    conn->dev = netdev_findbyname((char const*)&netdev_name);
+    #endif
 
-  canaddr = (FAR struct sockaddr_can *)addr;
-  conn    = (FAR struct can_conn_s *)psock->s_conn;
-
-  /* Bind CAN device to socket */
-
-#ifdef CONFIG_NETDEV_IFINDEX
-  conn->dev = netdev_findbyindex(canaddr->can_ifindex);
-#else
-  char netdev_name[5] = "can0";
-  netdev_name[3] += canaddr->can_ifindex;
-  conn->dev = netdev_findbyname((const char *)&netdev_name);
-#endif
-
-  return OK;
+    return (OK);
 }
 
 /****************************************************************************
@@ -355,112 +314,90 @@ static int can_bind(FAR struct socket *psock,
  *  0: Success; Negated errno on failure
  *
  ****************************************************************************/
+static int can_poll_local(FAR struct socket* psock, FAR struct pollfd* fds, bool setup) {
+    FAR struct can_conn_s*       conn;
+    FAR struct can_poll_s*       info;
+    FAR struct devif_callback_s* cb;
+    pollevent_t eventset = 0;
+    int         ret      = OK;
 
-static int can_poll_local(FAR struct socket *psock, FAR struct pollfd *fds,
-                          bool setup)
-{
-  FAR struct can_conn_s *conn;
-  FAR struct can_poll_s *info;
-  FAR struct devif_callback_s *cb;
-  pollevent_t eventset = 0;
-  int ret = OK;
+    DEBUGASSERT(psock != NULL && psock->s_conn != NULL);
+    conn = (FAR struct can_conn_s*)psock->s_conn;
+    info = conn->pollinfo;
 
-  DEBUGASSERT(psock != NULL && psock->s_conn != NULL);
-  conn = (FAR struct can_conn_s *)psock->s_conn;
-  info = conn->pollinfo;
+    /* FIXME add NETDEV_DOWN support */
 
-  /* FIXME add NETDEV_DOWN support */
+    /* Check if we are setting up or tearing down the poll */
+    if (setup) {
+        net_lock();
 
-  /* Check if we are setting up or tearing down the poll */
+        info->dev = conn->dev;
 
-  if (setup)
-    {
-      net_lock();
-
-      info->dev = conn->dev;
-
-      cb = can_callback_alloc(info->dev, conn);
-      if (cb == NULL)
-        {
-          ret = -EBUSY;
-          goto errout_with_lock;
+        cb = can_callback_alloc(info->dev, conn);
+        if (cb == NULL) {
+            ret = -EBUSY;
+            goto errout_with_lock;
         }
 
-      /* Initialize the poll info container */
+        /* Initialize the poll info container */
+        info->psock = psock;
+        info->fds   = fds;
+        info->cb    = cb;
 
-      info->psock = psock;
-      info->fds   = fds;
-      info->cb    = cb;
+        /* Initialize the callback structure.  Save the reference to the info
+         * structure as callback private data so that it will be available
+         * during callback processing.
+         */
+        cb->flags = NETDEV_DOWN;
+        cb->priv  = (FAR void*)info;
+        cb->event = can_poll_eventhandler;
 
-      /* Initialize the callback structure.  Save the reference to the info
-       * structure as callback private data so that it will be available
-       * during callback processing.
-       */
-
-      cb->flags   = NETDEV_DOWN;
-      cb->priv    = (FAR void *)info;
-      cb->event   = can_poll_eventhandler;
-
-      if ((fds->events & POLLOUT) != 0)
-        {
-          cb->flags |= CAN_POLL;
+        if ((fds->events & POLLOUT) != 0) {
+            cb->flags |= CAN_POLL;
         }
 
-      if ((fds->events & POLLIN) != 0)
-        {
-          cb->flags |= CAN_NEWDATA;
+        if ((fds->events & POLLIN) != 0) {
+            cb->flags |= CAN_NEWDATA;
         }
 
-      /* Save the reference in the poll info structure as fds private as well
-       * for use during poll teardown as well.
-       */
+        /* Save the reference in the poll info structure as fds private as well
+         * for use during poll teardown as well.
+         */
+        fds->priv = (FAR void*)info;
 
-      fds->priv = (FAR void *)info;
-
-      /* Check for read data availability now */
-
-      if (!IOB_QEMPTY(&conn->readahead))
-        {
-          /* Normal data may be read without blocking. */
-
-          eventset |= POLLRDNORM;
+        /* Check for read data availability now */
+        if (!IOB_QEMPTY(&conn->readahead)) {
+            /* Normal data may be read without blocking. */
+            eventset |= POLLRDNORM;
         }
 
-      if (psock_can_cansend(psock) >= 0)
-        {
-          /* A CAN frame may be sent without blocking. */
-
-          eventset |= POLLWRNORM;
+        if (psock_can_cansend(psock) >= 0) {
+            /* A CAN frame may be sent without blocking. */
+            eventset |= POLLWRNORM;
         }
 
-      /* Check if any requested events are already in effect */
+        /* Check if any requested events are already in effect */
+        poll_notify(&fds, 1, eventset);
 
-      poll_notify(&fds, 1, eventset);
-
-errout_with_lock:
-      net_unlock();
+    errout_with_lock:
+        net_unlock();
     }
-  else
-    {
-      info = (FAR struct can_poll_s *)fds->priv;
+    else {
+        info = (FAR struct can_poll_s*)fds->priv;
 
-      if (info != NULL)
-        {
-          /* Cancel any response notifications */
+        if (info != NULL) {
+            /* Cancel any response notifications */
+            can_callback_free(info->dev, conn, info->cb);
 
-          can_callback_free(info->dev, conn, info->cb);
+            /* Release the poll/select data slot */
+            info->fds->priv = NULL;
 
-          /* Release the poll/select data slot */
-
-          info->fds->priv = NULL;
-
-          /* Then free the poll info container */
-
-          info->psock = NULL;
+            /* Then free the poll info container */
+            info->psock = NULL;
         }
     }
 
-  return ret;
+    return (ret);
 }
 
 /****************************************************************************
@@ -478,45 +415,35 @@ errout_with_lock:
  * Assumptions:
  *
  ****************************************************************************/
+static int can_close(FAR struct socket* psock) {
+    FAR struct can_conn_s* conn = psock->s_conn;
+    int ret  = OK;
 
-static int can_close(FAR struct socket *psock)
-{
-  FAR struct can_conn_s *conn = psock->s_conn;
-  int ret = OK;
+    /* Perform some pre-close operations for the CAN socket type. */
 
-  /* Perform some pre-close operations for the CAN socket type. */
+    /* Is this the last reference to the connection structure (there
+     * could be more if the socket was dup'ed).
+     */
+    if (conn->crefs <= 1) {
+        /* Yes... inform user-space daemon of socket close. */
+        /* #warning Missing logic */
 
-  /* Is this the last reference to the connection structure (there
-   * could be more if the socket was dup'ed).
-   */
+        /* Free the connection structure */
+        conn->crefs = 0;
+        can_free(psock->s_conn);
 
-  if (conn->crefs <= 1)
-    {
-      /* Yes... inform user-space daemon of socket close. */
-
-#warning Missing logic
-
-      /* Free the connection structure */
-
-      conn->crefs = 0;
-      can_free(psock->s_conn);
-
-      if (ret < 0)
-        {
-          /* Return with error code, but free resources. */
-
-          nerr("ERROR: can_close failed: %d\n", ret);
-          return ret;
+        if (ret < 0) {
+            /* Return with error code, but free resources. */
+            nerr("ERROR: can_close failed: %d\n", ret);
+            return ret;
         }
     }
-  else
-    {
-      /* No.. Just decrement the reference count */
-
-      conn->crefs--;
+    else {
+        /* No.. Just decrement the reference count */
+        conn->crefs--;
     }
 
-  return ret;
+    return (ret);
 }
 
 #endif /* CONFIG_NET_CAN */

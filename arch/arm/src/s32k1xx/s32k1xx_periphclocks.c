@@ -87,23 +87,18 @@
  *   name does not map to a PCC control register.
  *
  ****************************************************************************/
+static uint32_t* s32k1xx_get_pclkctrl(enum clock_names_e clkname) {
+    /* Map the clock name to an index to the corresponding PCC control
+     * register.
+     */
+    uintptr_t index = (uintptr_t)g_clkname_mapping[clkname];
 
-static uint32_t *s32k1xx_get_pclkctrl(enum clock_names_e clkname)
-{
-  /* Map the clock name to an index to the corresponding PCC control
-   * register.
-   */
-
-  uintptr_t index = (uintptr_t)g_clkname_mapping[clkname];
-
-  if (index != PCC_INVALID_INDEX)
-    {
-      /* Return the fall address of the PCC control register */
-
-      return (uint32_t *)((uintptr_t)S32K1XX_PCC_BASE + (index << 2));
+    if (index != PCC_INVALID_INDEX) {
+        /* Return the fall address of the PCC control register */
+        return (uint32_t*)((uintptr_t)S32K1XX_PCC_BASE + (index << 2));
     }
 
-  return NULL;
+    return NULL;
 }
 
 /****************************************************************************
@@ -119,37 +114,30 @@ static uint32_t *s32k1xx_get_pclkctrl(enum clock_names_e clkname)
  *   None
  *
  ****************************************************************************/
+static inline void s32k1xx_set_pclkctrl(const struct peripheral_clock_config_s* pclk) {
+    uint32_t* ctrlp = s32k1xx_get_pclkctrl(pclk->clkname);
+    uint32_t  regval;
 
-static inline void
-s32k1xx_set_pclkctrl(const struct peripheral_clock_config_s *pclk)
-{
-  uint32_t *ctrlp = s32k1xx_get_pclkctrl(pclk->clkname);
-  uint32_t regval;
+    DEBUGASSERT(ctrlp != NULL);
 
-  DEBUGASSERT(ctrlp != NULL);
+    /* Configure the peripheral clock source, the fractional clock divider and
+     * the clock gate.
+     */
+    regval = PCC_PCS(pclk->clksrc);
 
-  /* Configure the peripheral clock source, the fractional clock divider and
-   * the clock gate.
-   */
-
-  regval =  PCC_PCS(pclk->clksrc);
-
-  if (pclk->divider > 1)
-    {
-      regval |= PCC_PCD(pclk->divider);
+    if (pclk->divider > 1) {
+        regval |= PCC_PCD(pclk->divider);
     }
 
-  if (pclk->frac == MULTIPLY_BY_TWO)
-    {
-      regval |= PCC_FRAC;
+    if (pclk->frac == MULTIPLY_BY_TWO) {
+        regval |= PCC_FRAC;
     }
 
-  if (pclk->clkgate)
-    {
-      regval |= PCC_CGC;
+    if (pclk->clkgate) {
+        regval |= PCC_CGC;
     }
 
-  *ctrlp = regval;
+    *ctrlp = regval;
 }
 
 /****************************************************************************
@@ -166,64 +154,54 @@ s32k1xx_set_pclkctrl(const struct peripheral_clock_config_s *pclk)
  *   None
  *
  ****************************************************************************/
+static uint32_t s32k1xx_get_pclkfreq_divided(enum clock_names_e clkname, enum scg_async_clock_type_e divider) {
+    uint32_t* ctrlp;
+    uint32_t  frequency = 0;
+    uint32_t  frac;
+    uint32_t  div;
 
-static uint32_t
-s32k1xx_get_pclkfreq_divided(enum clock_names_e clkname,
-                             enum scg_async_clock_type_e divider)
-{
-  uint32_t *ctrlp;
-  uint32_t frequency = 0;
-  uint32_t frac;
-  uint32_t div;
+    ctrlp = s32k1xx_get_pclkctrl(clkname);
+    frac  = ((*ctrlp & PCC_FRAC) == 0) ? 0 : 1;
+    div   = (*ctrlp & PCC_PCD_MASK) >> PCC_PCD_SHIFT;
 
-  ctrlp = s32k1xx_get_pclkctrl(clkname);
-  frac  = ((*ctrlp & PCC_FRAC) == 0) ? 0 : 1;
-  div   = (*ctrlp & PCC_PCD_MASK) >> PCC_PCD_SHIFT;
+    /* Check division factor */
+    if (frac <= div) {
+        /* Check clock gate */
+        if ((*ctrlp & PCC_CGC) != 0) {
+            uint32_t clksrc;
 
-  /* Check division factor */
+            /* Check clock source */
+            clksrc = (*ctrlp & PCC_PCS_MASK) >> PCC_PCS_SHIFT;
+            switch (clksrc) {
+                case CLK_SRC_SOSC :
+                    frequency = s32k1xx_get_asnchfreq(SOSC_CLK, divider);
+                    break;
 
-  if (frac <= div)
-    {
-      /* Check clock gate */
+                case CLK_SRC_SIRC :
+                    frequency = s32k1xx_get_asnchfreq(SIRC_CLK, divider);
+                    break;
 
-      if ((*ctrlp & PCC_CGC) != 0)
-        {
-          uint32_t clksrc;
+                case CLK_SRC_FIRC :
+                    frequency = s32k1xx_get_asnchfreq(FIRC_CLK, divider);
+                    break;
 
-          /* Check clock source */
+                #ifdef CONFIG_S32K1XX_HAVE_SPLL
+                case CLK_SRC_SPLL :
+                    frequency = s32k1xx_get_asnchfreq(SPLL_CLK, divider);
+                    break;
+                #endif
 
-          clksrc = (*ctrlp & PCC_PCS_MASK) >> PCC_PCS_SHIFT;
-          switch (clksrc)
-            {
-              case CLK_SRC_SOSC:
-                frequency = s32k1xx_get_asnchfreq(SOSC_CLK, divider);
-                break;
-
-              case CLK_SRC_SIRC:
-                frequency = s32k1xx_get_asnchfreq(SIRC_CLK, divider);
-                break;
-
-              case CLK_SRC_FIRC:
-                frequency = s32k1xx_get_asnchfreq(FIRC_CLK, divider);
-                break;
-
-#ifdef CONFIG_S32K1XX_HAVE_SPLL
-              case CLK_SRC_SPLL:
-                frequency = s32k1xx_get_asnchfreq(SPLL_CLK, divider);
-                break;
-#endif
-
-              default:
-                frequency = 0;
-                break;
+                default :
+                    frequency = 0;
+                    break;
             }
 
-          frequency = frequency / (div + 1);
-          frequency = frequency * (frac + 1);
+            frequency = frequency / (div + 1);
+            frequency = frequency * (frac + 1);
         }
     }
 
-  return frequency;
+    return frequency;
 }
 
 /****************************************************************************
@@ -244,23 +222,17 @@ s32k1xx_get_pclkfreq_divided(enum clock_names_e clkname,
  *   None
  *
  ****************************************************************************/
+void /**/s32k1xx_periphclocks(unsigned int count, const struct peripheral_clock_config_s* pclks) {
+    unsigned int i;
 
-void s32k1xx_periphclocks(unsigned int count,
-                          const struct peripheral_clock_config_s *pclks)
-{
-  unsigned int i;
+    DEBUGASSERT(pclks != NULL);
 
-  DEBUGASSERT(pclks != NULL);
+    for (i = 0; i < count; i++, pclks++) {
+        /* Disable the peripheral clock */
+        s32k1xx_pclk_enable(pclks->clkname, false);
 
-  for (i = 0; i < count; i++, pclks++)
-    {
-      /* Disable the peripheral clock */
-
-      s32k1xx_pclk_enable(pclks->clkname, false);
-
-      /* Set peripheral clock control */
-
-      s32k1xx_set_pclkctrl(pclks);
+        /* Set peripheral clock control */
+        s32k1xx_set_pclkctrl(pclks);
     }
 }
 
@@ -282,98 +254,68 @@ void s32k1xx_periphclocks(unsigned int count,
  *   being clocked.
  *
  ****************************************************************************/
+int /**/s32k1xx_get_pclkfreq(enum clock_names_e clkname, uint32_t* frequency) {
+    uint32_t* ctrlp;
+    uint32_t  freq = 0;
+    int       ret  = -ENODEV;
 
-int s32k1xx_get_pclkfreq(enum clock_names_e clkname, uint32_t *frequency)
-{
-  uint32_t *ctrlp;
-  uint32_t freq = 0;
-  int ret = -ENODEV;
+    /* Check if the clock is enabled */
+    ctrlp = s32k1xx_get_pclkctrl(clkname);
+    if ((*ctrlp & PCC_CGC) != 0) {
+        if ((g_periph_features[clkname] & HAS_INT_CLOCK_FROM_BUS_CLOCK) != 0) {
+            uint32_t busclk;
 
-  /* Check if the clock is enabled */
-
-  ctrlp = s32k1xx_get_pclkctrl(clkname);
-  if ((*ctrlp & PCC_CGC) != 0)
-    {
-      if ((g_periph_features[clkname] & HAS_INT_CLOCK_FROM_BUS_CLOCK) != 0)
-        {
-          uint32_t busclk;
-
-          /* Check whether BUS CLOCK is clocked. */
-
-          busclk = s32k1xx_get_sysclk(SCG_SYSTEM_CLOCK_BUS);
-          ret    = (busclk == 0) ? -ENODEV : OK;
+            /* Check whether BUS CLOCK is clocked. */
+            busclk = s32k1xx_get_sysclk(SCG_SYSTEM_CLOCK_BUS);
+            ret    = (busclk == 0) ? -ENODEV : OK;
         }
-      else if ((g_periph_features[clkname] &
-                HAS_INT_CLOCK_FROM_SYS_CLOCK) != 0)
-        {
-          uint32_t sysclk;
+        else if ((g_periph_features[clkname] & HAS_INT_CLOCK_FROM_SYS_CLOCK) != 0) {
+            uint32_t sysclk;
 
-          /* Check whether SYS CLOCK is clocked. */
-
-          sysclk = s32k1xx_get_sysclk(SCG_SYSTEM_CLOCK_CORE);
-          ret    = (sysclk == 0) ? -ENODEV : OK;
+            /* Check whether SYS CLOCK is clocked. */
+            sysclk = s32k1xx_get_sysclk(SCG_SYSTEM_CLOCK_CORE);
+            ret    = (sysclk == 0) ? -ENODEV : OK;
         }
-      else if ((g_periph_features[clkname] &
-                HAS_INT_CLOCK_FROM_SLOW_CLOCK) != 0)
-        {
-          uint32_t slowclk;
+        else if ((g_periph_features[clkname] & HAS_INT_CLOCK_FROM_SLOW_CLOCK) != 0) {
+            uint32_t slowclk;
 
-          /* Check whether SLOW CLOCK is clocked. */
-
-          slowclk = s32k1xx_get_sysclk(SCG_SYSTEM_CLOCK_SLOW);
-          ret     = (slowclk == 0) ? -ENODEV : OK;
+            /* Check whether SLOW CLOCK is clocked. */
+            slowclk = s32k1xx_get_sysclk(SCG_SYSTEM_CLOCK_SLOW);
+            ret     = (slowclk == 0) ? -ENODEV : OK;
         }
-      else
-        {
-          /* It's an issue in peripheral features list, each peripheral must
-           * have one interface clock.
-           */
-
-          DEBUGPANIC();
+        else {
+            /* It's an issue in peripheral features list, each peripheral must
+             * have one interface clock.
+             */
+            DEBUGPANIC();
         }
 
-      if (ret == OK)
-        {
-          /* Check whether peripheral has protocol clock (functional clock) */
-
-          if ((g_periph_features[clkname] &
-              (HAS_PROTOCOL_CLOCK_FROM_ASYNC1 |
-               HAS_PROTOCOL_CLOCK_FROM_ASYNC2)) != 0)
-            {
-              if ((g_periph_features[clkname] &
-                   HAS_PROTOCOL_CLOCK_FROM_ASYNC1) != 0)
-                {
-                  /* Check whether the functional clock is clocked */
-
-                  freq = s32k1xx_get_pclkfreq_divided(clkname,
-                                                      SCG_ASYNC_CLOCK_DIV1);
+        if (ret == OK) {
+            /* Check whether peripheral has protocol clock (functional clock) */
+            if ((g_periph_features[clkname] & (HAS_PROTOCOL_CLOCK_FROM_ASYNC1 | HAS_PROTOCOL_CLOCK_FROM_ASYNC2)) != 0) {
+                if ((g_periph_features[clkname] & HAS_PROTOCOL_CLOCK_FROM_ASYNC1) != 0) {
+                    /* Check whether the functional clock is clocked */
+                    freq = s32k1xx_get_pclkfreq_divided(clkname, SCG_ASYNC_CLOCK_DIV1);
                 }
 
-              if ((g_periph_features[clkname] &
-                   HAS_PROTOCOL_CLOCK_FROM_ASYNC2) != 0)
-                {
-                  /* Check whether the functional clock is clocked */
-
-                  freq = s32k1xx_get_pclkfreq_divided(clkname,
-                                                      SCG_ASYNC_CLOCK_DIV2);
+                if ((g_periph_features[clkname] & HAS_PROTOCOL_CLOCK_FROM_ASYNC2) != 0) {
+                    /* Check whether the functional clock is clocked */
+                    freq = s32k1xx_get_pclkfreq_divided(clkname, SCG_ASYNC_CLOCK_DIV2);
                 }
 
-              if (freq == 0)
-                {
-                  ret = -ENODEV;
+                if (freq == 0) {
+                    ret = -ENODEV;
                 }
             }
         }
     }
 
-  /* If frequency reference is provided, write this value */
-
-  if (frequency != NULL)
-    {
-      *frequency = freq;
+    /* If frequency reference is provided, write this value */
+    if (frequency != NULL) {
+        *frequency = freq;
     }
 
-  return ret;
+    return (ret);
 }
 
 /****************************************************************************
@@ -390,24 +332,17 @@ int s32k1xx_get_pclkfreq(enum clock_names_e clkname, uint32_t *frequency)
  *   None
  *
  ****************************************************************************/
+void s32k1xx_pclk_enable(enum clock_names_e clkname, bool enable) {
+    uint32_t* ctrlp = s32k1xx_get_pclkctrl(clkname);
+    DEBUGASSERT(ctrlp != NULL);
 
-void s32k1xx_pclk_enable(enum clock_names_e clkname, bool enable)
-{
-  uint32_t *ctrlp = s32k1xx_get_pclkctrl(clkname);
-  DEBUGASSERT(ctrlp != NULL);
-
-  /* check if it needs to be enabled */
-
-  if (enable)
-    {
-      /* enable it */
-
-      *ctrlp |= PCC_CGC;
+    /* check if it needs to be enabled */
+    if (enable) {
+        /* enable it */
+        *ctrlp |= PCC_CGC;
     }
-  else
-    {
-      /* disable it */
-
-      *ctrlp &= ~PCC_CGC;
+    else {
+        /* disable it */
+        *ctrlp &= ~PCC_CGC;
     }
 }

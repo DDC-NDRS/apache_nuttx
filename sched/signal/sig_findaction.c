@@ -36,30 +36,26 @@
  *   Allocate a new element for a signal queue
  *
  ****************************************************************************/
+FAR sigactq_t* /**/nxsig_find_action(FAR struct task_group_s* group, int signo) {
+    FAR sigactq_t* sigact = NULL;
 
-FAR sigactq_t *nxsig_find_action(FAR struct task_group_s *group, int signo)
-{
-  FAR sigactq_t *sigact = NULL;
+    /* Verify the caller's sanity */
+    if (group) {
+        /* Sigactions can only be assigned to the currently executing
+         * thread.  So, a simple lock ought to give us sufficient
+         * protection.
+         */
 
-  /* Verify the caller's sanity */
+        sched_lock();
 
-  if (group)
-    {
-      /* Sigactions can only be assigned to the currently executing
-       * thread.  So, a simple lock ought to give us sufficient
-       * protection.
-       */
+        /* Search the list for a sigaction on this signal */
 
-      sched_lock();
+        for (sigact = (FAR sigactq_t*)group->tg_sigactionq.head; ((sigact) && (sigact->signo != signo));
+             sigact = sigact->flink)
+            ;
 
-      /* Search the list for a sigaction on this signal */
-
-      for (sigact = (FAR sigactq_t *)group->tg_sigactionq.head;
-           ((sigact) && (sigact->signo != signo));
-           sigact = sigact->flink);
-
-      sched_unlock();
+        sched_unlock();
     }
 
-  return sigact;
+    return sigact;
 }

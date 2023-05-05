@@ -35,7 +35,6 @@
 /****************************************************************************
  * Included Files
  ****************************************************************************/
-
 #include <nuttx/config.h>
 
 #include "chip.h"
@@ -44,7 +43,6 @@
 /****************************************************************************
  * Pre-processor Definitions
  ****************************************************************************/
-
 #define IDLE_STACK      (_ebss + CONFIG_IDLETHREAD_STACKSIZE)
 
 #ifndef ARMV7M_PERIPHERAL_INTERRUPTS
@@ -54,19 +52,15 @@
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
-
 /* Chip-specific entrypoint */
-
 extern void __start(void);
 
 /* Common exception entrypoint */
-
 extern void exception_common(void);
 
 /****************************************************************************
  * Public data
  ****************************************************************************/
-
 /* The v7m vector table consists of an array of function pointers, with the
  * first slot (vector zero) used to hold the initial stack pointer.
  *
@@ -75,18 +69,13 @@ extern void exception_common(void);
  *
  * Note that the [ ... ] designated initializer is a GCC extension.
  */
-
-const void * const _vectors[] locate_data(".vectors") =
-{
+const void * const _vectors[] locate_data(".vectors") = {
   /* Initial stack */
-
   IDLE_STACK,
 
   /* Reset exception handler */
-
   __start,
 
   /* Vectors 2 - n point directly at the generic handler */
-
   [2 ... (15 + ARMV7M_PERIPHERAL_INTERRUPTS)] = exception_common
 };

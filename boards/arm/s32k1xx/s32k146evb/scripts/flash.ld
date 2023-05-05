@@ -19,14 +19,14 @@
  ****************************************************************************/
 
 /* The S32K146 has 1Mb of FLASH beginning at address 0x0000:0000 and
- * 124Kb of SRAM beginning at address 0x1fff:0000 (plus 4Kb of FlexRAM)
+ * 124Kb of SRAM beginning at address 0x1FFF:0000 (plus 4Kb of FlexRAM)
  *
  * The on-chip RAM is split in two regions: SRAM_L and SRAM_U. The RAM is
  * implemented such that the SRAM_L and SRAM_U ranges form a contiguous
  * block in the memory map
  *
- *   SRAM_L 1fff0000 - 1fffffff 64Kb
- *   SRAM_U 20000000 - 2000efff 60Kb
+ *   SRAM_L 1FFF0000 - 1FFFFFFF 64Kb
+ *   SRAM_U 20000000 - 2000EFFF 60Kb
  */
 
 MEMORY
@@ -34,7 +34,7 @@ MEMORY
   vflash (rx) : ORIGIN = 0x00000000, LENGTH = 1K
   pflash (rx) : ORIGIN = 0x00000400, LENGTH = 16
   dflash (rx) : ORIGIN = 0x00000410, LENGTH = 1023K-16
-  sram  (rwx) : ORIGIN = 0x1fff0000, LENGTH = 124K
+  sram  (rwx) : ORIGIN = 0x1FFF0000, LENGTH = 124K
 }
 
 OUTPUT_ARCH(arm)

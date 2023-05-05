@@ -21,7 +21,6 @@
 /****************************************************************************
  * Included Files
  ****************************************************************************/
-
 #include <nuttx/config.h>
 #include <nuttx/arch.h>
 #include <nuttx/board.h>
@@ -42,18 +41,15 @@
  *   initialized.
  *
  ****************************************************************************/
+void s32k1xx_board_initialize(void) {
+    #ifdef CONFIG_SEGGER_SYSVIEW
+    up_perf_init((void*)S32K146EVB_RUN_SYSCLK_FREQUENCY);
+    #endif
 
-void s32k1xx_board_initialize(void)
-{
-#ifdef CONFIG_SEGGER_SYSVIEW
-  up_perf_init((void *)S32K146EVB_RUN_SYSCLK_FREQUENCY);
-#endif
-
-#ifdef CONFIG_ARCH_LEDS
-  /* Configure on-board LEDs if LED support has been selected */
-
-  board_autoled_initialize();
-#endif
+    #ifdef CONFIG_ARCH_LEDS
+    /* Configure on-board LEDs if LED support has been selected */
+    board_autoled_initialize();
+    #endif
 }
 
 /****************************************************************************
@@ -69,12 +65,9 @@ void s32k1xx_board_initialize(void)
  *   drivers.
  *
  ****************************************************************************/
-
 #ifdef CONFIG_BOARD_LATE_INITIALIZE
-void board_late_initialize(void)
-{
-  /* Perform board-specific initialization */
-
-  s32k1xx_bringup();
+void board_late_initialize(void) {
+    /* Perform board-specific initialization */
+    s32k1xx_bringup();
 }
 #endif

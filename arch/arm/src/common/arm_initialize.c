@@ -21,7 +21,6 @@
 /****************************************************************************
  * Included Files
  ****************************************************************************/
-
 #include <nuttx/arch.h>
 #include <nuttx/board.h>
 #include <arch/board/board.h>
@@ -37,8 +36,7 @@
  * processing.  Access to g_current_regs[] must be through the macro
  * CURRENT_REGS for portability.
  */
-
-volatile uint32_t *g_current_regs[CONFIG_SMP_NCPUS];
+volatile uint32_t* g_current_regs[CONFIG_SMP_NCPUS];
 
 /****************************************************************************
  * Private Functions
@@ -52,26 +50,21 @@ volatile uint32_t *g_current_regs[CONFIG_SMP_NCPUS];
  *   much stack space was used by interrupt handling logic
  *
  ****************************************************************************/
-
 #if defined(CONFIG_STACK_COLORATION) && CONFIG_ARCH_INTERRUPTSTACK > 3
-static inline void arm_color_intstack(void)
-{
-#ifdef CONFIG_SMP
-  uint32_t *ptr = (uint32_t *)arm_intstack_alloc();
-#else
-  uint32_t *ptr = (uint32_t *)g_intstackalloc;
-#endif
-  ssize_t size;
+static inline void arm_color_intstack(void) {
+    #ifdef CONFIG_SMP
+    uint32_t* ptr = (uint32_t*)arm_intstack_alloc();
+    #else
+    uint32_t* ptr = (uint32_t*)g_intstackalloc;
+    #endif
+    ssize_t size;
 
-  for (size = ((CONFIG_ARCH_INTERRUPTSTACK & ~3) * CONFIG_SMP_NCPUS);
-       size > 0;
-       size -= sizeof(uint32_t))
-    {
-      *ptr++ = INTSTACK_COLOR;
+    for (size = ((CONFIG_ARCH_INTERRUPTSTACK & ~3) * CONFIG_SMP_NCPUS); size > 0; size -= sizeof(uint32_t)) {
+        *ptr++ = INTSTACK_COLOR;
     }
 }
 #else
-#  define arm_color_intstack()
+#define arm_color_intstack()
 #endif
 
 /****************************************************************************
@@ -94,58 +87,49 @@ static inline void arm_color_intstack(void)
  *   been initialized.  OS services and driver services are available.
  *
  ****************************************************************************/
+void /**/up_initialize(void) {
+    /* Colorize the interrupt stack */
+    arm_color_intstack();
 
-void up_initialize(void)
-{
-  /* Colorize the interrupt stack */
+    /* Add any extra memory fragments to the memory manager */
+    arm_addregion();
 
-  arm_color_intstack();
+    #ifdef CONFIG_PM
+    /* Initialize the power management subsystem.  This MCU-specific function
+     * must be called *very* early in the initialization sequence *before* any
+     * other device drivers are initialized (since they may attempt to register
+     * with the power management subsystem).
+     */
+    arm_pminitialize();
+    #endif
 
-  /* Add any extra memory fragments to the memory manager */
+    #ifdef CONFIG_ARCH_DMA
+    /* Initialize the DMA subsystem if the weak function arm_dma_initialize has
+     * been brought into the build
+     */
 
-  arm_addregion();
-
-#ifdef CONFIG_PM
-  /* Initialize the power management subsystem.  This MCU-specific function
-   * must be called *very* early in the initialization sequence *before* any
-   * other device drivers are initialized (since they may attempt to register
-   * with the power management subsystem).
-   */
-
-  arm_pminitialize();
-#endif
-
-#ifdef CONFIG_ARCH_DMA
-  /* Initialize the DMA subsystem if the weak function arm_dma_initialize has
-   * been brought into the build
-   */
-
-#ifdef CONFIG_HAVE_WEAKFUNCTIONS
-  if (arm_dma_initialize)
-#endif
+    #ifdef CONFIG_HAVE_WEAKFUNCTIONS
+    if (arm_dma_initialize)
+    #endif
     {
-      arm_dma_initialize();
+        arm_dma_initialize();
     }
-#endif
+    #endif
 
-  /* Initialize the serial device driver */
+    /* Initialize the serial device driver */
+    #ifdef USE_SERIALDRIVER
+    arm_serialinit();
+    #endif
 
-#ifdef USE_SERIALDRIVER
-  arm_serialinit();
-#endif
+    /* Initialize the network */
+    arm_netinitialize();
 
-  /* Initialize the network */
+    #if defined(CONFIG_USBDEV) || defined(CONFIG_USBHOST)
+    /* Initialize USB -- device and/or host */
+    arm_usbinitialize();
+    #endif
 
-  arm_netinitialize();
-
-#if defined(CONFIG_USBDEV) || defined(CONFIG_USBHOST)
-  /* Initialize USB -- device and/or host */
-
-  arm_usbinitialize();
-#endif
-
-  /* Initialize the L2 cache if present and selected */
-
-  arm_l2ccinitialize();
-  board_autoled_on(LED_IRQSENABLED);
+    /* Initialize the L2 cache if present and selected */
+    arm_l2ccinitialize();
+    board_autoled_on(LED_IRQSENABLED);
 }

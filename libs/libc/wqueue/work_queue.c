@@ -70,79 +70,70 @@
  *
  ****************************************************************************/
 
-static int work_qqueue(FAR struct usr_wqueue_s *wqueue,
-                       FAR struct work_s *work, worker_t worker,
-                       FAR void *arg, clock_t delay)
-{
-  FAR dq_entry_t *prev = NULL;
-  FAR dq_entry_t *curr;
-  sclock_t delta;
-  int semcount;
+static int work_qqueue(FAR struct usr_wqueue_s* wqueue, FAR struct work_s* work, worker_t worker, FAR void* arg,
+                       clock_t delay) {
+    FAR dq_entry_t* prev = NULL;
+    FAR dq_entry_t* curr;
+    sclock_t        delta;
+    int             semcount;
 
-  /* Get exclusive access to the work queue */
+    /* Get exclusive access to the work queue */
 
-  while (nxmutex_lock(&wqueue->lock) < 0);
+    while (nxmutex_lock(&wqueue->lock) < 0)
+        ;
 
-  /* Initialize the work structure */
+    /* Initialize the work structure */
 
-  work->worker = worker;             /* Work callback. non-NULL means queued */
-  work->arg    = arg;                /* Callback argument */
-  work->u.s.qtime = clock() + delay; /* Delay until work performed */
+    work->worker    = worker;          /* Work callback. non-NULL means queued */
+    work->arg       = arg;             /* Callback argument */
+    work->u.s.qtime = clock() + delay; /* Delay until work performed */
 
-  /* Do the easy case first -- when the work queue is empty. */
+    /* Do the easy case first -- when the work queue is empty. */
 
-  if (wqueue->q.head == NULL)
-    {
-      /* Add the watchdog to the head == tail of the queue. */
+    if (wqueue->q.head == NULL) {
+        /* Add the watchdog to the head == tail of the queue. */
 
-      dq_addfirst(&work->u.s.dq, &wqueue->q);
-      _SEM_POST(&wqueue->wake);
+        dq_addfirst(&work->u.s.dq, &wqueue->q);
+        _SEM_POST(&wqueue->wake);
     }
 
-  /* There are other active watchdogs in the timer queue */
+    /* There are other active watchdogs in the timer queue */
 
-  else
-    {
-      curr = wqueue->q.head;
+    else {
+        curr = wqueue->q.head;
 
-      /* Check if the new work must be inserted before the curr. */
+        /* Check if the new work must be inserted before the curr. */
 
-      do
-        {
-          delta = work->u.s.qtime - ((FAR struct work_s *)curr)->u.s.qtime;
-          if (delta < 0)
-            {
-              break;
+        do {
+            delta = work->u.s.qtime - ((FAR struct work_s*)curr)->u.s.qtime;
+            if (delta < 0) {
+                break;
             }
 
-          prev = curr;
-          curr = curr->flink;
-        }
-      while (curr != NULL);
+            prev = curr;
+            curr = curr->flink;
+        } while (curr != NULL);
 
-      /* Insert the new watchdog in the list */
+        /* Insert the new watchdog in the list */
 
-      if (prev == NULL)
-        {
-          /* Insert the watchdog at the head of the list */
+        if (prev == NULL) {
+            /* Insert the watchdog at the head of the list */
 
-          dq_addfirst(&work->u.s.dq, &wqueue->q);
-          _SEM_GETVALUE(&wqueue->wake, &semcount);
-          if (semcount < 1)
-            {
-              _SEM_POST(&wqueue->wake);
+            dq_addfirst(&work->u.s.dq, &wqueue->q);
+            _SEM_GETVALUE(&wqueue->wake, &semcount);
+            if (semcount < 1) {
+                _SEM_POST(&wqueue->wake);
             }
         }
-      else
-        {
-          /* Insert the watchdog in mid- or end-of-queue */
+        else {
+            /* Insert the watchdog in mid- or end-of-queue */
 
-          dq_addafter(prev, &work->u.s.dq, &wqueue->q);
+            dq_addafter(prev, &work->u.s.dq, &wqueue->q);
         }
     }
 
-  nxmutex_unlock(&wqueue->lock);
-  return OK;
+    nxmutex_unlock(&wqueue->lock);
+    return OK;
 }
 
 /****************************************************************************
@@ -178,20 +169,16 @@ static int work_qqueue(FAR struct usr_wqueue_s *wqueue,
  *
  ****************************************************************************/
 
-int work_queue(int qid, FAR struct work_s *work, worker_t worker,
-               FAR void *arg, clock_t delay)
-{
-  if (qid == USRWORK)
-    {
-      /* Is there already pending work? */
+int /**/work_queue(int qid, FAR struct work_s* work, worker_t worker, FAR void* arg, clock_t delay) {
+    if (qid == USRWORK) {
+        /* Is there already pending work? */
 
-      work_cancel(qid, work);
+        work_cancel(qid, work);
 
-      return work_qqueue(&g_usrwork, work, worker, arg, delay);
+        return work_qqueue(&g_usrwork, work, worker, arg, delay);
     }
-  else
-    {
-      return -EINVAL;
+    else {
+        return -EINVAL;
     }
 }
 

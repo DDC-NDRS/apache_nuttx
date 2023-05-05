@@ -21,7 +21,6 @@
 /****************************************************************************
  * Included Files
  ****************************************************************************/
-
 #include <nuttx/config.h>
 
 #include <stdint.h>
@@ -41,19 +40,15 @@
 /****************************************************************************
  * Pre-processor Definitions
  ****************************************************************************/
-
-#define queue_work(wqueue, work) \
-  do \
-    { \
-      int sem_count; \
-      dq_addlast((FAR dq_entry_t *)(work), &(wqueue).q); \
-      nxsem_get_value(&(wqueue).sem, &sem_count); \
-      if (sem_count < 0) /* There are threads waiting for sem. */ \
-        { \
-          nxsem_post(&(wqueue).sem); \
-        } \
-    } \
-  while (0)
+#define queue_work(wqueue, work)                                \
+    do {                                                        \
+        int sem_count;                                          \
+        dq_addlast((FAR dq_entry_t*)(work), &(wqueue).q);       \
+        nxsem_get_value(&(wqueue).sem, &sem_count);             \
+        if (sem_count < 0) {  /* There are threads waiting for sem. */  \
+            nxsem_post(&(wqueue).sem);                          \
+        }                                                       \
+    } while (0)
 
 /****************************************************************************
  * Private Functions
@@ -62,26 +57,22 @@
 /****************************************************************************
  * Name: hp_work_timer_expiry
  ****************************************************************************/
-
 #ifdef CONFIG_SCHED_HPWORK
-static void hp_work_timer_expiry(wdparm_t arg)
-{
-  irqstate_t flags = enter_critical_section();
-  queue_work(g_hpwork, arg);
-  leave_critical_section(flags);
+static void hp_work_timer_expiry(wdparm_t arg) {
+    irqstate_t flags = enter_critical_section();
+    queue_work(g_hpwork, arg);
+    leave_critical_section(flags);
 }
 #endif
 
 /****************************************************************************
  * Name: lp_work_timer_expiry
  ****************************************************************************/
-
 #ifdef CONFIG_SCHED_LPWORK
-static void lp_work_timer_expiry(wdparm_t arg)
-{
-  irqstate_t flags = enter_critical_section();
-  queue_work(g_lpwork, arg);
-  leave_critical_section(flags);
+static void lp_work_timer_expiry(wdparm_t arg) {
+    irqstate_t flags = enter_critical_section();
+    queue_work(g_lpwork, arg);
+    leave_critical_section(flags);
 }
 #endif
 
@@ -118,74 +109,58 @@ static void lp_work_timer_expiry(wdparm_t arg)
  *   Zero on success, a negated errno on failure
  *
  ****************************************************************************/
+int /**/work_queue(int qid, FAR struct work_s* work, worker_t worker, 
+                   FAR void* arg, clock_t delay) {
+    irqstate_t flags;
+    int ret = OK;
 
-int work_queue(int qid, FAR struct work_s *work, worker_t worker,
-               FAR void *arg, clock_t delay)
-{
-  irqstate_t flags;
-  int ret = OK;
+    /* Interrupts are disabled so that this logic can be called from with
+     * task logic or from interrupt handling logic.
+     */
+    flags = enter_critical_section();
 
-  /* Interrupts are disabled so that this logic can be called from with
-   * task logic or from interrupt handling logic.
-   */
-
-  flags = enter_critical_section();
-
-  /* Remove the entry from the timer and work queue. */
-
-  if (work->worker != NULL)
-    {
-      work_cancel(qid, work);
+    /* Remove the entry from the timer and work queue. */
+    if (work->worker != NULL) {
+        work_cancel(qid, work);
     }
 
-  /* Initialize the work structure. */
+    /* Initialize the work structure. */
+    work->worker = worker; /* Work callback. non-NULL means queued */
+    work->arg    = arg;    /* Callback argument */
 
-  work->worker = worker;           /* Work callback. non-NULL means queued */
-  work->arg = arg;                 /* Callback argument */
+    /* Queue the new work */
+    #ifdef CONFIG_SCHED_HPWORK
+    if (qid == HPWORK) {
+        /* Queue high priority work */
 
-  /* Queue the new work */
-
-#ifdef CONFIG_SCHED_HPWORK
-  if (qid == HPWORK)
-    {
-      /* Queue high priority work */
-
-      if (!delay)
-        {
-          queue_work(g_hpwork, work);
+        if (!delay) {
+            queue_work(g_hpwork, work);
         }
-      else
-        {
-          wd_start(&work->u.timer, delay, hp_work_timer_expiry,
-                   (wdparm_t)work);
+        else {
+            wd_start(&work->u.timer, delay, hp_work_timer_expiry, (wdparm_t)work);
         }
     }
-  else
-#endif
-#ifdef CONFIG_SCHED_LPWORK
-  if (qid == LPWORK)
-    {
-      /* Queue low priority work */
-
-      if (!delay)
-        {
-          queue_work(g_lpwork, work);
+    else
+    #endif
+    #ifdef CONFIG_SCHED_LPWORK
+        if (qid == LPWORK) {
+        /* Queue low priority work */
+        if (!delay) {
+            queue_work(g_lpwork, work);
         }
-      else
-        {
-          wd_start(&work->u.timer, delay, lp_work_timer_expiry,
-                   (wdparm_t)work);
+        else {
+            wd_start(&work->u.timer, delay, lp_work_timer_expiry, (wdparm_t)work);
         }
     }
-  else
-#endif
+    else
+    #endif
     {
-      ret = -EINVAL;
+        ret = -EINVAL;
     }
 
-  leave_critical_section(flags);
+    leave_critical_section(flags);
 
-  return ret;
+    return ret;
 }
 
 #endif /* CONFIG_SCHED_WORKQUEUE */

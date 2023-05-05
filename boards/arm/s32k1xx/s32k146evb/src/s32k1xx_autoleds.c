@@ -47,7 +47,6 @@
 /****************************************************************************
  * Included Files
  ****************************************************************************/
-
 #include <nuttx/config.h>
 
 #include <stdint.h>
@@ -60,18 +59,16 @@
 #include "s32k146evb.h"
 
 #ifdef CONFIG_ARCH_LEDS
-
 /****************************************************************************
  * Pre-processor Definitions
  ****************************************************************************/
 
 /* Summary of all possible settings */
-
-#define LED_NOCHANGE     0 /* LED_IRQSENABLED, LED_INIRQ, LED_SIGNAL, LED_ASSERTION */
-#define LED_OFF_OFF_OFF  1 /* LED_STARTED */
-#define LED_OFF_OFF_ON   2 /* LED_HEAPALLOCATE */
-#define LED_OFF_ON_OFF   3 /* LED_STACKCREATED */
-#define LED_ON_OFF_OFF   4 /* LED_PANIC */
+#define LED_NOCHANGE    0 /* LED_IRQSENABLED, LED_INIRQ, LED_SIGNAL, LED_ASSERTION */
+#define LED_OFF_OFF_OFF 1 /* LED_STARTED */
+#define LED_OFF_OFF_ON  2 /* LED_HEAPALLOCATE */
+#define LED_OFF_ON_OFF  3 /* LED_STACKCREATED */
+#define LED_ON_OFF_OFF  4 /* LED_PANIC */
 
 /****************************************************************************
  * Public Functions
@@ -80,68 +77,56 @@
 /****************************************************************************
  * Name: board_autoled_initialize
  ****************************************************************************/
-
-void board_autoled_initialize(void)
-{
-  /* Configure LED GPIOs for output */
-
-  s32k1xx_pinconfig(GPIO_LED_R);
-  s32k1xx_pinconfig(GPIO_LED_G);
-  s32k1xx_pinconfig(GPIO_LED_B);
+void /**/board_autoled_initialize(void) {
+    /* Configure LED GPIOs for output */
+    s32k1xx_pinconfig(GPIO_LED_R);
+    s32k1xx_pinconfig(GPIO_LED_G);
+    s32k1xx_pinconfig(GPIO_LED_B);
 }
 
 /****************************************************************************
  * Name: board_autoled_on
  ****************************************************************************/
+void /**/board_autoled_on(int led) {
+    if (led != LED_NOCHANGE) {
+        bool redon   = false;
+        bool greenon = false;
+        bool blueon  = false;
 
-void board_autoled_on(int led)
-{
-  if (led != LED_NOCHANGE)
-    {
-      bool redon   = false;
-      bool greenon = false;
-      bool blueon  = false;
+        switch (led) {
+            default :
+            case LED_OFF_OFF_OFF :
+                break;
 
-      switch (led)
-        {
-          default:
-          case LED_OFF_OFF_OFF:
-            break;
+            case LED_OFF_OFF_ON :
+                blueon = true;
+                break;
 
-          case LED_OFF_OFF_ON:
-            blueon = true;
-            break;
+            case LED_OFF_ON_OFF :
+                greenon = true;
+                break;
 
-          case LED_OFF_ON_OFF:
-            greenon = true;
-            break;
-
-          case LED_ON_OFF_OFF:
-            redon = true;
-            break;
+            case LED_ON_OFF_OFF :
+                redon = true;
+                break;
         }
 
-      /* An output of '1' illuminates the LED */
-
-      s32k1xx_gpiowrite(GPIO_LED_R, redon);
-      s32k1xx_gpiowrite(GPIO_LED_G, greenon);
-      s32k1xx_gpiowrite(GPIO_LED_B, blueon);
+        /* An output of '1' illuminates the LED */
+        s32k1xx_gpiowrite(GPIO_LED_R, redon);
+        s32k1xx_gpiowrite(GPIO_LED_G, greenon);
+        s32k1xx_gpiowrite(GPIO_LED_B, blueon);
     }
 }
 
 /****************************************************************************
  * Name: board_autoled_off
  ****************************************************************************/
-
-void board_autoled_off(int led)
-{
-  if (led == LED_ON_OFF_OFF)
-    {
-      /* An output of '1' illuminates the LED */
-
-      s32k1xx_gpiowrite(GPIO_LED_R, true);
-      s32k1xx_gpiowrite(GPIO_LED_G, false);
-      s32k1xx_gpiowrite(GPIO_LED_B, false);
+void /**/board_autoled_off(int led) {
+    if (led == LED_ON_OFF_OFF) {
+        /* An output of '1' illuminates the LED */
+        s32k1xx_gpiowrite(GPIO_LED_R, true);
+        s32k1xx_gpiowrite(GPIO_LED_G, false);
+        s32k1xx_gpiowrite(GPIO_LED_B, false);
     }
 }
 

@@ -21,7 +21,6 @@
 /****************************************************************************
  * Included Files
  ****************************************************************************/
-
 #include <nuttx/config.h>
 
 #include <sys/ioctl.h>
@@ -35,103 +34,83 @@
 /****************************************************************************
  * Private Functions
  ****************************************************************************/
-
 /****************************************************************************
  * Name: file_vioctl
  ****************************************************************************/
+int file_vioctl(FAR struct file* filep, int req, va_list ap) {
+    FAR struct inode* inode;
+    unsigned long     arg;
+    int ret = -ENOTTY;
 
-int file_vioctl(FAR struct file *filep, int req, va_list ap)
-{
-  FAR struct inode *inode;
-  unsigned long arg;
-  int ret = -ENOTTY;
+    DEBUGASSERT(filep != NULL);
 
-  DEBUGASSERT(filep != NULL);
+    arg = va_arg(ap, unsigned long);
 
-  arg = va_arg(ap, unsigned long);
-
-  /* Is a driver opened? */
-
-  inode = filep->f_inode;
-  if (!inode)
-    {
-      return -EBADF;
+    /* Is a driver opened? */
+    inode = filep->f_inode;
+    if (!inode) {
+        return -EBADF;
     }
 
-  /* Does the driver support the ioctl method? */
-
-  if (inode->u.i_ops != NULL && inode->u.i_ops->ioctl != NULL)
-    {
-      /* Yes on both accounts.  Let the driver perform the ioctl command */
-
-      ret = inode->u.i_ops->ioctl(filep, req, arg);
+    /* Does the driver support the ioctl method? */
+    if (inode->u.i_ops != NULL && inode->u.i_ops->ioctl != NULL) {
+        /* Yes on both accounts.  Let the driver perform the ioctl command */
+        ret = inode->u.i_ops->ioctl(filep, req, arg);
     }
 
-  switch (req)
-    {
-      case FIONBIO:
-        if (ret == OK || ret == -ENOTTY)
-          {
-            FAR int *nonblock = (FAR int *)(uintptr_t)arg;
-            if (nonblock && *nonblock)
-              {
-                filep->f_oflags |= O_NONBLOCK;
-              }
-            else
-              {
-                filep->f_oflags &= ~O_NONBLOCK;
-              }
+    switch (req) {
+        case FIONBIO :
+            if (ret == OK || ret == -ENOTTY) {
+                FAR int* nonblock = (FAR int*)(uintptr_t)arg;
+                if (nonblock && *nonblock) {
+                    filep->f_oflags |= O_NONBLOCK;
+                }
+                else {
+                    filep->f_oflags &= ~O_NONBLOCK;
+                }
 
-            ret = OK;
-          }
-        break;
+                ret = OK;
+            }
+            break;
 
-      case FIOCLEX:
-        if (ret == OK || ret == -ENOTTY)
-          {
-            filep->f_oflags |= O_CLOEXEC;
-            ret = OK;
-          }
-        break;
+        case FIOCLEX :
+            if (ret == OK || ret == -ENOTTY) {
+                filep->f_oflags |= O_CLOEXEC;
+                ret = OK;
+            }
+            break;
 
-      case FIONCLEX:
-        if (ret == OK || ret == -ENOTTY)
-          {
-            filep->f_oflags &= ~O_CLOEXEC;
-            ret = OK;
-          }
-        break;
+        case FIONCLEX :
+            if (ret == OK || ret == -ENOTTY) {
+                filep->f_oflags &= ~O_CLOEXEC;
+                ret = OK;
+            }
+            break;
 
-      case FIOC_FILEPATH:
-        if (ret == -ENOTTY && !INODE_IS_MOUNTPT(inode))
-          {
-            ret = inode_getpath(inode, (FAR char *)(uintptr_t)arg);
-          }
-        break;
+        case FIOC_FILEPATH :
+            if (ret == -ENOTTY && !INODE_IS_MOUNTPT(inode)) {
+                ret = inode_getpath(inode, (FAR char*)(uintptr_t)arg);
+            }
+            break;
 
-#ifndef CONFIG_DISABLE_MOUNTPOINT
-      case BIOC_BLKSSZGET:
-        if (ret == -ENOTTY && inode->u.i_ops != NULL &&
-            inode->u.i_ops->ioctl != NULL)
-          {
-            struct geometry geo;
-            ret = inode->u.i_ops->ioctl(filep, BIOC_GEOMETRY,
-                                        (unsigned long)(uintptr_t)&geo);
-            if (ret >= 0)
-              {
-                *(FAR blksize_t *)(uintptr_t)arg = geo.geo_sectorsize;
-              }
-          }
-#endif
+        #ifndef CONFIG_DISABLE_MOUNTPOINT
+        case BIOC_BLKSSZGET :
+            if (ret == -ENOTTY && inode->u.i_ops != NULL && inode->u.i_ops->ioctl != NULL) {
+                struct geometry geo;
+                ret = inode->u.i_ops->ioctl(filep, BIOC_GEOMETRY, (unsigned long)(uintptr_t)&geo);
+                if (ret >= 0) {
+                    *(FAR blksize_t*)(uintptr_t)arg = geo.geo_sectorsize;
+                }
+            }
+        #endif
     }
 
-  return ret;
+    return ret;
 }
 
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
-
 /****************************************************************************
  * Name: file_ioctl
  *
@@ -149,19 +128,16 @@ int file_vioctl(FAR struct file *filep, int req, va_list ap)
  *   errno values).
  *
  ****************************************************************************/
+int /**/file_ioctl(FAR struct file* filep, int req, ...) {
+    va_list ap;
+    int     ret;
 
-int file_ioctl(FAR struct file *filep, int req, ...)
-{
-  va_list ap;
-  int ret;
+    /* Let file_vioctl() do the real work. */
+    va_start(ap, req);
+    ret = file_vioctl(filep, req, ap);
+    va_end(ap);
 
-  /* Let file_vioctl() do the real work. */
-
-  va_start(ap, req);
-  ret = file_vioctl(filep, req, ap);
-  va_end(ap);
-
-  return ret;
+    return ret;
 }
 
 /****************************************************************************
@@ -191,35 +167,29 @@ int file_ioctl(FAR struct file *filep, int req, ...)
  *      descriptor 'fd' references.
  *
  ****************************************************************************/
+int /**/ioctl(int fd, int req, ...) {
+    FAR struct file* filep;
+    va_list          ap;
+    int              ret;
 
-int ioctl(int fd, int req, ...)
-{
-  FAR struct file *filep;
-  va_list ap;
-  int ret;
-
-  /* Get the file structure corresponding to the file descriptor. */
-
-  ret = fs_getfilep(fd, &filep);
-  if (ret < 0)
-    {
-      goto err;
+    /* Get the file structure corresponding to the file descriptor. */
+    ret = fs_getfilep(fd, &filep);
+    if (ret < 0) {
+        goto err;
     }
 
-  /* Let file_vioctl() do the real work. */
+    /* Let file_vioctl() do the real work. */
+    va_start(ap, req);
+    ret = file_vioctl(filep, req, ap);
+    va_end(ap);
 
-  va_start(ap, req);
-  ret = file_vioctl(filep, req, ap);
-  va_end(ap);
-
-  if (ret < 0)
-    {
-      goto err;
+    if (ret < 0) {
+        goto err;
     }
 
-  return ret;
+    return ret;
 
 err:
-  set_errno(-ret);
-  return ERROR;
+    set_errno(-ret);
+    return ERROR;
 }
