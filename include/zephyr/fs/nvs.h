@@ -11,6 +11,7 @@
 #include <zephyr/kernel.h>
 #include <zephyr/device.h>
 #include <zephyr/toolchain.h>
+#include <nuttx/mutex.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -45,19 +46,19 @@ extern "C" {
  * @param flash_device Flash Device runtime structure
  * @param flash_parameters Flash memory parameters structure
  */
-struct nvs_fs {
+struct z_nvs_fs {
     off_t offset;
     uint32_t ate_wra;
     uint32_t data_wra;
     uint16_t sector_size;
     uint16_t sector_count;
     bool ready;
-    struct k_mutex nvs_lock;
+    mutex_t nvs_lock;
     const struct device* flash_device;
     const struct flash_parameters* flash_parameters;
-#if CONFIG_NVS_LOOKUP_CACHE
+    #if CONFIG_NVS_LOOKUP_CACHE
     uint32_t lookup_cache[CONFIG_NVS_LOOKUP_CACHE_SIZE];
-#endif
+    #endif
 };
 
 /**
@@ -80,7 +81,7 @@ struct nvs_fs {
  * @retval 0 Success
  * @retval -ERRNO errno code if error
  */
-int nvs_mount(struct nvs_fs *fs);
+int nvs_mount(struct z_nvs_fs *fs);
 
 /**
  * @brief nvs_clear
@@ -90,7 +91,7 @@ int nvs_mount(struct nvs_fs *fs);
  * @retval 0 Success
  * @retval -ERRNO errno code if error
  */
-int nvs_clear(struct nvs_fs *fs);
+int nvs_clear(struct z_nvs_fs *fs);
 
 /**
  * @brief nvs_write
@@ -106,7 +107,7 @@ int nvs_clear(struct nvs_fs *fs);
  * to be written. When a rewrite of the same data already stored is attempted, nothing is written
  * to flash, thus 0 is returned. On error, returns negative value of errno.h defined error codes.
  */
-ssize_t nvs_write(struct nvs_fs *fs, uint16_t id, const void *data, size_t len);
+ssize_t nvs_write(struct z_nvs_fs *fs, uint16_t id, const void *data, size_t len);
 
 /**
  * @brief nvs_delete
@@ -118,7 +119,7 @@ ssize_t nvs_write(struct nvs_fs *fs, uint16_t id, const void *data, size_t len);
  * @retval 0 Success
  * @retval -ERRNO errno code if error
  */
-int nvs_delete(struct nvs_fs *fs, uint16_t id);
+int nvs_delete(struct z_nvs_fs *fs, uint16_t id);
 
 /**
  * @brief nvs_read
@@ -135,7 +136,7 @@ int nvs_delete(struct nvs_fs *fs, uint16_t id);
  * indicates not all bytes were read, and more data is available. On error, returns negative
  * value of errno.h defined error codes.
  */
-ssize_t nvs_read(struct nvs_fs *fs, uint16_t id, void *data, size_t len);
+ssize_t nvs_read(struct z_nvs_fs *fs, uint16_t id, void *data, size_t len);
 
 /**
  * @brief nvs_read_hist
@@ -153,7 +154,7 @@ ssize_t nvs_read(struct nvs_fs *fs, uint16_t id, void *data, size_t len);
  * indicates not all bytes were read, and more data is available. On error, returns negative
  * value of errno.h defined error codes.
  */
-ssize_t nvs_read_hist(struct nvs_fs *fs, uint16_t id, void *data, size_t len, uint16_t cnt);
+ssize_t nvs_read_hist(struct z_nvs_fs *fs, uint16_t id, void *data, size_t len, uint16_t cnt);
 
 /**
  * @brief nvs_calc_free_space
@@ -166,7 +167,7 @@ ssize_t nvs_read_hist(struct nvs_fs *fs, uint16_t id, void *data, size_t len, ui
  * still be written to the file system. Calculating the free space is a time consuming operation,
  * especially on spi flash. On error, returns negative value of errno.h defined error codes.
  */
-ssize_t nvs_calc_free_space(struct nvs_fs *fs);
+ssize_t nvs_calc_free_space(struct z_nvs_fs *fs);
 
 /**
  * @}
