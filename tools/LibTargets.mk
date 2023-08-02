@@ -103,6 +103,14 @@ drivers$(DELIM)libdrivers$(LIBEXT): pass2dep
 staging$(DELIM)libdrivers$(LIBEXT): drivers$(DELIM)libdrivers$(LIBEXT)
 	$(Q) $(call INSTALL_LIB,$<,$@)
 
+# CUSTOM@NDRS
+zephyr$(DELIM)libzephyr$(LIBEXT): pass2dep
+	$(Q) $(MAKE) -C zephyr libzephyr$(LIBEXT) EXTRAFLAGS="$(KDEFINE) $(EXTRAFLAGS)"
+
+# CUSTOM@NDRS
+staging$(DELIM)libzephyr$(LIBEXT): zephyr$(DELIM)libzephyr$(LIBEXT)
+	$(Q) $(call INSTALL_LIB,$<,$@)
+
 external$(DELIM)libexternal$(LIBEXT): pass2dep
 	$(Q) $(MAKE) -C external libexternal$(LIBEXT) EXTRAFLAGS="$(KDEFINE) $(EXTRAFLAGS)"
 

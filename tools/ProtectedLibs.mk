@@ -29,8 +29,10 @@ NUTTXLIBS = staging$(DELIM)libsched$(LIBEXT)
 USERLIBS =
 
 # Driver support.
-
 NUTTXLIBS += staging$(DELIM)libdrivers$(LIBEXT)
+
+# CUSTOM@NDRS
+NUTTXLIBS += staging$(DELIM)libzephyrs$(LIBEXT)
 
 # External code support
 

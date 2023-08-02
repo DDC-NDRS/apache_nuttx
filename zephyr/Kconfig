@@ -1,0 +1,14 @@
+#
+# For a description of the syntax of this configuration file,
+# see the file kconfig-language.txt in the NuttX tools repository.
+#
+
+comment "Zephyr Libraries"
+
+config ZEPHYR_LIBS
+	bool "Zephyr Librries Support"
+	default y
+	---help---
+		Enables overall support for Zephyr libraries.
+
+source "lib/smf/Kconfig"
