@@ -312,7 +312,7 @@ struct /**/k_work_delayable {
 	struct _timeout timeout;
 
 	/* The queue to which the work should be submitted. */
-	struct k_work_q *queue;
+	struct k_work_q* queue;
 };
 
 #define Z_WORK_DELAYABLE_INITIALIZER(work_handler) { \

@@ -90,23 +90,20 @@
  * Assumptions:
  *
  ****************************************************************************/
+int /**/usleep(useconds_t usec) {
+    struct timespec rqtp;
+    time_t sec;
+    int    ret;
 
-int usleep(useconds_t usec)
-{
-  struct timespec rqtp;
-  time_t sec;
-  int ret = 0;
+    ret = 0;
+    if (usec) {
+        /* Let clock_nanosleep() do all of the work. */
+        sec          = usec / 1000000;
+        rqtp.tv_sec  = sec;
+        rqtp.tv_nsec = (usec - (sec * 1000000)) * 1000;
 
-  if (usec)
-    {
-      /* Let clock_nanosleep() do all of the work. */
-
-      sec          = usec / 1000000;
-      rqtp.tv_sec  = sec;
-      rqtp.tv_nsec = (usec - (sec * 1000000)) * 1000;
-
-      ret = clock_nanosleep(CLOCK_REALTIME, 0, &rqtp, NULL);
+        ret = clock_nanosleep(CLOCK_REALTIME, 0, &rqtp, NULL);
     }
 
-  return ret;
+    return (ret);
 }

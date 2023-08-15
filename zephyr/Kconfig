@@ -11,4 +11,4 @@ config ZEPHYR_LIBS
 	---help---
 		Enables overall support for Zephyr libraries.
 
-source "lib/smf/Kconfig"
+source "zephyr/lib/smf/Kconfig"

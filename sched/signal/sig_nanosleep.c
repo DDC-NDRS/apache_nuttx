@@ -21,7 +21,6 @@
 /****************************************************************************
  * Included Files
  ****************************************************************************/
-
 #include <nuttx/config.h>
 
 #include <time.h>
@@ -87,98 +86,81 @@
  *       implementation.
  *
  ****************************************************************************/
+int /**/nxsig_nanosleep(FAR const struct timespec* rqtp, FAR struct timespec* rmtp) {
+    irqstate_t flags;
+    clock_t    starttick;
+    sigset_t   set;
+    int        ret;
 
-int nxsig_nanosleep(FAR const struct timespec *rqtp,
-                    FAR struct timespec *rmtp)
-{
-  irqstate_t flags;
-  clock_t starttick;
-  sigset_t set;
-  int ret;
-
-  /* Sanity check */
-
-  if (rqtp == NULL || rqtp->tv_nsec < 0 || rqtp->tv_nsec >= 1000000000)
-    {
-      return -EINVAL;
+    /* Sanity check */
+    if ((rqtp == NULL) || (rqtp->tv_nsec < 0) || (rqtp->tv_nsec >= 1000000000)) {
+        return -EINVAL;
     }
 
-  /* Get the start time of the wait.  Interrupts are disabled to prevent
-   * timer interrupts while we do tick-related calculations before and
-   * after the wait.
-   */
+    /* Get the start time of the wait.  Interrupts are disabled to prevent
+     * timer interrupts while we do tick-related calculations before and
+     * after the wait.
+     */
+    flags     = enter_critical_section();
+    starttick = clock_systime_ticks();
 
-  flags     = enter_critical_section();
-  starttick = clock_systime_ticks();
+    /* Set up for the sleep.  Using the empty set means that we are not
+     * waiting for any particular signal.  However, any unmasked signal can
+     * still awaken nxsig_timedwait().
+     */
+    sigemptyset(&set);
 
-  /* Set up for the sleep.  Using the empty set means that we are not
-   * waiting for any particular signal.  However, any unmasked signal can
-   * still awaken nxsig_timedwait().
-   */
+    /* nxsig_nanosleep is a simple application of nxsig_timedwait. */
+    ret = nxsig_timedwait(&set, NULL, rqtp);
 
-  sigemptyset(&set);
-
-  /* nxsig_nanosleep is a simple application of nxsig_timedwait. */
-
-  ret = nxsig_timedwait(&set, NULL, rqtp);
-
-  /* nxsig_timedwait() cannot succeed.  It should always return error with
-   * either (1) EAGAIN meaning that the timeout occurred, or (2) EINTR
-   * meaning that some other unblocked signal was caught.
-   */
-
-  if (ret == -EAGAIN)
-    {
-      /* The timeout "error" is the normal, successful result */
-
-      leave_critical_section(flags);
-      return OK;
+    /* nxsig_timedwait() cannot succeed.  It should always return error with
+     * either (1) EAGAIN meaning that the timeout occurred, or (2) EINTR
+     * meaning that some other unblocked signal was caught.
+     */
+    if (ret == -EAGAIN) {
+        /* The timeout "error" is the normal, successful result */
+        leave_critical_section(flags);
+        return OK;
     }
 
-  /* If we get there, the wait has failed because we were awakened by a
-   * signal.  Return the amount of "unwaited" time if rmtp is non-NULL.
-   */
+    /* If we get there, the wait has failed because we were awakened by a
+     * signal.  Return the amount of "unwaited" time if rmtp is non-NULL.
+     */
+    if (rmtp) {
+        clock_t  elapsed;
+        clock_t  remaining;
+        sclock_t ticks;
 
-  if (rmtp)
-    {
-      clock_t elapsed;
-      clock_t remaining;
-      sclock_t ticks;
+        /* REVISIT: The conversion from time to ticks and back could
+         * be avoided.  clock_timespec_subtract() would be used instead
+         * to get the time difference.
+         */
 
-      /* REVISIT: The conversion from time to ticks and back could
-       * be avoided.  clock_timespec_subtract() would be used instead
-       * to get the time difference.
-       */
+        /* First get the number of clock ticks that we were requested to
+         * wait.
+         */
 
-      /* First get the number of clock ticks that we were requested to
-       * wait.
-       */
+        clock_time2ticks(rqtp, &ticks);
 
-      clock_time2ticks(rqtp, &ticks);
+        /* Get the number of ticks that we actually waited */
+        elapsed = clock_systime_ticks() - starttick;
 
-      /* Get the number of ticks that we actually waited */
-
-      elapsed = clock_systime_ticks() - starttick;
-
-      /* The difference between the number of ticks that we were requested
-       * to wait and the number of ticks that we actually waited is that
-       * amount of time that we failed to wait.
-       */
-
-      if (elapsed >= (clock_t)ticks)
-        {
-          remaining = 0;
+        /* The difference between the number of ticks that we were requested
+         * to wait and the number of ticks that we actually waited is that
+         * amount of time that we failed to wait.
+         */
+        if (elapsed >= (clock_t)ticks) {
+            remaining = 0;
         }
-      else
-        {
-          remaining = (clock_t)ticks - elapsed;
+        else {
+            remaining = (clock_t)ticks - elapsed;
         }
 
-      clock_ticks2time((sclock_t)remaining, rmtp);
+        clock_ticks2time((sclock_t)remaining, rmtp);
     }
 
-  leave_critical_section(flags);
-  return ret;
+    leave_critical_section(flags);
+    return ret;
 }
 
 /****************************************************************************
@@ -254,70 +236,55 @@ int nxsig_nanosleep(FAR const struct timespec *rqtp,
  *       implementation.
  *
  ****************************************************************************/
+int /**/clock_nanosleep(clockid_t clockid, int flags, FAR const struct timespec* rqtp, 
+                        FAR struct timespec* rmtp) {
+    int ret;
 
-int clock_nanosleep(clockid_t clockid, int flags,
-                    FAR const struct timespec *rqtp,
-                    FAR struct timespec *rmtp)
-{
-  int ret;
+    /* clock_nanosleep() is a cancellation point */
+    enter_cancellation_point();
 
-  /* clock_nanosleep() is a cancellation point */
+    /* Check if absolute time is selected */
+    if ((flags & TIMER_ABSTIME) != 0) {
+        struct timespec reltime;
+        struct timespec now;
+        irqstate_t      irqstate;
 
-  enter_cancellation_point();
-
-  /* Check if absolute time is selected */
-
-  if ((flags & TIMER_ABSTIME) != 0)
-    {
-      struct timespec reltime;
-      struct timespec now;
-      irqstate_t irqstate;
-
-      /* Calculate the relative time delay.  We need to enter a critical
-       * section early to assure the relative time is valid from this
-       * point in time.
-       */
-
-      irqstate = enter_critical_section();
-      ret = clock_gettime(clockid, &now);
-      if (ret < 0)
-        {
-          /* clock_gettime() sets the errno variable */
-
-          leave_critical_section(irqstate);
-          leave_cancellation_point();
-          return ERROR;
+        /* Calculate the relative time delay.  We need to enter a critical
+         * section early to assure the relative time is valid from this
+         * point in time.
+         */
+        irqstate = enter_critical_section();
+        ret      = clock_gettime(clockid, &now);
+        if (ret < 0) {
+            /* clock_gettime() sets the errno variable */
+            leave_critical_section(irqstate);
+            leave_cancellation_point();
+            return ERROR;
         }
 
-      clock_timespec_subtract(rqtp, &now, &reltime);
+        clock_timespec_subtract(rqtp, &now, &reltime);
 
-      /* Now that we have the relative time, the remaining operations
-       * are equivalent to nxsig_nanosleep().
-       */
-
-      ret = nxsig_nanosleep(&reltime, rmtp);
-      leave_critical_section(irqstate);
+        /* Now that we have the relative time, the remaining operations
+         * are equivalent to nxsig_nanosleep().
+         */
+        ret = nxsig_nanosleep(&reltime, rmtp);
+        leave_critical_section(irqstate);
     }
-  else
-    {
-      /* In the relative time case, clock_nanosleep() is equivalent to
-       * nanosleep.  In this case, it is a paper thin wrapper around
-       * nxsig_nanosleep().
-       */
-
-      ret = nxsig_nanosleep(rqtp, rmtp);
+    else {
+        /* In the relative time case, clock_nanosleep() is equivalent to
+         * nanosleep.  In this case, it is a paper thin wrapper around
+         * nxsig_nanosleep().
+         */
+        ret = nxsig_nanosleep(rqtp, rmtp);
     }
 
-  /* Check if nxsig_nanosleep() succeeded */
-
-  if (ret < 0)
-    {
-      /* If not set the errno variable and return -1 */
-
-      set_errno(-ret);
-      ret = ERROR;
+    /* Check if nxsig_nanosleep() succeeded */
+    if (ret < 0) {
+        /* If not set the errno variable and return -1 */
+        set_errno(-ret);
+        ret = ERROR;
     }
 
-  leave_cancellation_point();
-  return ret;
+    leave_cancellation_point();
+    return ret;
 }

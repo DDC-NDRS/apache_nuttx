@@ -21,7 +21,6 @@
 /****************************************************************************
  * Included Files
  ****************************************************************************/
-
 #include <nuttx/config.h>
 
 #include <stdlib.h>
@@ -72,74 +71,63 @@
  *   None
  *
  ****************************************************************************/
+void /**/nxtask_start(void) {
+    FAR struct task_tcb_s* tcb = (FAR struct task_tcb_s*)this_task();
+    int exitcode = EXIT_FAILURE;
+    int argc;
 
-void nxtask_start(void)
-{
-  FAR struct task_tcb_s *tcb = (FAR struct task_tcb_s *)this_task();
-  int exitcode = EXIT_FAILURE;
-  int argc;
+    DEBUGASSERT((tcb->cmn.flags & TCB_FLAG_TTYPE_MASK) != TCB_FLAG_TTYPE_PTHREAD);
 
-  DEBUGASSERT((tcb->cmn.flags & TCB_FLAG_TTYPE_MASK) != \
-              TCB_FLAG_TTYPE_PTHREAD);
-
-#ifdef CONFIG_SIG_DEFAULT
-  if ((tcb->cmn.flags & TCB_FLAG_TTYPE_MASK) != TCB_FLAG_TTYPE_KERNEL)
-    {
-      /* Set up default signal actions for NON-kernel thread */
-
-      nxsig_default_initialize(&tcb->cmn);
+    #ifdef CONFIG_SIG_DEFAULT
+    if ((tcb->cmn.flags & TCB_FLAG_TTYPE_MASK) != TCB_FLAG_TTYPE_KERNEL) {
+        /* Set up default signal actions for NON-kernel thread */
+        nxsig_default_initialize(&tcb->cmn);
     }
-#endif
+    #endif
 
-  /* Execute the start hook if one has been registered */
-
-#ifdef CONFIG_SCHED_STARTHOOK
-  if (tcb->starthook != NULL)
-    {
-      tcb->starthook(tcb->starthookarg);
+    /* Execute the start hook if one has been registered */
+    #ifdef CONFIG_SCHED_STARTHOOK
+    if (tcb->starthook != NULL) {
+        tcb->starthook(tcb->starthookarg);
     }
-#endif
+    #endif
 
-  /* Count how many non-null arguments we are passing. The first non-null
-   * argument terminates the list .
-   */
-
-  argc = 1;
-  while (tcb->cmn.group->tg_info->argv[argc])
-    {
-      /* Increment the number of args.  Here is a sanity check to
-       * prevent running away with an unterminated argv[] list.
-       * MAX_START_ARGS should be sufficiently large that this never
-       * happens in normal usage.
-       */
-
-      if (++argc > MAX_START_ARGS)
-        {
-          _exit(EXIT_FAILURE);
+    /* Count how many non-null arguments we are passing. The first non-null
+     * argument terminates the list .
+     */
+    argc = 1;
+    while (tcb->cmn.group->tg_info->argv[argc]) {
+        /* Increment the number of args.  Here is a sanity check to
+         * prevent running away with an unterminated argv[] list.
+         * MAX_START_ARGS should be sufficiently large that this never
+         * happens in normal usage.
+         */
+        if (++argc > MAX_START_ARGS) {
+            _exit(EXIT_FAILURE);
         }
     }
 
-  /* Call the 'main' entry point passing argc and argv.  In the kernel build
-   * this has to be handled differently if we are starting a user-space task;
-   * we have to switch to user-mode before calling the task.
-   */
-
-  if ((tcb->cmn.flags & TCB_FLAG_TTYPE_MASK) == TCB_FLAG_TTYPE_KERNEL)
-    {
-      exitcode = tcb->cmn.entry.main(argc, tcb->cmn.group->tg_info->argv);
+    /* Call the 'main' entry point passing argc and argv.  In the kernel build
+     * this has to be handled differently if we are starting a user-space task;
+     * we have to switch to user-mode before calling the task.
+     */
+    if ((tcb->cmn.flags & TCB_FLAG_TTYPE_MASK) == TCB_FLAG_TTYPE_KERNEL) {
+        exitcode = tcb->cmn.entry.main(argc, tcb->cmn.group->tg_info->argv);
     }
-  else
-    {
-#ifdef CONFIG_BUILD_FLAT
-      nxtask_startup(tcb->cmn.entry.main, argc,
-                     tcb->cmn.group->tg_info->argv);
-#else
-      up_task_start(tcb->cmn.entry.main, argc,
-                    tcb->cmn.group->tg_info->argv);
-#endif
+    else {
+        #ifdef CONFIG_BUILD_FLAT
+        if (argc == 1) {
+            /* assume that when argc equal to 1, we can safely put tcb->arg in argument */
+            nxtask_startup(tcb->cmn.entry.main, argc, tcb->arg);        /* #CUSTOM@NDRS */
+        }
+        else {
+            nxtask_startup(tcb->cmn.entry.main, argc, tcb->cmn.group->tg_info->argv);
+        }
+        #else
+        up_task_start(tcb->cmn.entry.main, argc, tcb->cmn.group->tg_info->argv);
+        #endif
     }
 
-  /* Call _exit() if/when the task returns */
-
-  _exit(exitcode);
+    /* Call _exit() if/when the task returns */
+    _exit(exitcode);
 }

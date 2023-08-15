@@ -21,7 +21,6 @@
 /****************************************************************************
  * Included Files
  ****************************************************************************/
-
 #include <nuttx/config.h>
 
 #include <sys/types.h>
@@ -70,47 +69,36 @@
  *   insufficient or the task cannot be created -ENOMEM will be returned.
  *
  ****************************************************************************/
+int /**/nxthread_create(FAR char const* name, uint8_t ttype, int priority, FAR void* stack_addr, int stack_size,
+                        main_t entry, FAR char* const argv[], FAR char* const envp[]) {
+    FAR struct task_tcb_s* tcb;
+    pid_t pid;
+    int   ret;
 
-int nxthread_create(FAR const char *name, uint8_t ttype, int priority,
-                    FAR void *stack_addr, int stack_size, main_t entry,
-                    FAR char * const argv[], FAR char * const envp[])
-{
-  FAR struct task_tcb_s *tcb;
-  pid_t pid;
-  int ret;
-
-  /* Allocate a TCB for the new task. */
-
-  tcb = (FAR struct task_tcb_s *)kmm_zalloc(sizeof(struct task_tcb_s));
-  if (!tcb)
-    {
-      serr("ERROR: Failed to allocate TCB\n");
-      return -ENOMEM;
+    /* Allocate a TCB for the new task. */
+    tcb = (FAR struct task_tcb_s*)kmm_zalloc(sizeof(struct task_tcb_s));
+    if (!tcb) {
+        serr("ERROR: Failed to allocate TCB\n");
+        return (-ENOMEM);
     }
 
-  /* Setup the task type */
+    /* Setup the task type */
+    tcb->cmn.flags = ttype;
 
-  tcb->cmn.flags = ttype;
-
-  /* Initialize the task */
-
-  ret = nxtask_init(tcb, name, priority, stack_addr, stack_size,
-                    entry, argv, envp);
-  if (ret < OK)
-    {
-      kmm_free(tcb);
-      return ret;
+    /* Initialize the task */
+    ret = nxtask_init(tcb, name, priority, stack_addr, stack_size, entry, argv, envp);
+    if (ret < OK) {
+        kmm_free(tcb);
+        return (ret);
     }
 
-  /* Get the assigned pid before we start the task */
+    /* Get the assigned pid before we start the task */
+    pid = tcb->cmn.pid;
 
-  pid = tcb->cmn.pid;
+    /* Activate the task */
+    nxtask_activate(&tcb->cmn);
 
-  /* Activate the task */
-
-  nxtask_activate(&tcb->cmn);
-
-  return (int)pid;
+    return ((int)pid);
 }
 
 /****************************************************************************
@@ -153,13 +141,10 @@ int nxthread_create(FAR const char *name, uint8_t ttype, int priority,
  *   insufficient or the task cannot be created -ENOMEM will be returned.
  *
  ****************************************************************************/
-
-int nxtask_create(FAR const char *name, int priority,
-                  FAR void *stack_addr, int stack_size, main_t entry,
-                  FAR char * const argv[], FAR char * const envp[])
-{
-  return nxthread_create(name, TCB_FLAG_TTYPE_TASK, priority, stack_addr,
-                         stack_size, entry, argv, envp ? envp : environ);
+int /**/nxtask_create(FAR char const* name, int priority, FAR void* stack_addr, int stack_size, main_t entry,
+                      FAR char* const argv[], FAR char* const envp[]) {
+    return nxthread_create(name, TCB_FLAG_TTYPE_TASK, priority, stack_addr, stack_size, entry, argv,
+                           envp ? envp : environ);
 }
 
 /****************************************************************************
@@ -193,28 +178,20 @@ int nxtask_create(FAR const char *name, int priority,
  *   the failure case to indicate the nature of the error.
  *
  ****************************************************************************/
-
 #ifndef CONFIG_BUILD_KERNEL
-int task_create_with_stack(FAR const char *name, int priority,
-                           FAR void *stack_addr, int stack_size,
-                           main_t entry, FAR char * const argv[])
-{
-  int ret = nxtask_create(name, priority, stack_addr,
-                          stack_size, entry, argv, NULL);
-  if (ret < 0)
-    {
-      set_errno(-ret);
-      ret = ERROR;
+int task_create_with_stack(FAR char const* name, int priority, FAR void* stack_addr, int stack_size, main_t entry,
+                           FAR char* const argv[]) {
+    int ret = nxtask_create(name, priority, stack_addr, stack_size, entry, argv, NULL);
+    if (ret < 0) {
+        set_errno(-ret);
+        ret = ERROR;
     }
 
-  return ret;
+    return ret;
 }
 
-int task_create(FAR const char *name, int priority,
-                int stack_size, main_t entry, FAR char * const argv[])
-{
-  return task_create_with_stack(name, priority, NULL,
-                                stack_size, entry, argv);
+int /**/task_create(FAR char const* name, int priority, int stack_size, main_t entry, FAR char* const argv[]) {
+    return task_create_with_stack(name, priority, NULL, stack_size, entry, argv);
 }
 #endif
 
@@ -242,13 +219,9 @@ int task_create(FAR const char *name, int priority,
  *   insufficient or the task cannot be created -ENOMEM will be returned.
  *
  ****************************************************************************/
-
-int kthread_create_with_stack(FAR const char *name, int priority,
-                              FAR void *stack_addr, int stack_size,
-                              main_t entry, FAR char * const argv[])
-{
-  return nxthread_create(name, TCB_FLAG_TTYPE_KERNEL, priority,
-                         stack_addr, stack_size, entry, argv, NULL);
+int kthread_create_with_stack(FAR char const* name, int priority, FAR void* stack_addr, int stack_size, main_t entry,
+                              FAR char* const argv[]) {
+    return nxthread_create(name, TCB_FLAG_TTYPE_KERNEL, priority, stack_addr, stack_size, entry, argv, NULL);
 }
 
 /****************************************************************************
@@ -274,10 +247,6 @@ int kthread_create_with_stack(FAR const char *name, int priority,
  *   insufficient or the task cannot be created -ENOMEM will be returned.
  *
  ****************************************************************************/
-
-int kthread_create(FAR const char *name, int priority,
-                   int stack_size, main_t entry, FAR char * const argv[])
-{
-  return kthread_create_with_stack(name, priority,
-                                   NULL, stack_size, entry, argv);
+int kthread_create(FAR char const* name, int priority, int stack_size, main_t entry, FAR char* const argv[]) {
+    return kthread_create_with_stack(name, priority, NULL, stack_size, entry, argv);
 }

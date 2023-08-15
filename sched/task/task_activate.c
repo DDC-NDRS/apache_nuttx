@@ -54,44 +54,37 @@
  *   None
  *
  ****************************************************************************/
+void /**/nxtask_activate(FAR struct tcb_s* tcb) {
+    irqstate_t flags = enter_critical_section();
+    FAR struct tcb_s* rtcb = this_task();
+    bool rc;
 
-void nxtask_activate(FAR struct tcb_s *tcb)
-{
-  irqstate_t flags = enter_critical_section();
-  FAR struct tcb_s *rtcb = this_task();
-
-#ifdef CONFIG_SCHED_INSTRUMENTATION
-
-  /* Check if this is really a re-start */
-
-  if (tcb->task_state != TSTATE_TASK_INACTIVE)
-    {
-      /* Inform the instrumentation layer that the task
-       * has stopped
-       */
-
-      sched_note_stop(tcb);
+    #ifdef CONFIG_SCHED_INSTRUMENTATION
+    /* Check if this is really a re-start */
+    if (tcb->task_state != TSTATE_TASK_INACTIVE) {
+        /* Inform the instrumentation layer that the task
+         * has stopped
+         */
+        sched_note_stop(tcb);
     }
 
-  /* Inform the instrumentation layer that the task
-   * has started
-   */
+    /* Inform the instrumentation layer that the task
+     * has started
+     */
 
-  sched_note_start(tcb);
-#endif
+    sched_note_start(tcb);
+    #endif
 
-  /* Remove the task from waitting list */
+    /* Remove the task from waitting list */
+    nxsched_remove_blocked(tcb);
 
-  nxsched_remove_blocked(tcb);
-
-  /* Add the task to ready-to-run task list, and
-   * perform the context switch if one is needed
-   */
-
-  if (nxsched_add_readytorun(tcb))
-    {
-      up_switch_context(tcb, rtcb);
+    /* Add the task to ready-to-run task list, and
+     * perform the context switch if one is needed
+     */
+    rc = nxsched_add_readytorun(tcb);
+    if (rc == true) {
+        up_switch_context(tcb, rtcb);
     }
 
-  leave_critical_section(flags);
+    leave_critical_section(flags);
 }

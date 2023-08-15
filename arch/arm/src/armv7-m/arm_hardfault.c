@@ -21,7 +21,6 @@
 /****************************************************************************
  * Included Files
  ****************************************************************************/
-
 #include <nuttx/config.h>
 
 #include <inttypes.h>
@@ -39,24 +38,22 @@
 /****************************************************************************
  * Pre-processor Definitions
  ****************************************************************************/
-
 /* If CONFIG_ARMV7M_USEBASEPRI=n, then debug output from this file may
  * interfere with context switching!
  */
-
 #ifdef CONFIG_DEBUG_HARDFAULT_ALERT
-# define hfalert(format, ...)  _alert(format, ##__VA_ARGS__)
+#define hfalert(format, ...) _alert(format, ##__VA_ARGS__)
 #else
-# define hfalert(x...)
+#define hfalert(x...)
 #endif
 
 #ifdef CONFIG_DEBUG_HARDFAULT_INFO
-# define hfinfo(format, ...)   _info(format, ##__VA_ARGS__)
+#define hfinfo(format, ...) _info(format, ##__VA_ARGS__)
 #else
-# define hfinfo(x...)
+#define hfinfo(x...)
 #endif
 
-#define INSN_SVC0        0xdf00 /* insn: svc 0 */
+#define INSN_SVC0           0xDF00 /* insn: svc 0 */
 
 /****************************************************************************
  * Public Functions
@@ -70,108 +67,86 @@
  *   exceptions that are performed in bad contexts.
  *
  ****************************************************************************/
+int /**/arm_hardfault(int irq, void* context, void* arg) {
+    uint32_t hfsr = getreg32(NVIC_HFAULTS);
+    uint32_t cfsr = getreg32(NVIC_CFAULTS);
 
-int arm_hardfault(int irq, void *context, void *arg)
-{
-  uint32_t hfsr = getreg32(NVIC_HFAULTS);
-  uint32_t cfsr = getreg32(NVIC_CFAULTS);
+    UNUSED(cfsr);
 
-  UNUSED(cfsr);
+    /* Get the value of the program counter where the fault occurred */
+    #ifndef CONFIG_ARMV7M_USEBASEPRI
+    uint32_t* regs = (uint32_t*)context;
+    uint16_t* pc   = (uint16_t*)regs[REG_PC] - 1;
 
-  /* Get the value of the program counter where the fault occurred */
-
-#ifndef CONFIG_ARMV7M_USEBASEPRI
-  uint32_t *regs = (uint32_t *)context;
-  uint16_t *pc = (uint16_t *)regs[REG_PC] - 1;
-
-  /* Check if the pc lies in known FLASH memory.
-   * REVISIT:  What if the PC lies in "unknown" external memory?  Best
-   * use the BASEPRI register if you have external memory.
-   */
-
-#ifdef CONFIG_BUILD_PROTECTED
-  /* In the kernel build, SVCalls are expected in either the base, kernel
-   * FLASH region or in the user FLASH region.
-   */
-
-  if (((uintptr_t)pc >= (uintptr_t)_START_TEXT &&
-       (uintptr_t)pc <  (uintptr_t)_END_TEXT) ||
-      ((uintptr_t)pc >= (uintptr_t)USERSPACE->us_textstart &&
-       (uintptr_t)pc <  (uintptr_t)USERSPACE->us_textend))
-#else
-  /* SVCalls are expected only from the base, kernel FLASH region */
-
-  if ((uintptr_t)pc >= (uintptr_t)_START_TEXT &&
-      (uintptr_t)pc <  (uintptr_t)_END_TEXT)
-#endif
+    /* Check if the pc lies in known FLASH memory.
+     * REVISIT:  What if the PC lies in "unknown" external memory?  Best
+     * use the BASEPRI register if you have external memory.
+     */
+    #ifdef CONFIG_BUILD_PROTECTED
+    /* In the kernel build, SVCalls are expected in either the base, kernel
+     * FLASH region or in the user FLASH region.
+     */
+    if (((uintptr_t)pc >= (uintptr_t)_START_TEXT && (uintptr_t)pc < (uintptr_t)_END_TEXT) ||
+        ((uintptr_t)pc >= (uintptr_t)USERSPACE->us_textstart && (uintptr_t)pc < (uintptr_t)USERSPACE->us_textend))
+    #else
+    /* SVCalls are expected only from the base, kernel FLASH region */
+    if ((uintptr_t)pc >= (uintptr_t)_START_TEXT && (uintptr_t)pc < (uintptr_t)_END_TEXT)
+    #endif
     {
-      /* Fetch the instruction that caused the Hard fault */
+        /* Fetch the instruction that caused the Hard fault */
+        uint16_t insn = *pc;
+        hfinfo("  PC: %p INSN: %04x\n", pc, insn);
 
-      uint16_t insn = *pc;
-      hfinfo("  PC: %p INSN: %04x\n", pc, insn);
-
-      /* If this was the instruction 'svc 0', then forward processing
-       * to the SVCall handler
-       */
-
-      if (insn == INSN_SVC0)
-        {
-          hfinfo("Forward SVCall\n");
-          return arm_svcall(irq, context, arg);
+        /* If this was the instruction 'svc 0', then forward processing
+         * to the SVCall handler
+         */
+        if (insn == INSN_SVC0) {
+            hfinfo("Forward SVCall\n");
+            return arm_svcall(irq, context, arg);
         }
     }
-#endif
+    #endif
 
-  if (hfsr & NVIC_HFAULTS_FORCED)
-    {
-      hfalert("Hard Fault escalation:\n");
+    if (hfsr & NVIC_HFAULTS_FORCED) {
+        hfalert("Hard Fault escalation:\n");
 
-#ifdef CONFIG_DEBUG_MEMFAULT
-      if (cfsr & NVIC_CFAULTS_MEMFAULTSR_MASK)
-        {
-          return arm_memfault(irq, context, arg);
+        #ifdef CONFIG_DEBUG_MEMFAULT
+        if (cfsr & NVIC_CFAULTS_MEMFAULTSR_MASK) {
+            return arm_memfault(irq, context, arg);
         }
-#endif /* CONFIG_DEBUG_MEMFAULT */
+        #endif /* CONFIG_DEBUG_MEMFAULT */
 
-#ifdef CONFIG_DEBUG_BUSFAULT
-      if (cfsr & NVIC_CFAULTS_BUSFAULTSR_MASK)
-        {
-          return arm_busfault(irq, context, arg);
+        #ifdef CONFIG_DEBUG_BUSFAULT
+        if (cfsr & NVIC_CFAULTS_BUSFAULTSR_MASK) {
+            return arm_busfault(irq, context, arg);
         }
-#endif /* CONFIG_DEBUG_BUSFAULT */
+        #endif /* CONFIG_DEBUG_BUSFAULT */
 
-#ifdef CONFIG_DEBUG_USAGEFAULT
-      if (cfsr & NVIC_CFAULTS_USGFAULTSR_MASK)
-        {
-          return arm_usagefault(irq, context, arg);
+        #ifdef CONFIG_DEBUG_USAGEFAULT
+        if (cfsr & NVIC_CFAULTS_USGFAULTSR_MASK) {
+            return arm_usagefault(irq, context, arg);
         }
-#endif /* CONFIG_DEBUG_USAGEFAULT */
+        #endif /* CONFIG_DEBUG_USAGEFAULT */
     }
 
-  /* Dump some hard fault info */
+    /* Dump some hard fault info */
+    hfalert("PANIC!!! Hard Fault!:");
+    hfalert("\tIRQ: %d regs: %p\n", irq, context);
+    hfalert("\tBASEPRI: %08x PRIMASK: %08x IPSR: %08" PRIx32 " CONTROL: %08" PRIx32 "\n", getbasepri(), getprimask(),
+            getipsr(), getcontrol());
+    hfalert("\tCFSR: %08" PRIx32 " HFSR: %08" PRIx32 " DFSR: %08" PRIx32 " BFAR: %08" PRIx32 " AFSR: %08" PRIx32 "\n",
+            cfsr, hfsr, getreg32(NVIC_DFAULTS), getreg32(NVIC_BFAULT_ADDR), getreg32(NVIC_AFAULTS));
 
-  hfalert("PANIC!!! Hard Fault!:");
-  hfalert("\tIRQ: %d regs: %p\n", irq, context);
-  hfalert("\tBASEPRI: %08x PRIMASK: %08x IPSR: %08"
-          PRIx32 " CONTROL: %08" PRIx32 "\n",
-          getbasepri(), getprimask(), getipsr(), getcontrol());
-  hfalert("\tCFSR: %08" PRIx32 " HFSR: %08" PRIx32 " DFSR: %08"
-          PRIx32 " BFAR: %08" PRIx32 " AFSR: %08" PRIx32 "\n",
-          cfsr, hfsr, getreg32(NVIC_DFAULTS),
-          getreg32(NVIC_BFAULT_ADDR), getreg32(NVIC_AFAULTS));
+    hfalert("Hard Fault Reason:\n");
 
-  hfalert("Hard Fault Reason:\n");
-
-  if (hfsr & NVIC_HFAULTS_VECTTBL)
-    {
-      hfalert("\tBusFault on a vector table read\n");
+    if (hfsr & NVIC_HFAULTS_VECTTBL) {
+        hfalert("\tBusFault on a vector table read\n");
     }
-  else if (hfsr & NVIC_HFAULTS_DEBUGEVT)
-    {
-      hfalert("\tDebug event\n");
+    else if (hfsr & NVIC_HFAULTS_DEBUGEVT) {
+        hfalert("\tDebug event\n");
     }
 
-  up_irq_save();
-  PANIC_WITH_REGS("panic", context);
-  return OK;
+    up_irq_save();
+    PANIC_WITH_REGS("panic", context);
+    return OK;
 }

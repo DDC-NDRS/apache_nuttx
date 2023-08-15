@@ -80,27 +80,21 @@ volatile sq_queue_t g_alloctimers;
  *   None
  *
  ****************************************************************************/
+void /**/timer_initialize(void) {
+    #if (CONFIG_PREALLOC_TIMERS > 0)
+    int i;
 
-void timer_initialize(void)
-{
-#if CONFIG_PREALLOC_TIMERS > 0
-  int i;
+    /* Place all of the pre-allocated timers into the free timer list */
+    sq_init((FAR sq_queue_t*)&g_freetimers);
 
-  /* Place all of the pre-allocated timers into the free timer list */
-
-  sq_init((FAR sq_queue_t *)&g_freetimers);
-
-  for (i = 0; i < CONFIG_PREALLOC_TIMERS; i++)
-    {
-      g_prealloctimers[i].pt_flags = PT_FLAGS_PREALLOCATED;
-      sq_addlast((FAR sq_entry_t *)&g_prealloctimers[i],
-                 (FAR sq_queue_t *)&g_freetimers);
+    for (i = 0; i < CONFIG_PREALLOC_TIMERS; i++) {
+        g_prealloctimers[i].pt_flags = PT_FLAGS_PREALLOCATED;
+        sq_addlast((FAR sq_entry_t*)&g_prealloctimers[i], (FAR sq_queue_t*)&g_freetimers);
     }
-#endif
+    #endif
 
-  /* Initialize the list of allocated timers */
-
-  sq_init((FAR sq_queue_t *)&g_alloctimers);
+    /* Initialize the list of allocated timers */
+    sq_init((FAR sq_queue_t*)&g_alloctimers);
 }
 
 /****************************************************************************
@@ -121,26 +115,20 @@ void timer_initialize(void)
  *   None
  *
  ****************************************************************************/
+void /**/timer_deleteall(pid_t pid) {
+    FAR struct posix_timer_s* timer;
+    FAR struct posix_timer_s* next;
+    irqstate_t                flags;
 
-void timer_deleteall(pid_t pid)
-{
-  FAR struct posix_timer_s *timer;
-  FAR struct posix_timer_s *next;
-  irqstate_t flags;
-
-  flags = enter_critical_section();
-  for (timer = (FAR struct posix_timer_s *)g_alloctimers.head;
-       timer != NULL;
-       timer = next)
-    {
-      next = timer->flink;
-      if (timer->pt_owner == pid)
-        {
-          timer_delete((timer_t)timer);
+    flags = enter_critical_section();
+    for (timer = (FAR struct posix_timer_s*)g_alloctimers.head; timer != NULL; timer = next) {
+        next = timer->flink;
+        if (timer->pt_owner == pid) {
+            timer_delete((timer_t)timer);
         }
     }
 
-  leave_critical_section(flags);
+    leave_critical_section(flags);
 }
 
 /****************************************************************************
@@ -158,30 +146,25 @@ void timer_deleteall(pid_t pid)
  *   On error, NULL is returned.
  *
  ****************************************************************************/
+FAR struct posix_timer_s* timer_gethandle(timer_t timerid) {
+    FAR struct posix_timer_s* timer = NULL;
+    FAR sq_entry_t* entry;
+    irqstate_t intflags;
 
-FAR struct posix_timer_s *timer_gethandle(timer_t timerid)
-{
-  FAR struct posix_timer_s *timer = NULL;
-  FAR sq_entry_t *entry;
-  irqstate_t intflags;
+    if (timerid != NULL) {
+        intflags = enter_critical_section();
 
-  if (timerid != NULL)
-    {
-      intflags = enter_critical_section();
-
-      sq_for_every(&g_alloctimers, entry)
-        {
-          if (entry == timerid)
-            {
-              timer = (FAR struct posix_timer_s *)timerid;
-              break;
+        sq_for_every(&g_alloctimers, entry) {
+            if (entry == timerid) {
+                timer = (FAR struct posix_timer_s*)timerid;
+                break;
             }
         }
 
-      leave_critical_section(intflags);
+        leave_critical_section(intflags);
     }
 
-  return timer;
+    return (timer);
 }
 
 #endif /* CONFIG_DISABLE_POSIX_TIMERS */

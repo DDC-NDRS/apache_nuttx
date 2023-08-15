@@ -9,7 +9,6 @@
 #include <errno.h>
 #include <nuttx/nuttx.h>
 #include <nuttx/config.h>
-#include <nuttx/board.h>
 #include <zephyr/sys/util.h>
 
 /**

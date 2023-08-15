@@ -668,10 +668,11 @@ struct tcb_s
 struct task_tcb_s
 {
   /* Common TCB fields ******************************************************/
-
   struct tcb_s cmn;                      /* Common TCB fields               */
 
   /* Task Management Fields *************************************************/
+  /* #CUSTOM@NDRS */
+  void* arg;                             /* Startup argument                */
 
 #ifdef CONFIG_SCHED_STARTHOOK
   starthook_t starthook;                 /* Task startup function               */

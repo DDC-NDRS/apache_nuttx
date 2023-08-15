@@ -2185,6 +2185,11 @@ menu "Wireless Support"
 source "wireless/Kconfig"
 endmenu
 
+# #CUSTOM@NDRS
+menu "Zephyr Support"
+source "zephyr/Kconfig"
+endmenu
+
 menu "Binary Loader"
 source "binfmt/Kconfig"
 endmenu

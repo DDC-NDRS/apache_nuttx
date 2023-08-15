@@ -95,6 +95,13 @@
 #define BUTTON_SW2_BIT      (1 << BUTTON_SW2)
 #define BUTTON_SW3_BIT      (1 << BUTTON_SW3)
 
+#define PIN_SW2     (PIN_PTC12 | GPIO_INPUT)  /* SW2  PTC12 */
+#define PIN_SW3     (PIN_PTC13 | GPIO_INPUT)  /* SW3  PTC13 */
+
+#define PIN_LED_R   (PIN_PTD15 | GPIO_LOWDRIVE | GPIO_OUTPUT_ZERO)
+#define PIN_LED_G   (PIN_PTD16 | GPIO_LOWDRIVE | GPIO_OUTPUT_ZERO)
+#define PIN_LED_B   (PIN_PTD0  | GPIO_LOWDRIVE | GPIO_OUTPUT_ZERO)
+
 /* UART selections **********************************************************/
 /* By default, the serial console will be provided on the OpenSDA VCOM port:
  *
