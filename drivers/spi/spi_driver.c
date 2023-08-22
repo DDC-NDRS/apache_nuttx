@@ -36,6 +36,7 @@
 #include <nuttx/fs/fs.h>
 #include <nuttx/mutex.h>
 #include <nuttx/spi/spi_transfer.h>
+#include <nuttx/signal.h>
 
 #ifdef CONFIG_SPI_DRIVER
 
@@ -213,7 +214,41 @@ static ssize_t spidrvr_read(FAR struct file *filep, FAR char *buffer,
 static ssize_t spidrvr_write(FAR struct file *filep, FAR const char *buffer,
                              size_t len)
 {
+  FAR struct inode *inode;
+  FAR struct spi_driver_s *priv;
+
+  spiinfo("filep=%p buffer=%p buflen=%zu\n", filep, buffer, len);
+
+  /* Get our private data structure */
+
+  DEBUGASSERT(filep != NULL && filep->f_inode != NULL);
+  inode = filep->f_inode;
+
+  priv = (FAR struct spi_driver_s *)inode->i_private;
+  DEBUGASSERT(priv);
+
+  /* Get exclusive access to the SPI bus */
+
+  SPI_LOCK(priv->spi, true);
+
+  /* select which PCS pin to use for transfer */
+
+  SPI_SELECT(priv->spi, 0, true);
+
+  SPI_SETFREQUENCY(priv->spi, 2000000);
+  SPI_SETMODE(priv->spi, 1);
+  SPI_SETBITS(priv->spi, len*8);
+
+  /* Perform the transfer */
+
+  SPI_EXCHANGE(priv->spi, buffer, NULL, 1);
+
+  /* Return exclusive access to the SPI bus */
+
+  SPI_LOCK(priv->spi, false);
+  
   return len; /* Say that everything was written */
+  
 }
 
 /****************************************************************************
