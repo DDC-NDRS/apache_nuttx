@@ -25,6 +25,7 @@
  * Included Files
  ****************************************************************************/
 #include <nuttx/config.h>
+#include <hardware/s32k1xx_pinmux.h>
 
 /****************************************************************************
  * Pre-processor Definitions
@@ -185,5 +186,23 @@
 #define DEV_GPIO11  (PIN_PTA13 | GPIO_INPUT | PIN_INT_BOTH)
 
 #define DEV_NUM_OF_GPIO 5
+
+/* VNQ9080AJ High-Side Driver */
+#define DEV_CONTACT1        "/dev/gpio0"    // PTD18 OUTPUT_ZERO
+#define DEV_CONTACT2        "/dev/gpio1"    // PTD19 OUTPUT_ZERO
+#define DEV_CONTACT3        "/dev/gpio2"    // PTD22 OUTPUT_ZERO
+#define DEV_CONTACT4        "/dev/gpio3"    // PTD23 OUTPUT_ZERO
+#define DEV_VNQ_SEN         "/dev/gpio4"    // PTD24 OUTPUT_ZERO
+#define DEV_VNQ_FAULT_RST   "/dev/gpio5"    // PTD27 OUTPUT_ONE
+#define DEV_VNQ_SEL0        "/dev/gpio6"    // PTD28 OUTPUT_ZERO
+#define DEV_VNQ_CS          "/dev/gpio7"    // PTD29 INPUT
+#define DEV_VNQ_SEL1        "/dev/gpio8"    // PTD30 OUTPUT_ZERO
+
+/* UCC21750DWR IGBT driver */
+#define DEV_UCC_INP         "/dev/gpio9"    // PTE20 OUTPUT_ZERO
+#define DEV_UCC_INN         "/dev/gpio10"   // PTE21 OUTPUT_ZERO
+#define DEV_UCC_RDY         "/dev/gpio11"   // PTE22 INPUT
+#define DEV_UCC_FLT         "/dev/gpio12"   // PTE23 INPUT
+#define DEV_UCC_EN          "/dev/gpio13"   // PTE24 OUTPUT_ONE
 
 #endif /* __BOARDS_ARM_S32K1XX_S32K146EVB_INCLUDE_BOARD_H */
