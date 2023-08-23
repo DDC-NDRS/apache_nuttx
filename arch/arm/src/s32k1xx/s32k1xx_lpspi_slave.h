@@ -53,7 +53,6 @@
 /****************************************************************************
  * Included Files
  ****************************************************************************/
-
 #include <nuttx/config.h>
 
 #include <sys/types.h>
@@ -79,47 +78,40 @@
 #include <arch/board/board.h>
 
 #ifndef CONFIG_SPI_SLAVE_QSIZE
-#define CONFIG_SPI_SLAVE_QSIZE 10
+#define CONFIG_SPI_SLAVE_QSIZE  10
 #endif
 
 /****************************************************************************
  * Private Types
  ****************************************************************************/
 /* The overall state of one SPI controller */
+struct s32k1xx_lpspidev_s {
+    /* Externally visible part of the SPI slave controller interface */
+    struct spi_slave_ctrlr_s ctrlr;
 
-struct s32k1xx_lpspidev_s
-{
-  /* Externally visible part of the SPI slave controller interface */
+    /* Bound SPI slave device interface */
+    struct spi_slave_dev_s* dev;
+    xcpt_t   handler;                       /* SPI interrupt handler */
+    uint32_t base;                          /* SPI controller register base address */
+    mutex_t  spilock;                       /* Assures mutually exclusive access to SPI */
+    uint32_t outval;                        /* Default shift-out value */
+    uint16_t irq;                           /* SPI IRQ number */
+    uint8_t  mode;                          /* Mode 0,1,2,3 */
+    uint16_t nbits;                         /* Width of word in bits (2 to 4096) */
+    uint8_t  PCSpin;                        /* Peripheral Chip Select Pin 0,1,2,3 */
+    bool     initialized;                   /* True: Controller has been initialized */
+    bool     nss;                           /* True: Chip selected */
 
-  struct spi_slave_ctrlr_s ctrlr;
+    /* Output queue */
+    uint8_t tx_head;                        /* Location of next value */
+    uint8_t tx_tail;                        /* Index of first value */
 
-  /* Bound SPI slave device interface */
-
-  struct spi_slave_dev_s *dev;
-  xcpt_t handler;              /* SPI interrupt handler */
-  uint32_t base;               /* SPI controller register base address */
-  mutex_t spilock;             /* Assures mutually exclusive access to SPI */
-  uint32_t outval;             /* Default shift-out value */
-  uint16_t irq;                /* SPI IRQ number */
-  uint8_t mode;                /* Mode 0,1,2,3 */
-  uint16_t nbits;              /* Width of word in bits (2 to 4096) */
-  uint8_t PCSpin;              /* Peripheral Chip Select Pin 0,1,2,3 */
-  bool initialized;            /* True: Controller has been initialized */
-  bool nss;                    /* True: Chip selected */
-
-  /* Output queue */
-
-  uint8_t tx_head;                /* Location of next value */
-  uint8_t tx_tail;                /* Index of first value */
-
-  uint32_t outq[CONFIG_SPI_SLAVE_QSIZE];
-
+    uint32_t outq[CONFIG_SPI_SLAVE_QSIZE];
 };
 
 /****************************************************************************
  * Public Function Prototype
  ****************************************************************************/
+struct spi_slave_ctrlr_s* s32k1xx_spi_slave_initialize(int port);
 
-struct spi_slave_ctrlr_s *s32k1xx_spi_slave_initialize(int port);
-
-#endif  /* __ARCH_ARM_SRC_S32K1XX_S32K1XX_LPSPI_SLAVE_H */
+#endif /* __ARCH_ARM_SRC_S32K1XX_S32K1XX_LPSPI_SLAVE_H */
