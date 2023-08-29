@@ -187,6 +187,50 @@
 
 #define DEV_NUM_OF_GPIO 5
 
+/* VNQ9080AJ High-Side Driver
+ *
+ * CONTACT1             PTD18   control input pin
+ * CONTACT2             PTD19
+ * CONTACT3             PTD22
+ * CONTACT4             PTD23
+ *
+ * VNQ_SEN              PTD24   enable CS diagnostic
+ * VNQ_FAULT_RST        PTD27   auto restart mode active low
+ * VNQ_SEL0             PTD28   CS multiplexer
+ * VNQ_CS               PTD29   input pin
+ * VNQ_SEL1             PTD30
+ */
+#define PIN_CONF_CONTACT1        (PIN_PTD18 | GPIO_OUTPUT | GPIO_OUTPUT_ZERO)
+#define PIN_CONF_CONTACT2        (PIN_PTD19 | GPIO_OUTPUT | GPIO_OUTPUT_ZERO)
+#define PIN_CONF_CONTACT3        (PIN_PTD22 | GPIO_OUTPUT | GPIO_OUTPUT_ZERO)
+#define PIN_CONF_CONTACT4        (PIN_PTD23 | GPIO_OUTPUT | GPIO_OUTPUT_ZERO)
+
+#define PIN_CONF_VNQ_SEN         (PIN_PTD24 | GPIO_OUTPUT | GPIO_OUTPUT_ZERO)
+#define PIN_CONF_VNQ_FAULT_RST   (PIN_PTD27 | GPIO_OUTPUT | GPIO_OUTPUT_ONE)
+#define PIN_CONF_VNQ_SEL0        (PIN_PTD28 | GPIO_OUTPUT | GPIO_OUTPUT_ZERO)
+#define PIN_CONF_VNQ_CS          (PIN_PTD29 | GPIO_INPUT)
+#define PIN_CONF_VNQ_SEL1        (PIN_PTD30 | GPIO_OUTPUT | GPIO_OUTPUT_ZERO)
+
+/* UCC21750DWR IGBT driver 
+ * 
+ * UCC_INP      PTE20   Control pin
+ * UCC_INN      PTE21   OUTPUT always LOW
+ * UCC_RDY      PTE22   INPUT active HIGH
+ * UCC_FLT      PTE23   INPUT active low
+ * UCC_EN       PTE24   OUTPUT (RST)
+ */
+#define PIN_CONF_UCC_INP        (PIN_PTE20 | GPIO_OUTPUT | GPIO_OUTPUT_ZERO)
+#define PIN_CONF_UCC_INN        (PIN_PTE21 | GPIO_OUTPUT | GPIO_OUTPUT_ZERO)
+#define PIN_CONF_UCC_RDY        (PIN_PTE22 | GPIO_INPUT)
+#define PIN_CONF_UCC_FLT        (PIN_PTE23 | GPIO_INPUT)
+#define PIN_CONF_UCC_EN         (PIN_PTE24 | GPIO_OUTPUT | GPIO_OUTPUT_ONE)
+
+/* MC33664 Isolated network high-speed transceiver for BCC
+ * BCC_INT      PTB12   Input interrupt
+ * BCC_EN       PTE8    Output chip enable
+ * BCC_PCS      PTB5    Output chip select for wakeup
+ */
+
 /* VNQ9080AJ High-Side Driver */
 #define DEV_CONTACT1        "/dev/gpio0"    // PTD18 OUTPUT_ZERO
 #define DEV_CONTACT2        "/dev/gpio1"    // PTD19 OUTPUT_ZERO
