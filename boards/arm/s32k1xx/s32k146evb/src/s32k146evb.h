@@ -24,7 +24,6 @@
 /****************************************************************************
  * Included Files
  ****************************************************************************/
-
 #include <nuttx/config.h>
 #include <nuttx/compiler.h>
 
@@ -37,11 +36,8 @@
 /****************************************************************************
  * Pre-processor Definitions
  ****************************************************************************/
-
 /* Configuration ************************************************************/
-
 /* S32K146EVB GPIOs *********************************************************/
-
 /* LEDs.  The S32K146EVB has one RGB LED:
  *
  *   RedLED    PTD15  (FTM0 CH0)
@@ -50,7 +46,6 @@
  *
  * An output of '1' illuminates the LED.
  */
-
 #define GPIO_LED_R  (PIN_PTD15 | GPIO_LOWDRIVE | GPIO_OUTPUT_ZERO)
 #define GPIO_LED_G  (PIN_PTD16 | GPIO_LOWDRIVE | GPIO_OUTPUT_ZERO)
 #define GPIO_LED_B  (PIN_PTD0  | GPIO_LOWDRIVE | GPIO_OUTPUT_ZERO)
@@ -60,68 +55,19 @@
  *   SW2  PTC12
  *   SW3  PTC13
  */
-
 #define GPIO_SW2    (PIN_PTC12 | PIN_INT_BOTH)
 #define GPIO_SW3    (PIN_PTC13 | PIN_INT_BOTH)
-
-/* VNQ9080AJ High-Side Driver
- *
- * CONTACT1             PTD18   control input pin
- * CONTACT2             PTD19
- * CONTACT3             PTD22
- * CONTACT4             PTD23
- *
- * VNQ_SEN              PTD24   enable CS diagnostic
- * VNQ_FAULT_RST        PTD27   auto restart mode active low
- * VNQ_SEL0             PTD28   CS multiplexer
- * VNQ_CS               PTD29   input pin
- * VNQ_SEL1             PTD30
- */
-#define PIN_CONF_CONTACT1        (PIN_PTD18 | GPIO_OUTPUT | GPIO_OUTPUT_ZERO)
-#define PIN_CONF_CONTACT2        (PIN_PTD19 | GPIO_OUTPUT | GPIO_OUTPUT_ZERO)
-#define PIN_CONF_CONTACT3        (PIN_PTD22 | GPIO_OUTPUT | GPIO_OUTPUT_ZERO)
-#define PIN_CONF_CONTACT4        (PIN_PTD23 | GPIO_OUTPUT | GPIO_OUTPUT_ZERO)
-
-#define PIN_CONF_VNQ_SEN         (PIN_PTD24 | GPIO_OUTPUT | GPIO_OUTPUT_ZERO)
-#define PIN_CONF_VNQ_FAULT_RST   (PIN_PTD27 | GPIO_OUTPUT | GPIO_OUTPUT_ONE)
-#define PIN_CONF_VNQ_SEL0        (PIN_PTD28 | GPIO_OUTPUT | GPIO_OUTPUT_ZERO)
-#define PIN_CONF_VNQ_CS          (PIN_PTD29 | GPIO_INPUT)
-#define PIN_CONF_VNQ_SEL1        (PIN_PTD30 | GPIO_OUTPUT | GPIO_OUTPUT_ZERO)
-
-/* UCC21750DWR IGBT driver 
- * 
- * UCC_INP      PTE20   Control pin
- * UCC_INN      PTE21   OUTPUT always LOW
- * UCC_RDY      PTE22   INPUT active HIGH
- * UCC_FLT      PTE23   INPUT active low
- * UCC_EN       PTE24   OUTPUT (RST)
- */
-#define PIN_CONF_UCC_INP        (PIN_PTE20 | GPIO_OUTPUT | GPIO_OUTPUT_ZERO)
-#define PIN_CONF_UCC_INN        (PIN_PTE21 | GPIO_OUTPUT | GPIO_OUTPUT_ZERO)
-#define PIN_CONF_UCC_RDY        (PIN_PTE22 | GPIO_INPUT)
-#define PIN_CONF_UCC_FLT        (PIN_PTE23 | GPIO_INPUT)
-#define PIN_CONF_UCC_EN         (PIN_PTE24 | GPIO_OUTPUT | GPIO_OUTPUT_ONE)
-
-/* MC33664 Isolated network high-speed transceiver for BCC
- * BCC_INT      PTB12   Input interrupt
- * BCC_EN       PTE8    Output chip enable
- * BCC_PCS      PTB5    Output chip select for wakeup
- */
 
 /****************************************************************************
  * Public Data
  ****************************************************************************/
-
 #ifndef __ASSEMBLY__
-
 /* User peripheral configuration structure 0 */
-
 extern const struct peripheral_clock_config_s g_peripheral_clockconfig0[];
 
 /****************************************************************************
  * Public Function Prototypes
  ****************************************************************************/
-
 /****************************************************************************
  * Name: s32k1xx_bringup
  *
@@ -135,7 +81,6 @@ extern const struct peripheral_clock_config_s g_peripheral_clockconfig0[];
  *     Called from the NSH library
  *
  ****************************************************************************/
-
 int s32k1xx_bringup(void);
 
 /****************************************************************************
@@ -145,7 +90,6 @@ int s32k1xx_bringup(void);
  *   Initialize GPIO drivers for use with /apps/examples/gpio
  *
  ****************************************************************************/
-
 int s32k1xx_gpio_initialize(void);
 
 /****************************************************************************
@@ -155,7 +99,6 @@ int s32k1xx_gpio_initialize(void);
  *   Initialize I2C driver and register /dev/i2cN devices.
  *
  ****************************************************************************/
-
 int s32k1xx_i2cdev_initialize(void);
 
 /****************************************************************************
@@ -166,10 +109,7 @@ int s32k1xx_i2cdev_initialize(void);
  *   /dev/spiN devices.
  *
  ****************************************************************************/
-
 int s32k1xx_spidev_initialize(void);
-
-
 int s32k1xx_spislavedev_initialize(void);
 
 #endif /* __ASSEMBLY__ */

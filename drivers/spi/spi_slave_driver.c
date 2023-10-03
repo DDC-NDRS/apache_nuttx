@@ -21,7 +21,6 @@
 /****************************************************************************
  * Included Files
  ****************************************************************************/
-
 #include <nuttx/config.h>
 
 #include <semaphore.h>
@@ -41,114 +40,94 @@
 #include <nuttx/spi/slave.h>
 
 #ifdef CONFIG_SPI_SLAVE_DRIVER
-
 /****************************************************************************
  * Pre-processor Definitions
  ****************************************************************************/
+#define DEVNAME_FMT             "/dev/spislv%d"
+#define DEVNAME_FMTLEN          (11 + 3 + 1)
 
-#define DEVNAME_FMT    "/dev/spislv%d"
-#define DEVNAME_FMTLEN (11 + 3 + 1)
-
-#define WORDS2BYTES(_wn)   ((_wn) * (CONFIG_SPI_SLAVE_DRIVER_WIDTH / 8))
-#define BYTES2WORDS(_bn)   ((_bn) / (CONFIG_SPI_SLAVE_DRIVER_WIDTH / 8))
+#define WORDS2BYTES(_wn)        ((_wn) * (CONFIG_SPI_SLAVE_DRIVER_WIDTH / 8))
+#define BYTES2WORDS(_bn)        ((_bn) / (CONFIG_SPI_SLAVE_DRIVER_WIDTH / 8))
 
 /****************************************************************************
  * Private Types
  ****************************************************************************/
+struct spi_slave_driver_s {
+    /* Externally visible part of the SPI Slave device interface */
+    struct spi_slave_dev_s dev;
 
-struct spi_slave_driver_s
-{
-  /* Externally visible part of the SPI Slave device interface */
+    /* Reference to SPI Slave controller interface */
+    struct spi_slave_ctrlr_s* ctrlr;
 
-  struct spi_slave_dev_s dev;
+    /* Receive buffer */
+    uint8_t rx_buffer[CONFIG_SPI_SLAVE_DRIVER_BUFFER_SIZE];
 
-  /* Reference to SPI Slave controller interface */
+    /* Receive Circular FIFO */
+    uint8_t rx_queue[CONFIG_SPI_SLAVE_DRIVER_BUFFER_SIZE];
+    uint8_t rx_head;
+    uint8_t rx_tail;
+    ssize_t rx_len;
 
-  struct spi_slave_ctrlr_s *ctrlr;
-
-  /* Receive buffer */
-
-  uint8_t rx_buffer[CONFIG_SPI_SLAVE_DRIVER_BUFFER_SIZE];
-  
-  /* Receive Circular FIFO */
-  uint8_t rx_queue[CONFIG_SPI_SLAVE_DRIVER_BUFFER_SIZE];
-  uint8_t rx_head;
-  uint8_t rx_tail;
-  ssize_t rx_len;
-
-  /* Transmit buffer */
-
-  uint8_t tx_buffer[CONFIG_SPI_SLAVE_DRIVER_BUFFER_SIZE];
-  uint8_t tx_length;         /* Location of next TX value */
-#ifndef CONFIG_DISABLE_PSEUDOFS_OPERATIONS
-  mutex_t lock;               /* Mutual exclusion */
-  int16_t crefs;              /* Number of open references */
-  bool unlinked;              /* Indicates if the driver has been unlinked */
-#endif
+    /* Transmit buffer */
+    uint8_t tx_buffer[CONFIG_SPI_SLAVE_DRIVER_BUFFER_SIZE];
+    uint8_t tx_length;                      /* Location of next TX value */
+    #ifndef CONFIG_DISABLE_PSEUDOFS_OPERATIONS
+    mutex_t lock;                           /* Mutual exclusion */
+    int16_t crefs;                          /* Number of open references */
+    bool    unlinked;                       /* Indicates if the driver has been unlinked */
+    #endif
 };
 
 /****************************************************************************
  * Private Function Prototypes
  ****************************************************************************/
-
 /* Character driver methods */
-
-static int     spi_slave_open(FAR struct file *filep);
-static int     spi_slave_close(FAR struct file *filep);
-static ssize_t spi_slave_read(FAR struct file *filep, FAR char *buffer,
-                              size_t buflen);
-static ssize_t spi_slave_write(FAR struct file *filep,
-                               FAR const char *buffer, size_t buflen);
-static int     spi_slave_unlink(FAR struct inode *inode);
+static int     spi_slave_open(FAR struct file* filep);
+static int     spi_slave_close(FAR struct file* filep);
+static ssize_t spi_slave_read(FAR struct file* filep, FAR char* buffer, size_t buflen);
+static ssize_t spi_slave_write(FAR struct file* filep, FAR char const* buffer, size_t buflen);
+static int     spi_slave_unlink(FAR struct inode* inode);
 
 /* SPI Slave driver methods */
-
-static void    spi_slave_select(FAR struct spi_slave_dev_s *sdev,
-                                bool selected);
-static void    spi_slave_cmddata(FAR struct spi_slave_dev_s *sdev,
-                                 bool data);
-static size_t  spi_slave_getdata(FAR struct spi_slave_dev_s *sdev,
-                                 FAR const void **data);
-static size_t  spi_slave_receive(FAR struct spi_slave_dev_s *sdev,
-                                 FAR const void *data, size_t nwords);
+static void   spi_slave_select(FAR struct spi_slave_dev_s* sdev, bool selected);
+static void   spi_slave_cmddata(FAR struct spi_slave_dev_s* sdev, bool data);
+static size_t spi_slave_getdata(FAR struct spi_slave_dev_s* sdev, FAR void const** data);
+static size_t spi_slave_receive(FAR struct spi_slave_dev_s* sdev, FAR void const* data, size_t nwords);
 
 /****************************************************************************
  * Private Data
  ****************************************************************************/
-
-static const struct file_operations g_spislavefops =
-{
-#ifndef CONFIG_DISABLE_PSEUDOFS_OPERATIONS
-  spi_slave_open,               /* open */
-  spi_slave_close,              /* close */
-#else
-  NULL,                         /* open */
-  NULL,                         /* close */
-#endif
-  spi_slave_read,               /* read */
-  spi_slave_write,              /* write */
-  NULL,                         /* seek */
-  NULL,                         /* ioctl */
-  NULL,                         /* mmap */
-  NULL,                         /* truncate */
-  NULL                          /* poll */
-#ifndef CONFIG_DISABLE_PSEUDOFS_OPERATIONS
-  , spi_slave_unlink            /* unlink */
-#endif
+static const struct file_operations g_spislavefops = {
+    #ifndef CONFIG_DISABLE_PSEUDOFS_OPERATIONS
+    spi_slave_open,                         /* open */
+    spi_slave_close,                        /* close */
+    #else
+    NULL,                                   /* open */
+    NULL,                                   /* close */
+    #endif
+    spi_slave_read,                         /* read */
+    spi_slave_write,                        /* write */
+    NULL,                                   /* seek */
+    NULL,                                   /* ioctl */
+    NULL,                                   /* mmap */
+    NULL,                                   /* truncate */
+    NULL                                    /* poll */
+    #ifndef CONFIG_DISABLE_PSEUDOFS_OPERATIONS
+    ,
+    spi_slave_unlink                        /* unlink */
+    #endif
 };
 
-static const struct spi_slave_devops_s g_spisdev_ops =
-{
-  spi_slave_select,             /* select */
-  spi_slave_cmddata,            /* cmddata */
-  spi_slave_getdata,            /* getdata */
-  spi_slave_receive,            /* receive */
+static const struct spi_slave_devops_s g_spisdev_ops = {
+    spi_slave_select,                       /* select */
+    spi_slave_cmddata,                      /* cmddata */
+    spi_slave_getdata,                      /* getdata */
+    spi_slave_receive                       /* receive */
 };
 
 /****************************************************************************
  * Private Functions
  ****************************************************************************/
-
 /****************************************************************************
  * Name: spi_slave_open
  *
@@ -163,45 +142,39 @@ static const struct spi_slave_devops_s g_spisdev_ops =
  *   any failure to indicate the nature of the failure.
  *
  ****************************************************************************/
-
 #ifndef CONFIG_DISABLE_PSEUDOFS_OPERATIONS
-static int spi_slave_open(FAR struct file *filep)
-{
-  FAR struct inode *inode;
-  FAR struct spi_slave_driver_s *priv;
-  int ret;
+static int spi_slave_open(FAR struct file* filep) {
+    FAR struct inode* inode;
+    FAR struct spi_slave_driver_s* priv;
+    int ret;
 
-  DEBUGASSERT(filep != NULL);
-  DEBUGASSERT(filep->f_inode != NULL);
-  DEBUGASSERT(filep->f_inode->i_private != NULL);
+    DEBUGASSERT(filep != NULL);
+    DEBUGASSERT(filep->f_inode != NULL);
+    DEBUGASSERT(filep->f_inode->i_private != NULL);
 
-  spiinfo("filep: %p\n", filep);
+    spiinfo("filep: %p\n", filep);
 
-  /* Get our private data structure */
+    /* Get our private data structure */
+    inode = filep->f_inode;
+    priv  = (FAR struct spi_slave_driver_s*)inode->i_private;
 
-  inode = filep->f_inode;
-  priv = (FAR struct spi_slave_driver_s *)inode->i_private;
-
-  /* Get exclusive access to the SPI Slave driver state structure */
-
-  ret = nxmutex_lock(&priv->lock);
-  if (ret < 0)
-    {
-      spierr("Failed to get exclusive access to the driver: %d\n", ret);
-      return ret;
+    /* Get exclusive access to the SPI Slave driver state structure */
+    ret = nxmutex_lock(&priv->lock);
+    if (ret < 0) {
+        spierr("Failed to get exclusive access to the driver: %d\n", ret);
+        return (ret);
     }
 
-  /* Increment the count of open references on the driver */
+    /* Increment the count of open references on the driver */
+    priv->crefs++;
+    DEBUGASSERT(priv->crefs > 0);
 
-  priv->crefs++;
-  DEBUGASSERT(priv->crefs > 0);
+    priv->rx_head = 0;
+    priv->rx_tail = 0;
+    priv->rx_len  = 0;
 
-  priv->rx_head = 0;
-  priv->rx_tail = 0;
-  priv->rx_len = 0;
-
-  nxmutex_unlock(&priv->lock);
-  return OK;
+    nxmutex_unlock(&priv->lock);
+    return (OK);
 }
 #endif
 
@@ -219,53 +192,45 @@ static int spi_slave_open(FAR struct file *filep)
  *   any failure to indicate the nature of the failure.
  *
  ****************************************************************************/
-
 #ifndef CONFIG_DISABLE_PSEUDOFS_OPERATIONS
-static int spi_slave_close(FAR struct file *filep)
-{
-  FAR struct inode *inode;
-  FAR struct spi_slave_driver_s *priv;
-  int ret;
+static int spi_slave_close(FAR struct file* filep) {
+    FAR struct inode* inode;
+    FAR struct spi_slave_driver_s* priv;
+    int ret;
 
-  DEBUGASSERT(filep != NULL);
-  DEBUGASSERT(filep->f_inode != NULL);
-  DEBUGASSERT(filep->f_inode->i_private != NULL);
+    DEBUGASSERT(filep != NULL);
+    DEBUGASSERT(filep->f_inode != NULL);
+    DEBUGASSERT(filep->f_inode->i_private != NULL);
 
-  spiinfo("filep: %p\n", filep);
+    spiinfo("filep: %p\n", filep);
 
-  /* Get our private data structure */
+    /* Get our private data structure */
+    inode = filep->f_inode;
+    priv  = (FAR struct spi_slave_driver_s*)inode->i_private;
 
-  inode = filep->f_inode;
-  priv = (FAR struct spi_slave_driver_s *)inode->i_private;
-
-  /* Get exclusive access to the SPI Slave driver state structure */
-
-  ret = nxmutex_lock(&priv->lock);
-  if (ret < 0)
-    {
-      spierr("Failed to get exclusive access to the driver: %d\n", ret);
-      return ret;
+    /* Get exclusive access to the SPI Slave driver state structure */
+    ret = nxmutex_lock(&priv->lock);
+    if (ret < 0) {
+        spierr("Failed to get exclusive access to the driver: %d\n", ret);
+        return (ret);
     }
 
-  /* Decrement the count of open references on the driver */
+    /* Decrement the count of open references on the driver */
+    DEBUGASSERT(priv->crefs > 0);
+    priv->crefs--;
 
-  DEBUGASSERT(priv->crefs > 0);
-  priv->crefs--;
-
-  /* If the count has decremented to zero and the driver has been already
-   * unlinked, then dispose of the driver resources.
-   */
-
-  if (priv->crefs <= 0 && priv->unlinked)
-    {
-      nxmutex_destroy(&priv->lock);
-      kmm_free(priv);
-      inode->i_private = NULL;
-      return OK;
+    /* If the count has decremented to zero and the driver has been already
+     * unlinked, then dispose of the driver resources.
+     */
+    if (priv->crefs <= 0 && priv->unlinked) {
+        nxmutex_destroy(&priv->lock);
+        kmm_free(priv);
+        inode->i_private = NULL;
+        return (OK);
     }
 
-  nxmutex_unlock(&priv->lock);
-  return OK;
+    nxmutex_unlock(&priv->lock);
+    return (OK);
 }
 #endif
 
@@ -286,60 +251,47 @@ static int spi_slave_close(FAR struct file *filep)
  *   end-of-file condition, or a negated errno value on any failure.
  *
  ****************************************************************************/
+static ssize_t spi_slave_read(FAR struct file* filep, FAR char* buffer, size_t buflen) {
+    FAR struct inode* inode;
+    FAR struct spi_slave_driver_s* priv;
+    size_t read_bytes = 0;
 
-static ssize_t spi_slave_read(FAR struct file *filep, FAR char *buffer,
-                           size_t buflen)
-{
-  FAR struct inode *inode;
-  FAR struct spi_slave_driver_s *priv;
-  size_t read_bytes = 0;
+    spiinfo("filep=%p buffer=%p buflen=%zu\n", filep, buffer, buflen);
 
-  spiinfo("filep=%p buffer=%p buflen=%zu\n", filep, buffer, buflen);
+    /* Get our private data structure */
+    inode = filep->f_inode;
+    priv  = (FAR struct spi_slave_driver_s*)inode->i_private;
 
-  /* Get our private data structure */
-
-  inode = filep->f_inode;
-  priv  = (FAR struct spi_slave_driver_s *)inode->i_private;
-
-  if (buffer == NULL)
-    {
-      spierr("ERROR: Buffer is NULL\n");
-      return -ENOBUFS;
+    if (buffer == NULL) {
+        spierr("ERROR: Buffer is NULL\n");
+        return (-ENOBUFS);
     }
 
-   if (priv->rx_len > 0)
-    {
-      read_bytes = MIN(priv->rx_len, buflen);
+    if (priv->rx_len > 0) {
+        read_bytes = MIN(priv->rx_len, buflen);
 
-      /* dequeue data from circular FIFO to buffer */
-      
-      priv->rx_len -= read_bytes;
-      
-      for (ssize_t i = 0; i < read_bytes; i++)
-        {
-          /* dequeue 1 byte of data*/
+        /* dequeue data from circular FIFO to buffer */
+        priv->rx_len -= read_bytes;
 
-          priv->rx_buffer[i] = priv->rx_queue[priv->rx_tail];
+        for (ssize_t i = 0; i < read_bytes; i++) {
+            /* dequeue 1 byte of data*/
+            priv->rx_buffer[i] = priv->rx_queue[priv->rx_tail];
 
-          /* Update tail index, handling wraparound */
-
-          priv->rx_tail++;
-          if (priv->rx_tail >= CONFIG_SPI_SLAVE_DRIVER_BUFFER_SIZE)
-            {
-              priv->rx_tail = 0;
+            /* Update tail index, handling wraparound */
+            priv->rx_tail++;
+            if (priv->rx_tail >= CONFIG_SPI_SLAVE_DRIVER_BUFFER_SIZE) {
+                priv->rx_tail = 0;
             }
         }
 
-      /* copy data from buffer to user variable */
-
-      memcpy(buffer, priv->rx_buffer, read_bytes);
+        /* copy data from buffer to user variable */
+        memcpy(buffer, priv->rx_buffer, read_bytes);
     }
-  else
-    {
-      spierr("ERROR: No available data\n");
+    else {
+        spierr("ERROR: No available data\n");
     }
 
-  return (ssize_t)read_bytes;
+    return ((ssize_t)read_bytes);
 }
 
 /****************************************************************************
@@ -359,43 +311,34 @@ static ssize_t spi_slave_read(FAR struct file *filep, FAR char *buffer,
  *   nothing was written). On any failure, a negated errno value is returned.
  *
  ****************************************************************************/
+static ssize_t spi_slave_write(FAR struct file* filep, FAR char const* buffer, size_t buflen) {
+    FAR struct inode* inode;
+    FAR struct spi_slave_driver_s* priv;
+    size_t num_words;
+    size_t enqueued_bytes;
 
-static ssize_t spi_slave_write(FAR struct file *filep,
-                               FAR const char *buffer, size_t buflen)
-{
-  FAR struct inode *inode;
-  FAR struct spi_slave_driver_s *priv;
-  size_t num_words;
-  size_t enqueued_bytes;
+    spiinfo("filep=%p buffer=%p buflen=%zu\n", filep, buffer, buflen);
 
-  spiinfo("filep=%p buffer=%p buflen=%zu\n", filep, buffer, buflen);
+    /* Get our private data structure */
+    inode = filep->f_inode;
+    priv  = (FAR struct spi_slave_driver_s*)inode->i_private;
 
-  /* Get our private data structure */
+    memset(priv->tx_buffer, 0, CONFIG_SPI_SLAVE_DRIVER_BUFFER_SIZE);
+    memcpy(priv->tx_buffer, buffer, buflen);
+    priv->tx_length = buflen;
+    num_words       = BYTES2WORDS(priv->tx_length);
 
-  inode = filep->f_inode;
-  priv = (FAR struct spi_slave_driver_s *)inode->i_private;
-
-  memset(priv->tx_buffer, 0, CONFIG_SPI_SLAVE_DRIVER_BUFFER_SIZE);
-  memcpy(priv->tx_buffer, buffer, buflen);
-  priv->tx_length = buflen;
-  num_words = BYTES2WORDS(priv->tx_length);
-  
-  /* if the data doesn't fit the the buffer put zero after the LSB 
-   * to complete the words
-   */
-
-  if (priv->tx_length % (CONFIG_SPI_SLAVE_DRIVER_WIDTH / 8) != 0)
-    {
-      num_words += 1;
+    /* if the data doesn't fit the the buffer put zero after the LSB
+     * to complete the words
+     */
+    if (priv->tx_length % (CONFIG_SPI_SLAVE_DRIVER_WIDTH / 8) != 0) {
+        num_words += 1;
     }
 
-  enqueued_bytes = WORDS2BYTES(SPIS_CTRLR_ENQUEUE(priv->ctrlr,
-                                                  priv->tx_buffer,
-                                                  num_words));
+    enqueued_bytes = WORDS2BYTES(SPIS_CTRLR_ENQUEUE(priv->ctrlr, priv->tx_buffer, num_words));
+    spiinfo("%zu bytes enqueued\n", enqueued_bytes);
 
-  spiinfo("%zu bytes enqueued\n", enqueued_bytes);
-
-  return (ssize_t)enqueued_bytes;
+    return ((ssize_t)enqueued_bytes);
 }
 
 /****************************************************************************
@@ -411,46 +354,39 @@ static ssize_t spi_slave_write(FAR struct file *filep,
  *   Zero is returned on success; a negated value is returned on any failure.
  *
  ****************************************************************************/
-
 #ifndef CONFIG_DISABLE_PSEUDOFS_OPERATIONS
-static int spi_slave_unlink(FAR struct inode *inode)
-{
-  FAR struct spi_slave_driver_s *priv;
-  int ret;
+static int spi_slave_unlink(FAR struct inode* inode) {
+    FAR struct spi_slave_driver_s* priv;
+    int ret;
 
-  DEBUGASSERT(inode != NULL);
-  DEBUGASSERT(inode->i_private != NULL);
+    DEBUGASSERT(inode != NULL);
+    DEBUGASSERT(inode->i_private != NULL);
 
-  /* Get our private data structure */
+    /* Get our private data structure */
+    priv = (FAR struct spi_slave_driver_s*)inode->i_private;
 
-  priv = (FAR struct spi_slave_driver_s *)inode->i_private;
-
-  /* Get exclusive access to the SPI Slave driver state structure */
-
-  ret = nxmutex_lock(&priv->lock);
-  if (ret < 0)
-    {
-      spierr("Failed to get exclusive access to the driver: %d\n", ret);
-      return ret;
+    /* Get exclusive access to the SPI Slave driver state structure */
+    ret = nxmutex_lock(&priv->lock);
+    if (ret < 0) {
+        spierr("Failed to get exclusive access to the driver: %d\n", ret);
+        return (ret);
     }
 
-  /* Are there open references to the driver data structure? */
-
-  if (priv->crefs <= 0)
-    {
-      nxmutex_destroy(&priv->lock);
-      kmm_free(priv);
-      inode->i_private = NULL;
-      return OK;
+    /* Are there open references to the driver data structure? */
+    if (priv->crefs <= 0) {
+        nxmutex_destroy(&priv->lock);
+        kmm_free(priv);
+        inode->i_private = NULL;
+        return (OK);
     }
 
-  /* No... just mark the driver as unlinked and free the resources when the
-   * last client closes their reference to the driver.
-   */
+    /* No... just mark the driver as unlinked and free the resources when the
+     * last client closes their reference to the driver.
+     */
+    priv->unlinked = true;
+    nxmutex_unlock(&priv->lock);
 
-  priv->unlinked = true;
-  nxmutex_unlock(&priv->lock);
-  return ret;
+    return (ret);
 }
 #endif
 
@@ -473,10 +409,8 @@ static int spi_slave_unlink(FAR struct inode *inode)
  *   brief as possible.
  *
  ****************************************************************************/
-
-static void spi_slave_select(FAR struct spi_slave_dev_s *dev, bool selected)
-{
-  spiinfo("sdev: %p CS: %s\n", dev, selected ? "select" : "free");
+static void spi_slave_select(FAR struct spi_slave_dev_s* dev, bool selected) {
+    spiinfo("sdev: %p CS: %s\n", dev, selected ? "select" : "free");
 }
 
 /****************************************************************************
@@ -504,10 +438,8 @@ static void spi_slave_select(FAR struct spi_slave_dev_s *dev, bool selected)
  *   brief as possible.
  *
  ****************************************************************************/
-
-static void spi_slave_cmddata(FAR struct spi_slave_dev_s *dev, bool data)
-{
-  spiinfo("sdev: %p CMD: %s\n", dev, data ? "data" : "command");
+static void spi_slave_cmddata(FAR struct spi_slave_dev_s* dev, bool data) {
+    spiinfo("sdev: %p CMD: %s\n", dev, data ? "data" : "command");
 }
 
 /****************************************************************************
@@ -536,15 +468,12 @@ static void spi_slave_cmddata(FAR struct spi_slave_dev_s *dev, bool data)
  *   time-critical.
  *
  ****************************************************************************/
+static size_t spi_slave_getdata(FAR struct spi_slave_dev_s* dev, FAR void const** data) {
+    FAR struct spi_slave_driver_s* priv = (FAR struct spi_slave_driver_s*)dev;
 
-static size_t spi_slave_getdata(FAR struct spi_slave_dev_s *dev,
-                                FAR const void **data)
-{
-  FAR struct spi_slave_driver_s *priv = (FAR struct spi_slave_driver_s *)dev;
+    *data = priv->tx_buffer;
 
-  *data = priv->tx_buffer;
-
-  return BYTES2WORDS(priv->tx_length);
+    return BYTES2WORDS(priv->tx_length);
 }
 
 /****************************************************************************
@@ -573,58 +502,42 @@ static size_t spi_slave_getdata(FAR struct spi_slave_dev_s *dev,
  *   quickly as possible to avoid any data overrun problems.
  *
  ****************************************************************************/
+static size_t spi_slave_receive(FAR struct spi_slave_dev_s* dev, FAR void const* data, size_t len) {
+    FAR struct spi_slave_driver_s* priv = (FAR struct spi_slave_driver_s*)dev;
 
-static size_t spi_slave_receive(FAR struct spi_slave_dev_s *dev,
-                                FAR const void *data, size_t len)
-{
-  FAR struct spi_slave_driver_s *priv = (FAR struct spi_slave_driver_s *)dev;
-
-  /* Check if it is the last byte of 6 byte word */
-
-  if ((*(uint32_t*)data & 0xFFFFFF00) == 0x00)
-  {
-    len = 1;
-  }
-
-  /* determine writable data size by calculate remaining buffer space */
-
-  size_t recv_bytes = MIN(len, CONFIG_SPI_SLAVE_DRIVER_BUFFER_SIZE - priv->rx_len);
-
-  if (recv_bytes < len) 
-    {
-      spiwarn("SPI recieve driver FIFO is full required %d bytes, only got %d bytes",
-              len, recv_bytes);
+    /* Check if it is the last byte of 6 byte word */
+    if ((*(uint32_t*)data & 0xFFFFFF00) == 0x00) {
+        len = 1;
     }
 
-  if (len > 0)
-    {
-      /* enqueue data to circular FIFO */
+    /* determine writable data size by calculate remaining buffer space */
+    size_t recv_bytes = MIN(len, CONFIG_SPI_SLAVE_DRIVER_BUFFER_SIZE - priv->rx_len);
+    if (recv_bytes < len) {
+        spiwarn("SPI recieve driver FIFO is full required %d bytes, only got %d bytes", len, recv_bytes);
+    }
 
-      priv->rx_len += recv_bytes;
+    if (len > 0) {
+        /* enqueue data to circular FIFO */
+        priv->rx_len += recv_bytes;
 
-      for (ssize_t i = 0; i < recv_bytes; i++)
-        {
-          /* enqueue 4 byte of data */
+        for (ssize_t i = 0; i < recv_bytes; i++) {
+            /* enqueue 4 byte of data */
+            priv->rx_queue[priv->rx_head] = (uint8_t)((*(uint32_t*)data & (0xFF << i * 8)) >> i * 8);
 
-          priv->rx_queue[priv->rx_head] = (uint8_t)((*(uint32_t*)data & (0xFF << i*8)) >> i*8);
-
-          /* Update head index, handling wraparound */
-
-          priv->rx_head++;
-          if (priv->rx_head >= CONFIG_SPI_SLAVE_DRIVER_BUFFER_SIZE)
-            {
-              priv->rx_head = 0;
+            /* Update head index, handling wraparound */
+            priv->rx_head++;
+            if (priv->rx_head >= CONFIG_SPI_SLAVE_DRIVER_BUFFER_SIZE) {
+                priv->rx_head = 0;
             }
         }
     }
 
-  return BYTES2WORDS(recv_bytes);
+    return (BYTES2WORDS(recv_bytes));
 }
 
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
-
 /****************************************************************************
  * Name: spi_slave_register
  *
@@ -642,62 +555,50 @@ static size_t spi_slave_receive(FAR struct spi_slave_dev_s *dev,
  *   Zero (OK) on success; a negated errno value on failure.
  *
  ****************************************************************************/
+int spi_slave_register(FAR struct spi_slave_ctrlr_s* ctrlr, int bus) {
+    FAR struct spi_slave_driver_s* priv;
+    char devname[DEVNAME_FMTLEN];
+    int  ret;
 
-int spi_slave_register(FAR struct spi_slave_ctrlr_s *ctrlr, int bus)
-{
-  FAR struct spi_slave_driver_s *priv;
-  char devname[DEVNAME_FMTLEN];
-  int ret;
+    /* Sanity check */
+    DEBUGASSERT(ctrlr != NULL && (unsigned int)bus < 1000);
 
-  /* Sanity check */
-
-  DEBUGASSERT(ctrlr != NULL && (unsigned int)bus < 1000);
-
-  /* Initialize the SPI Slave device structure */
-
-  priv = (FAR struct spi_slave_driver_s *)
-    kmm_zalloc(sizeof(struct spi_slave_driver_s));
-  if (!priv)
-    {
-      spierr("ERROR: Failed to allocate instance\n");
-      return -ENOMEM;
+    /* Initialize the SPI Slave device structure */
+    priv = (FAR struct spi_slave_driver_s*)kmm_zalloc(sizeof(struct spi_slave_driver_s));
+    if (!priv) {
+        spierr("ERROR: Failed to allocate instance\n");
+        return (-ENOMEM);
     }
 
-  priv->dev.ops = &g_spisdev_ops;
-  priv->ctrlr = ctrlr;
+    priv->dev.ops = &g_spisdev_ops;
+    priv->ctrlr   = ctrlr;
 
-#ifdef CONFIG_SPI_SLAVE_DRIVER_COLORIZE_TX_BUFFER
-  memset(priv->tx_buffer,
-         CONFIG_SPI_SLAVE_DRIVER_COLORIZE_PATTERN,
-         CONFIG_SPI_SLAVE_DRIVER_COLORIZE_NUM_BYTES);
-  priv->tx_length = CONFIG_SPI_SLAVE_DRIVER_COLORIZE_NUM_BYTES;
-#endif
+    #ifdef CONFIG_SPI_SLAVE_DRIVER_COLORIZE_TX_BUFFER
+    memset(priv->tx_buffer, CONFIG_SPI_SLAVE_DRIVER_COLORIZE_PATTERN, CONFIG_SPI_SLAVE_DRIVER_COLORIZE_NUM_BYTES);
+    priv->tx_length = CONFIG_SPI_SLAVE_DRIVER_COLORIZE_NUM_BYTES;
+    #endif
 
-#ifndef CONFIG_DISABLE_PSEUDOFS_OPERATIONS
-  nxmutex_init(&priv->lock);
-#endif
+    #ifndef CONFIG_DISABLE_PSEUDOFS_OPERATIONS
+    nxmutex_init(&priv->lock);
+    #endif
 
-  /* Create the character device name */
+    /* Create the character device name */
+    snprintf(devname, sizeof(devname), DEVNAME_FMT, bus);
 
-  snprintf(devname, sizeof(devname), DEVNAME_FMT, bus);
-
-  /* Register the character driver */
-
-  ret = register_driver(devname, &g_spislavefops, 0666, priv);
-  if (ret < 0)
-    {
-      spierr("ERROR: Failed to register driver: %d\n", ret);
-      nxmutex_destroy(&priv->lock);
-      kmm_free(priv);
+    /* Register the character driver */
+    ret = register_driver(devname, &g_spislavefops, 0666, priv);
+    if (ret < 0) {
+        spierr("ERROR: Failed to register driver: %d\n", ret);
+        nxmutex_destroy(&priv->lock);
+        kmm_free(priv);
     }
 
-  SPIS_CTRLR_BIND(priv->ctrlr, (FAR struct spi_slave_dev_s *)priv,
-                  CONFIG_SPI_SLAVE_DRIVER_MODE, 
-                  CONFIG_SPI_SLAVE_DRIVER_FRAME_SIZE);
+    SPIS_CTRLR_BIND(priv->ctrlr, (FAR struct spi_slave_dev_s*)priv, CONFIG_SPI_SLAVE_DRIVER_MODE,
+                    CONFIG_SPI_SLAVE_DRIVER_FRAME_SIZE);
 
-  spiinfo("SPI Slave driver loaded successfully!\n");
+    spiinfo("SPI Slave driver loaded successfully!\n");
 
-  return ret;
+    return (ret);
 }
 
 #endif /* CONFIG_SPI_SLAVE_DRIVER */

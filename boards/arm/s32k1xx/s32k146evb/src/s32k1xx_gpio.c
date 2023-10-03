@@ -71,13 +71,13 @@ static uint32_t g_gpiopins[] = {
     DEV_GPIO2, 
     DEV_GPIO3, 
     DEV_GPIO4, 
-    DEV_GPIO5, 
-    DEV_GPIO6, 
-    DEV_GPIO7, 
-    DEV_GPIO8, 
-    DEV_GPIO9, 
-    DEV_GPIO10, 
-    DEV_GPIO11
+    // DEV_GPIO5, 
+    // DEV_GPIO6, 
+    // DEV_GPIO7, 
+    // DEV_GPIO8, 
+    // DEV_GPIO9, 
+    // DEV_GPIO10, 
+    // DEV_GPIO11
 };
 
 #if (DEV_NUM_OF_GPIO > 0)

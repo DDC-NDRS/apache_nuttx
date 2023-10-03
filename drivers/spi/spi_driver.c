@@ -21,7 +21,6 @@
 /****************************************************************************
  * Included Files
  ****************************************************************************/
-
 #include <nuttx/config.h>
 
 #include <sys/types.h>
@@ -39,329 +38,272 @@
 #include <nuttx/signal.h>
 
 #ifdef CONFIG_SPI_DRIVER
-
 /****************************************************************************
  * Pre-processor Definitions
  ****************************************************************************/
-
 /* Device naming ************************************************************/
-
 #define DEVNAME_FMT    "/dev/spi%d"
 #define DEVNAME_FMTLEN (8 + 3 + 1)
 
 /****************************************************************************
  * Private Types
  ****************************************************************************/
-
 /* Driver state structure */
-
-struct spi_driver_s
-{
-  FAR struct spi_dev_s *spi;  /* Contained SPI lower half driver */
-#ifndef CONFIG_DISABLE_PSEUDOFS_OPERATIONS
-  mutex_t lock;               /* Mutual exclusion */
-  int16_t crefs;              /* Number of open references */
-  bool unlinked;              /* True, driver has been unlinked */
-#endif
+struct spi_driver_s {
+    FAR struct spi_dev_s* spi;              /* Contained SPI lower half driver */
+    #ifndef CONFIG_DISABLE_PSEUDOFS_OPERATIONS
+    mutex_t lock;                           /* Mutual exclusion */
+    int16_t crefs;                          /* Number of open references */
+    bool    unlinked;                       /* True, driver has been unlinked */
+    #endif
 };
 
 /****************************************************************************
  * Private Function Prototypes
  ****************************************************************************/
-
 #ifndef CONFIG_DISABLE_PSEUDOFS_OPERATIONS
-static int     spidrvr_open(FAR struct file *filep);
-static int     spidrvr_close(FAR struct file *filep);
+static int spidrvr_open(FAR struct file* filep);
+static int spidrvr_close(FAR struct file* filep);
 #endif
-static ssize_t spidrvr_read(FAR struct file *filep, FAR char *buffer,
-                 size_t buflen);
-static ssize_t spidrvr_write(FAR struct file *filep, FAR const char *buffer,
-                 size_t buflen);
-static int     spidrvr_ioctl(FAR struct file *filep, int cmd,
-                 unsigned long arg);
+static ssize_t spidrvr_read(FAR struct file* filep, FAR char* buffer, size_t buflen);
+static ssize_t spidrvr_write(FAR struct file* filep, FAR char const* buffer, size_t buflen);
+static int     spidrvr_ioctl(FAR struct file* filep, int cmd, unsigned long arg);
 #ifndef CONFIG_DISABLE_PSEUDOFS_OPERATIONS
-static int     spidrvr_unlink(FAR struct inode *inode);
+static int spidrvr_unlink(FAR struct inode* inode);
 #endif
 
 /****************************************************************************
  * Private Data
  ****************************************************************************/
-
-static const struct file_operations g_spidrvr_fops =
-{
-#ifndef CONFIG_DISABLE_PSEUDOFS_OPERATIONS
-  spidrvr_open,    /* open */
-  spidrvr_close,   /* close */
-#else
-  NULL,            /* open */
-  NULL,            /* close */
-#endif
-  spidrvr_read,    /* read */
-  spidrvr_write,   /* write */
-  NULL,            /* seek */
-  spidrvr_ioctl,   /* ioctl */
-  NULL,            /* mmap */
-  NULL,            /* truncate */
-  NULL             /* poll */
-#ifndef CONFIG_DISABLE_PSEUDOFS_OPERATIONS
-  , spidrvr_unlink /* unlink */
-#endif
+static const struct file_operations g_spidrvr_fops = {
+    #ifndef CONFIG_DISABLE_PSEUDOFS_OPERATIONS
+    spidrvr_open,                           /* open */
+    spidrvr_close,                          /* close */
+    #else
+    NULL,                                   /* open */
+    NULL,                                   /* close */
+    #endif
+    spidrvr_read,                           /* read */
+    spidrvr_write,                          /* write */
+    NULL,                                   /* seek */
+    spidrvr_ioctl,                          /* ioctl */
+    NULL,                                   /* mmap */
+    NULL,                                   /* truncate */
+    NULL                                    /* poll */
+    #ifndef CONFIG_DISABLE_PSEUDOFS_OPERATIONS
+    ,
+    spidrvr_unlink                          /* unlink */
+    #endif
 };
 
 /****************************************************************************
  * Private Functions
  ****************************************************************************/
-
 /****************************************************************************
  * Name: spidrvr_open
  ****************************************************************************/
-
 #ifndef CONFIG_DISABLE_PSEUDOFS_OPERATIONS
-static int spidrvr_open(FAR struct file *filep)
-{
-  FAR struct inode *inode;
-  FAR struct spi_driver_s *priv;
-  int ret;
+static int spidrvr_open(FAR struct file* filep) {
+    FAR struct inode* inode;
+    FAR struct spi_driver_s* priv;
+    int ret;
 
-  /* Get our private data structure */
+    /* Get our private data structure */
+    DEBUGASSERT(filep != NULL && filep->f_inode != NULL);
+    inode = filep->f_inode;
 
-  DEBUGASSERT(filep != NULL && filep->f_inode != NULL);
-  inode = filep->f_inode;
+    priv = (FAR struct spi_driver_s*)inode->i_private;
+    DEBUGASSERT(priv);
 
-  priv = (FAR struct spi_driver_s *)inode->i_private;
-  DEBUGASSERT(priv);
-
-  /* Get exclusive access to the SPI driver state structure */
-
-  ret = nxmutex_lock(&priv->lock);
-  if (ret < 0)
-    {
-      return ret;
+    /* Get exclusive access to the SPI driver state structure */
+    ret = nxmutex_lock(&priv->lock);
+    if (ret < 0) {
+        return (ret);
     }
 
-  /* Increment the count of open references on the driver */
+    /* Increment the count of open references on the driver */
+    priv->crefs++;
+    DEBUGASSERT(priv->crefs > 0);
 
-  priv->crefs++;
-  DEBUGASSERT(priv->crefs > 0);
-
-  nxmutex_unlock(&priv->lock);
-  return OK;
+    nxmutex_unlock(&priv->lock);
+    return (OK);
 }
 #endif
 
 /****************************************************************************
  * Name: spidrvr_close
  ****************************************************************************/
-
 #ifndef CONFIG_DISABLE_PSEUDOFS_OPERATIONS
-static int spidrvr_close(FAR struct file *filep)
-{
-  FAR struct inode *inode;
-  FAR struct spi_driver_s *priv;
-  int ret;
+static int spidrvr_close(FAR struct file* filep) {
+    FAR struct inode* inode;
+    FAR struct spi_driver_s* priv;
+    int ret;
 
-  /* Get our private data structure */
+    /* Get our private data structure */
+    DEBUGASSERT(filep != NULL && filep->f_inode != NULL);
+    inode = filep->f_inode;
 
-  DEBUGASSERT(filep != NULL && filep->f_inode != NULL);
-  inode = filep->f_inode;
+    priv = (FAR struct spi_driver_s*)inode->i_private;
+    DEBUGASSERT(priv);
 
-  priv = (FAR struct spi_driver_s *)inode->i_private;
-  DEBUGASSERT(priv);
-
-  /* Get exclusive access to the SPI driver state structure */
-
-  ret = nxmutex_lock(&priv->lock);
-  if (ret < 0)
-    {
-      return ret;
+    /* Get exclusive access to the SPI driver state structure */
+    ret = nxmutex_lock(&priv->lock);
+    if (ret < 0) {
+        return (ret);
     }
 
-  /* Decrement the count of open references on the driver */
+    /* Decrement the count of open references on the driver */
+    DEBUGASSERT(priv->crefs > 0);
+    priv->crefs--;
 
-  DEBUGASSERT(priv->crefs > 0);
-  priv->crefs--;
-
-  /* If the count has decremented to zero and the driver has been unlinked,
-   * then commit Hara-Kiri now.
-   */
-
-  if (priv->crefs <= 0 && priv->unlinked)
-    {
-      nxmutex_destroy(&priv->lock);
-      kmm_free(priv);
-      return OK;
+    /* If the count has decremented to zero and the driver has been unlinked,
+     * then commit Hara-Kiri now.
+     */
+    if (priv->crefs <= 0 && priv->unlinked) {
+        nxmutex_destroy(&priv->lock);
+        kmm_free(priv);
+        return (OK);
     }
 
-  nxmutex_unlock(&priv->lock);
-  return OK;
+    nxmutex_unlock(&priv->lock);
+    return (OK);
 }
 #endif
 
 /****************************************************************************
  * Name: spidrvr_read
  ****************************************************************************/
-
-static ssize_t spidrvr_read(FAR struct file *filep, FAR char *buffer,
-                            size_t len)
-{
-  return 0; /* Return EOF */
+static ssize_t spidrvr_read(FAR struct file* filep, FAR char* buffer, size_t len) {
+    return (0);                             /* Return EOF */
 }
 
 /****************************************************************************
  * Name: spidrvr_write
  ****************************************************************************/
+static ssize_t spidrvr_write(FAR struct file* filep, FAR char const* buffer, size_t len) {
+    FAR struct inode* inode;
+    FAR struct spi_driver_s* priv;
 
-static ssize_t spidrvr_write(FAR struct file *filep, FAR const char *buffer,
-                             size_t len)
-{
-  FAR struct inode *inode;
-  FAR struct spi_driver_s *priv;
+    spiinfo("filep=%p buffer=%p buflen=%zu\n", filep, buffer, len);
 
-  spiinfo("filep=%p buffer=%p buflen=%zu\n", filep, buffer, len);
+    /* Get our private data structure */
+    DEBUGASSERT(filep != NULL && filep->f_inode != NULL);
+    inode = filep->f_inode;
 
-  /* Get our private data structure */
+    priv = (FAR struct spi_driver_s*)inode->i_private;
+    DEBUGASSERT(priv);
 
-  DEBUGASSERT(filep != NULL && filep->f_inode != NULL);
-  inode = filep->f_inode;
+    /* Get exclusive access to the SPI bus */
+    SPI_LOCK(priv->spi, true);
 
-  priv = (FAR struct spi_driver_s *)inode->i_private;
-  DEBUGASSERT(priv);
+    /* select which PCS pin to use for transfer */
+    SPI_SELECT(priv->spi, 0, true);
 
-  /* Get exclusive access to the SPI bus */
+    SPI_SETFREQUENCY(priv->spi, 2000000);
+    SPI_SETMODE(priv->spi, 1);
+    SPI_SETBITS(priv->spi, len * 8);
 
-  SPI_LOCK(priv->spi, true);
+    /* Perform the transfer */
+    SPI_EXCHANGE(priv->spi, buffer, NULL, 1);
 
-  /* select which PCS pin to use for transfer */
+    /* Return exclusive access to the SPI bus */
+    SPI_LOCK(priv->spi, false);
 
-  SPI_SELECT(priv->spi, 0, true);
-
-  SPI_SETFREQUENCY(priv->spi, 2000000);
-  SPI_SETMODE(priv->spi, 1);
-  SPI_SETBITS(priv->spi, len*8);
-
-  /* Perform the transfer */
-
-  SPI_EXCHANGE(priv->spi, buffer, NULL, 1);
-
-  /* Return exclusive access to the SPI bus */
-
-  SPI_LOCK(priv->spi, false);
-  
-  return len; /* Say that everything was written */
-  
+    return (len);                           /* Say that everything was written */
 }
 
 /****************************************************************************
  * Name: spidrvr_ioctl
  ****************************************************************************/
+static int spidrvr_ioctl(FAR struct file* filep, int cmd, unsigned long arg) {
+    FAR struct inode* inode;
+    FAR struct spi_driver_s* priv;
+    FAR struct spi_sequence_s* seq;
+    int ret;
 
-static int spidrvr_ioctl(FAR struct file *filep, int cmd, unsigned long arg)
-{
-  FAR struct inode *inode;
-  FAR struct spi_driver_s *priv;
-  FAR struct spi_sequence_s *seq;
-  int ret;
+    spiinfo("cmd=%d arg=%lu\n", cmd, arg);
 
-  spiinfo("cmd=%d arg=%lu\n", cmd, arg);
+    /* Get our private data structure */
+    DEBUGASSERT(filep != NULL && filep->f_inode != NULL);
+    inode = filep->f_inode;
 
-  /* Get our private data structure */
+    priv = (FAR struct spi_driver_s*)inode->i_private;
+    DEBUGASSERT(priv);
 
-  DEBUGASSERT(filep != NULL && filep->f_inode != NULL);
-  inode = filep->f_inode;
-
-  priv = (FAR struct spi_driver_s *)inode->i_private;
-  DEBUGASSERT(priv);
-
-  /* Get exclusive access to the SPI driver state structure */
-
-#ifndef CONFIG_DISABLE_PSEUDOFS_OPERATIONS
-  ret = nxmutex_lock(&priv->lock);
-  if (ret < 0)
-    {
-      return ret;
+    /* Get exclusive access to the SPI driver state structure */
+    #ifndef CONFIG_DISABLE_PSEUDOFS_OPERATIONS
+    ret = nxmutex_lock(&priv->lock);
+    if (ret < 0) {
+        return (ret);
     }
-#endif
+    #endif
 
-  /* Process the IOCTL command */
+    /* Process the IOCTL command */
+    switch (cmd) {
+        /* Command:      SPIIOC_TRANSFER
+         * Description:  Perform a sequence of SPI transfers
+         * Argument:     A reference to an instance of struct spi_sequence_s.
+         * Dependencies: CONFIG_SPI_DRIVER
+         */
+        case SPIIOC_TRANSFER : {
+            /* Get the reference to the spi_transfer_s structure */
+            seq = (FAR struct spi_sequence_s*)((uintptr_t)arg);
+            DEBUGASSERT(seq != NULL);
 
-  switch (cmd)
-    {
-      /* Command:      SPIIOC_TRANSFER
-       * Description:  Perform a sequence of SPI transfers
-       * Argument:     A reference to an instance of struct spi_sequence_s.
-       * Dependencies: CONFIG_SPI_DRIVER
-       */
+            /* Perform the transfer */
+            ret = spi_transfer(priv->spi, seq);
+        } break;
 
-      case SPIIOC_TRANSFER:
-        {
-          /* Get the reference to the spi_transfer_s structure */
-
-          seq = (FAR struct spi_sequence_s *)((uintptr_t)arg);
-          DEBUGASSERT(seq != NULL);
-
-          /* Perform the transfer */
-
-          ret = spi_transfer(priv->spi, seq);
-        }
-        break;
-
-      default:
-        ret = -ENOTTY;
-        break;
+        default :
+            ret = -ENOTTY;
+            break;
     }
 
-#ifndef CONFIG_DISABLE_PSEUDOFS_OPERATIONS
-  nxmutex_unlock(&priv->lock);
-#endif
-  return ret;
+    #ifndef CONFIG_DISABLE_PSEUDOFS_OPERATIONS
+    nxmutex_unlock(&priv->lock);
+    #endif
+
+    return (ret);
 }
 
 /****************************************************************************
  * Name: spidrvr_unlink
  ****************************************************************************/
-
 #ifndef CONFIG_DISABLE_PSEUDOFS_OPERATIONS
-static int spidrvr_unlink(FAR struct inode *inode)
-{
-  FAR struct spi_driver_s *priv;
-  int ret;
+static int spidrvr_unlink(FAR struct inode* inode) {
+    FAR struct spi_driver_s* priv;
+    int ret;
 
-  /* Get our private data structure */
+    /* Get our private data structure */
+    DEBUGASSERT(inode != NULL && inode->i_private != NULL);
+    priv = (FAR struct spi_driver_s*)inode->i_private;
 
-  DEBUGASSERT(inode != NULL && inode->i_private != NULL);
-  priv = (FAR struct spi_driver_s *)inode->i_private;
-
-  /* Get exclusive access to the SPI driver state structure */
-
-  ret = nxmutex_lock(&priv->lock);
-  if (ret < 0)
-    {
-      return ret;
+    /* Get exclusive access to the SPI driver state structure */
+    ret = nxmutex_lock(&priv->lock);
+    if (ret < 0) {
+        return (ret);
     }
 
-  /* Are there open references to the driver data structure? */
-
-  if (priv->crefs <= 0)
-    {
-      nxmutex_destroy(&priv->lock);
-      kmm_free(priv);
-      return OK;
+    /* Are there open references to the driver data structure? */
+    if (priv->crefs <= 0) {
+        nxmutex_destroy(&priv->lock);
+        kmm_free(priv);
+        return (OK);
     }
 
-  /* No... just mark the driver as unlinked and free the resources when the
-   * last client closes their reference to the driver.
-   */
+    /* No... just mark the driver as unlinked and free the resources when the
+     * last client closes their reference to the driver.
+     */
+    priv->unlinked = true;
+    nxmutex_unlock(&priv->lock);
 
-  priv->unlinked = true;
-  nxmutex_unlock(&priv->lock);
-  return ret;
+    return (ret);
 }
 #endif
 
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
-
 /****************************************************************************
  * Name: spi_register
  *
@@ -383,52 +325,42 @@ static int spidrvr_unlink(FAR struct inode *inode)
  *   returned on any failure.
  *
  ****************************************************************************/
+int spi_register(FAR struct spi_dev_s* spi, int bus) {
+    FAR struct spi_driver_s* priv;
+    char devname[DEVNAME_FMTLEN];
+    int  ret;
 
-int spi_register(FAR struct spi_dev_s *spi, int bus)
-{
-  FAR struct spi_driver_s *priv;
-  char devname[DEVNAME_FMTLEN];
-  int ret;
+    /* Sanity check */
+    DEBUGASSERT(spi != NULL && (unsigned)bus < 1000);
 
-  /* Sanity check */
+    /* Allocate a SPI character device structure */
+    priv = (FAR struct spi_driver_s*)kmm_zalloc(sizeof(struct spi_driver_s));
+    if (priv) {
+        /* Initialize the SPI character device structure */
+        priv->spi = spi;
+        #ifndef CONFIG_DISABLE_PSEUDOFS_OPERATIONS
+        nxmutex_init(&priv->lock);
+        #endif
 
-  DEBUGASSERT(spi != NULL && (unsigned)bus < 1000);
+        /* Create the character device name */
+        snprintf(devname, DEVNAME_FMTLEN, DEVNAME_FMT, bus);
+        ret = register_driver(devname, &g_spidrvr_fops, 0666, priv);
+        if (ret < 0) {
+            /* Free the device structure if we failed to create the character
+             * device.
+             */
+            #ifndef CONFIG_DISABLE_PSEUDOFS_OPERATIONS
+            nxmutex_destroy(&priv->lock);
+            #endif
 
-  /* Allocate a SPI character device structure */
-
-  priv = (FAR struct spi_driver_s *)kmm_zalloc(sizeof(struct spi_driver_s));
-  if (priv)
-    {
-      /* Initialize the SPI character device structure */
-
-      priv->spi = spi;
-#ifndef CONFIG_DISABLE_PSEUDOFS_OPERATIONS
-      nxmutex_init(&priv->lock);
-#endif
-
-      /* Create the character device name */
-
-      snprintf(devname, DEVNAME_FMTLEN, DEVNAME_FMT, bus);
-      ret = register_driver(devname, &g_spidrvr_fops, 0666, priv);
-      if (ret < 0)
-        {
-          /* Free the device structure if we failed to create the character
-           * device.
-           */
-
-#ifndef CONFIG_DISABLE_PSEUDOFS_OPERATIONS
-          nxmutex_destroy(&priv->lock);
-#endif
-          kmm_free(priv);
-          return ret;
+            kmm_free(priv);
+            return (ret);
         }
 
-      /* Return the result of the registration */
-
-      return ret;
+        /* Return the result of the registration */
+        return (ret);
     }
 
-  return -ENOMEM;
+    return (-ENOMEM);
 }
-
 #endif /* CONFIG_SPI_DRIVER */
