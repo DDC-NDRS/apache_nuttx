@@ -226,6 +226,7 @@ int timer_delete(timer_t timerid);
 int timer_settime(timer_t timerid, int flags, FAR const struct itimerspec* value, FAR struct itimerspec* ovalue);
 int timer_gettime(timer_t timerid, FAR struct itimerspec* value);
 int timer_getoverrun(timer_t timerid);
+int timer_disarm(timer_t timerid);
 
 int clock_nanosleep(clockid_t clockid, int flags, FAR const struct timespec* rqtp, FAR struct timespec* rmtp);
 int nanosleep(FAR const struct timespec* rqtp, FAR struct timespec* rmtp);
