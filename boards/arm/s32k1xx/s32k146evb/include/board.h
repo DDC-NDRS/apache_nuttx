@@ -231,6 +231,9 @@
  * BCC_PCS      PTB5    Output chip select for wakeup
  */
 
+/* ENC_DET      PTC19   Inter-lock pin */
+#define PIN_CONF_ENC_DET        (PIN_PTC19 | GPIO_INPUT)
+
 /* VNQ9080AJ High-Side Driver */
 #define DEV_CONTACT1        "/dev/gpio0"    // PTD18 OUTPUT_ZERO
 #define DEV_CONTACT2        "/dev/gpio1"    // PTD19 OUTPUT_ZERO
