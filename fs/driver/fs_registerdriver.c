@@ -60,43 +60,40 @@
  *
  ****************************************************************************/
 
-int register_driver(FAR const char *path,
-                    FAR const struct file_operations *fops,
-                    mode_t mode, FAR void *priv)
-{
-  FAR struct inode *node;
-  int ret;
+int register_driver(FAR char const* path,
+                    FAR const struct file_operations* fops,
+                    mode_t mode, FAR void* priv) {
+    FAR struct inode* node;
+    int ret;
 
-  sched_note_mark(NOTE_TAG_DRIVERS, path);
+    sched_note_mark(NOTE_TAG_DRIVERS, path);
 
-  /* Insert a dummy node -- we need to hold the inode semaphore because we
-   * will have a momentarily bad structure.
-   */
+    /* Insert a dummy node -- we need to hold the inode semaphore because we
+     * will have a momentarily bad structure.
+     */
 
-  ret = inode_lock();
-  if (ret < 0)
-    {
-      return ret;
+    ret = inode_lock();
+    if (ret < 0) {
+        return (ret);
     }
 
-  ret = inode_reserve(path, mode, &node);
-  if (ret >= 0)
-    {
-      /* We have it, now populate it with driver specific information.
-       * NOTE that the initial reference count on the new inode is zero.
-       */
+    ret = inode_reserve(path, mode, &node);
+    if (ret >= 0) {
+        /* We have it, now populate it with driver specific information.
+         * NOTE that the initial reference count on the new inode is zero.
+         */
 
-      INODE_SET_DRIVER(node);
+        INODE_SET_DRIVER(node);
 
-      node->u.i_ops   = fops;
-      node->i_private = priv;
-      inode_unlock();
-#ifdef CONFIG_FS_NOTIFY
-      notify_create(path);
-#endif
-      return OK;
+        node->u.i_ops   = fops;
+        node->i_private = priv;
+        inode_unlock();
+        #ifdef CONFIG_FS_NOTIFY
+        notify_create(path);
+        #endif
+        return (OK);
     }
 
-  inode_unlock();
-  return ret;
+    inode_unlock();
+    return (ret);
 }

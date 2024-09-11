@@ -575,11 +575,14 @@ ifeq ($(CONFIG_UBOOT_UIMAGE),y)
 	fi
 	$(Q) echo "uImage" >> nuttx.manifest
 endif
+
 ifeq ($(CONFIG_RAW_DISASSEMBLY),y)
 	@echo "CP: nuttx.asm"
 	$(Q) $(OBJDUMP) -d $(BIN) > nuttx.asm
 	$(Q) echo nuttx.bin >> nuttx.asm
 endif
+
+	mv $(BIN) nuttx.elf		# CUSTOM@NDRS - Rename the ELF file to nuttx.elf
 	$(call POSTBUILD, $(TOPDIR))
 
 # flash (or download : DEPRECATED)
